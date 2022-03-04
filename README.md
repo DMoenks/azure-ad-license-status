@@ -1,8 +1,11 @@
 # azure-ad-license-status
 
-## Target
+## use case
 
-## Features
-- [x] Checks for user-defined, mutually exclusive licenses
-- [x] Checks for calculated, mutually replaceable licenses
-- [ ] Checks for calculated, trouble-free removable licenses
+## features
+### included
+- [x] Check for user-defined, mutually exclusive licenses
+- [x] Check for calculated, replaceable licenses
+### planned
+- [ ] Check for multiple sets of user-defined, mutually exclusive licenses
+- [ ] Check for calculated, removable licenses
