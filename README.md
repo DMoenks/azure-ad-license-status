@@ -4,7 +4,7 @@
 
 ## Feature overview
 ### Included features
-- [x] Check for user-defined, mutually exclusive licenses
+- [x] #1
 - [x] Check for calculated, replaceable licenses
 ### Planned features
 - [ ] Check for multiple sets of user-defined, mutually exclusive licenses
