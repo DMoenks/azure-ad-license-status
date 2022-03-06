@@ -14,10 +14,10 @@
    2. create PowerShell runbook
 2. Create Azure key vault
    1. Create self-signed certificate
-   2. Grant read access to automation account's managed identity
+   2. Grant read access for automation account's managed identity to certificate
 3. Create Azure AD application
-   1. Grant Microsoft Graph application permissions _Organization.Read.All_, _Mail.Send_
-   2. Link certificate from key vault
+   1. Link certificate from key vault
+   2. Grant Microsoft Graph application permissions _Organization.Read.All_, _Mail.Send_
 4. (optional) Create Exchange Online application access policy
    1. Limit Azure AD application's permission to target sender mailbox
 
