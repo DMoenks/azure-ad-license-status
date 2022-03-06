@@ -18,11 +18,11 @@
 - Azure AD application
   - Microsoft Graph application permissions _Organization.Read.All_, _Mail.Send_
   - certificate from key vault
-- (optional)Exchange Online application access policy
+- (optional) Exchange Online application access policy
   - Limit application permission to specific sender mailbox
 
 ## Links
-- [Azure AD application](https://docs.microsoft.com/en-us/azure/active-directory/develop/quickstart-register-app)
 - [Azure automation runbook](https://docs.microsoft.com/en-us/azure/automation/quickstarts/create-account-portal)
 - [Azure key vault](https://docs.microsoft.com/en-us/azure/key-vault/general/quick-create-portal)
+- [Azure AD application](https://docs.microsoft.com/en-us/azure/active-directory/develop/quickstart-register-app)
 - [Exchange Online application access policy](https://docs.microsoft.com/en-us/azure/key-vault/general/quick-create-portal)
