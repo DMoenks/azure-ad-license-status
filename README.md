@@ -8,18 +8,18 @@
 - [ ] Check for multiple sets of user-defined, mutually exclusive licenses
 - [ ] Check for calculated, removable licenses
 
-## Requirements
-- Azure automation account
-  - PowerShell runbook
-  - Managed Identity
-- Azure key vault
-  - self-signed certificate
-  - read access for automation account's Managed Identity
-- Azure AD application
-  - Microsoft Graph application permissions _Organization.Read.All_, _Mail.Send_
-  - certificate from key vault
-- (optional) Exchange Online application access policy
-  - Limit application permission to specific sender mailbox
+## Preparations
+1. Create an Azure automation account
+  1. enable managed identity
+  2. create PowerShell runbook
+2. Create Azure key vault
+  1. Create self-signed certificate
+  2. Grant read access to automation account's managed identity
+3. Create Azure AD application
+  1. Grant Microsoft Graph application permissions _Organization.Read.All_, _Mail.Send_
+  2. Link certificate from key vault
+4. (optional) Create Exchange Online application access policy
+  1. Limit Azure AD application's permission to target sender mailbox
 
 ## Links
 - [Azure automation runbook](https://docs.microsoft.com/en-us/azure/automation/quickstarts/create-account-portal)
