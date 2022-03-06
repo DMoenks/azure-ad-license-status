@@ -9,11 +9,9 @@
 - [ ] Check for calculated, removable licenses
 
 ## Requirements
-- Azure AD application
-  - Microsoft Graph application permission _Organization.Read.All_
-- Azure subscription
-  - Automation runbook w/ managed identity
-  - Key vault w/ certificate and read permission for the managed identity
+- Azure AD application w/ Microsoft Graph application permission _Organization.Read.All_
+- Azure Automation runbook w/ managed identity
+- Azure key vault w/ certificate and read permission for the managed identity
 - (optional)Exchange Online application access policy
 
 ## Links
