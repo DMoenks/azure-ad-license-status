@@ -9,21 +9,15 @@ param ([Parameter(Mandatory=$true)]
         [string]$keyVaultName,
         [Parameter(Mandatory=$true)]
         [string]$certificateName,
-        [Parameter(Mandatory=$true)]
         [int]$licenseTestThreshold = 10,
-        [Parameter(Mandatory=$true)]
         [int]$licensePercentageThreshold = 5,
-        [Parameter(Mandatory=$true)]
         [int]$licenseTotalThreshold = 10,
-        [Parameter(Mandatory=$true)]
         [int]$warningPercentageThreshold = 80,
-        [Parameter(Mandatory=$true)]
         [int]$criticalPercentageThreshold = 20,
         [Parameter(Mandatory=$true)]
         [string]$sender,
         [Parameter(Mandatory=$true)]
         [string[]]$normalRecipients,
-        [Parameter(Mandatory=$true)]
         [string[]]$criticalRecipients)
 
 #region: Process configuration
@@ -304,14 +298,17 @@ if ($resultsSKU.Keys.Count -gt 0)
         $email['message']['subject'] = 'License counts far below specified thresholds'
         $email['message']['importance'] = 'high'
         # Add critical email recipients
-        $email['message'].Add('ccRecipients', [System.Collections.Generic.List[hashtable]]::new())
-        foreach ($recipient in $criticalRecipients)
+        if ($null -ne $criticalRecipients)
         {
-            $email['message']['ccRecipients'].Add(@{
-                                                        'emailAddress' = @{
-                                                            'address' = $recipient
-                                                        }
-                                                    })
+            $email['message'].Add('ccRecipients', [System.Collections.Generic.List[hashtable]]::new())
+            foreach ($recipient in $criticalRecipients)
+            {
+                $email['message']['ccRecipients'].Add(@{
+                                                            'emailAddress' = @{
+                                                                'address' = $recipient
+                                                            }
+                                                        })
+            }
         }
     }
     # Initiate email delivery
