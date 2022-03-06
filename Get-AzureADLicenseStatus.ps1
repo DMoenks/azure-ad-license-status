@@ -16,7 +16,7 @@ param ([Parameter(Mandatory=$true)]
         [string[]]$emailCriticalRecipients,
         [int]$licenseTestThreshold = 10,
         [int]$licensePercentageThreshold = 5,
-        [int]$licenseTotalThreshold = 10,
+        [int]$licenseTotalThreshold = 50,
         [int]$warningPercentageThreshold = 80,
         [int]$criticalPercentageThreshold = 20)
 
