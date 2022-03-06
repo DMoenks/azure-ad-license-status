@@ -9,16 +9,16 @@ param ([Parameter(Mandatory=$true)]
         [string]$keyVaultName,
         [Parameter(Mandatory=$true)]
         [string]$certificateName,
+        [Parameter(Mandatory=$true)]
+        [string]$emailSender,
+        [Parameter(Mandatory=$true)]
+        [string[]]$emailNormalRecipients,
+        [string[]]$emailCriticalRecipients,
         [int]$licenseTestThreshold = 10,
         [int]$licensePercentageThreshold = 5,
         [int]$licenseTotalThreshold = 10,
         [int]$warningPercentageThreshold = 80,
-        [int]$criticalPercentageThreshold = 20,
-        [Parameter(Mandatory=$true)]
-        [string]$sender,
-        [Parameter(Mandatory=$true)]
-        [string[]]$normalRecipients,
-        [string[]]$criticalRecipients)
+        [int]$criticalPercentageThreshold = 20)
 
 #region: Process configuration
 $skuTranslate = @{'AAD_PREMIUM' = 'AzureActvDrctryPremP1';
@@ -283,7 +283,7 @@ if ($resultsSKU.Keys.Count -gt 0)
                 }
     # Add normal email recipients
     $email['message'].Add('toRecipients', [System.Collections.Generic.List[hashtable]]::new())
-    foreach ($recipient in $normalRecipients)
+    foreach ($recipient in $emailNormalRecipients)
     {
         $email['message']['toRecipients'].Add(@{
                                                     'emailAddress' = @{
@@ -298,10 +298,10 @@ if ($resultsSKU.Keys.Count -gt 0)
         $email['message']['subject'] = 'License counts far below specified thresholds'
         $email['message']['importance'] = 'high'
         # Add critical email recipients
-        if ($null -ne $criticalRecipients)
+        if ($null -ne $emailCriticalRecipients)
         {
             $email['message'].Add('ccRecipients', [System.Collections.Generic.List[hashtable]]::new())
-            foreach ($recipient in $criticalRecipients)
+            foreach ($recipient in $emailCriticalRecipients)
             {
                 $email['message']['ccRecipients'].Add(@{
                                                             'emailAddress' = @{
@@ -312,6 +312,6 @@ if ($resultsSKU.Keys.Count -gt 0)
         }
     }
     # Initiate email delivery
-    Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/v1.0//users/$sender/sendMail" -Body $email -ContentType 'application/json'
+    Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/v1.0//users/$emailSender/sendMail" -Body $email -ContentType 'application/json'
 }
 #endregion
