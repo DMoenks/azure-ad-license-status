@@ -9,10 +9,17 @@
 - [ ] Check for calculated, removable licenses
 
 ## Requirements
-- Azure AD application w/ Microsoft Graph application permission _Organization.Read.All_
-- Azure Automation runbook w/ managed identity
-- Azure key vault w/ certificate and read permission for the managed identity
+- Azure automation account
+  - PowerShell runbook
+  - Managed Identity
+- Azure key vault
+  - self-signed certificate
+  - read access for automation account's Managed Identity
+- Azure AD application
+  - Microsoft Graph application permissions _Organization.Read.All_, _Mail.Send_
+  - certificate from key vault
 - (optional)Exchange Online application access policy
+  - Limit application permission to specific sender mailbox
 
 ## Links
 - [Azure AD application](https://docs.microsoft.com/en-us/azure/active-directory/develop/quickstart-register-app)
