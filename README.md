@@ -3,13 +3,17 @@
 ## Use case description
 
 ## Feature overview
+### Organization level
+- [x] Check for basic license availability based Azure AD licensing information and multiple user-defined thresholds
+- [ ] Check for advanced license based availability based on calculated information
+### User level
 - [x] Check for user-defined, mutually exclusive licenses
 - [x] Check for calculated, replaceable licenses
 - [ ] Check for multiple sets of user-defined, mutually exclusive licenses
 - [ ] Check for calculated, removable licenses
 
 ## Preparations
-1. Create an Azure automation account
+1. Create Azure automation account
    1. enable managed identity
    2. create PowerShell runbook
 2. Create Azure key vault
