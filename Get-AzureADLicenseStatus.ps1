@@ -1,3 +1,21 @@
+<#
+.SYNOPSIS
+.DESCRIPTION
+.PARAMETER directoryID
+.PARAMETER applicationID
+.PARAMETER subscriptionID
+.PARAMETER keyVaultName
+.PARAMETER certificateName
+.PARAMETER emailSender
+.PARAMETER emailNormalRecipients
+.PARAMETER emailCriticalRecipients
+.PARAMETER licenseTestThreshold
+.PARAMETER licensePercentageThreshold
+.PARAMETER licenseTotalThreshold
+.PARAMETER warningPercentageThreshold
+.PARAMETER criticalPercentageThreshold
+#>
+
 [OutputType([string])]
 param ([Parameter(Mandatory=$true)]
         [string]$directoryID,
