@@ -7,9 +7,9 @@
 - [x] Check for basic license availability, based on Azure AD licensing information and multiple user-defined thresholds
 - [ ] Check for advanced license availability, based on calculated information
 ### User level
-- [x] Check for user-defined, mutually exclusive licenses
+- [x] Check for pre-defined, mutually exclusive licenses
 - [x] Check for calculated, replaceable licenses
-- [ ] Check for multiple sets of user-defined, mutually exclusive licenses
+- [ ] Check for user-defined, mutually exclusive licenses
 - [ ] Check for calculated, removable licenses
 
 ## Preparations
