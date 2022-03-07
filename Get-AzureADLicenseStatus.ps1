@@ -39,31 +39,30 @@ param ([Parameter(Mandatory=$true)]
         [int]$criticalPercentageThreshold = 20)
 
 #region: Process configuration
-$skuTranslate = @{'AAD_PREMIUM' = 'AzureActvDrctryPremP1';
-                    'AAD_PREMIUM_P2' = 'AzureActvDrctryPremP2';
-                    'ADALLOM_STANDALONE' = 'CloudAppSec';
-                    'ATA' = 'AzureATPforUsrs';
-                    'DESKLESSPACK' = 'O365F3';
-                    'EMS' = 'EntMobandSecE3Full';
-                    'ENTERPRISEPACK' = 'O365E3';
-                    'ENTERPRISEPREMIUM' = 'O365E5';
-                    'EQUIVIO_ANALYTICS' = 'Office 365 Advanced Compliance';
-                    'IDENTITY_THREAT_PROTECTION' = 'M365E5Security';
-                    'INFOPROTECTION_P2' = 'AzureInfoProtPremP2';
-                    'INFORMATION_PROTECTION_COMPLIANCE' = 'M365E5Compliance';
-                    'INTUNE_A_D' = 'Intune Device';
-                    'INTUNE_A_VL' = 'IntunUSL';
-                    'MCOEV' = 'Phone Sys';
-                    'MCOMEETADV' = 'Audio Conf';
-                    'POWER_BI_PRO' = 'PwrBIPro';
-                    'PROJECTPREMIUM' = 'ProjectPlan5';
-                    'PROJECTPROFESSIONAL' = 'ProjectPlan3';
-                    'RIGHTSMANAGEMENT' = 'AzureInfoProtPremP1';
-                    'SPE_E3' = 'M365E3';
-                    'STANDARDPACK' = 'O365E1';
-                    'THREAT_INTELLIGENCE' = 'AzureInfoProtPremP2';
-                    'VISIOCLIENT' = 'VisioPlan2';
-                    'VISIOONLINE_PLAN1' = 'VisioPlan1'}
+$skuTranslate = @{'AAD_PREMIUM' = 'Azure Active Directory P1';
+                    'AAD_PREMIUM_P2' = 'Azure Active Directory P2';
+                    'RIGHTSMANAGEMENT' = 'Azure Information Protection P1';
+                    'INFOPROTECTION_P2' = 'Azure Information Protection P2';
+                    'DESKLESSPACK' = 'Office 365 F3';
+                    'STANDARDPACK' = 'Office 365 E1';
+                    'ENTERPRISEPACK' = 'Office 365 E3';
+                    'ENTERPRISEPREMIUM' = 'Office 365 E5';
+                    'SPE_F1' = 'Microsoft 365 F3';
+                    'SPE_E3' = 'Microsoft 365 E3';
+                    'SPE_E5' = 'Microsoft 365 E5';
+                    'PROJECTPROFESSIONAL' = 'Project Plan 3';
+                    'PROJECTPREMIUM' = 'Project Plan 5';
+                    'VISIOONLINE_PLAN1' = 'Visio Plan 1';
+                    'VISIOCLIENT' = 'Visio Plan 2'}
+$interchangeableSKUs_fixed = @('DESKLESSPACK',
+                                'STANDARDPACK',
+                                'ENTERPRISEPACK',
+                                'ENTERPRISEPREMIUM',
+                                'SPE_F1',
+                                'SPE_E3',
+                                'SPE_E5')
+$interchangeableSKUs_calculated_replacedBy = @{}
+$interchangeableSKUs_calculated_replaces = @{}
 #endregion
 
 #region: HTML configuration
@@ -166,17 +165,7 @@ foreach ($SKU in $SKUs | Where-Object{$_.prepaidUnits.enabled -gt $licenseTestTh
         $resultsSKU[$SKU.skuPartNumber].Add('differenceCount', ($availableCount - $minimumCount))
     }
 }
-# Configure theoretically interchangeable SKUs
-$interchangeableSKUs_fixed = @('DESKLESSPACK',
-                                'STANDARDPACK',
-                                'ENTERPRISEPACK',
-                                'ENTERPRISEPREMIUM',
-                                'SPE_F1',
-                                'SPE_E3',
-                                'SPE_E5')
-# Calculate practically interchangeable SKUs
-$interchangeableSKUs_calculated_replacedBy = @{}
-$interchangeableSKUs_calculated_replaces = @{}
+# Calculate interchangeable SKUs
 foreach ($referenceSKU in $SKUs)
 {
     foreach ($differenceSKU in $SKUs | Where-Object{$_.skuId -ne $referenceSKU.skuId})
