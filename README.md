@@ -4,8 +4,8 @@
 
 ## Feature overview
 ### Organization level
-- [x] Check for basic license availability based Azure AD licensing information and multiple user-defined thresholds
-- [ ] Check for advanced license based availability based on calculated information
+- [x] Check for basic license availability, based on Azure AD licensing information and multiple user-defined thresholds
+- [ ] Check for advanced license availability, based on calculated information
 ### User level
 - [x] Check for user-defined, mutually exclusive licenses
 - [x] Check for calculated, replaceable licenses
