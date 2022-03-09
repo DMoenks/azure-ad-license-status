@@ -20,7 +20,7 @@
    1. Create self-signed certificate
    2. Grant access for managed identity to certificate
 3. Create Azure AD application
-   1. Grant Microsoft Graph application permissions _Directory.Read.All_, _Organization.Read.All_, _Mail.Send_
+   1. Grant application permissions _Directory.Read.All_, _Organization.Read.All_, _Mail.Send_
    2. Attach certificate
 4. (optional) Create Exchange Online application access policy
    1. Limit Azure AD application's permission to intended sender mailbox
