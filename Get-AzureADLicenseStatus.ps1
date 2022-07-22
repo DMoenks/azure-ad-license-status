@@ -35,7 +35,7 @@ param ([Parameter(Mandatory=$true)]
         [string[]]$criticalRecipientsAddresses,
         [int]$licenseIgnoreThreshold = 10,
         [int]$licensePercentageThreshold_normalSKUs = 5,
-        [int]$licenseTotalThreshold_normalSKUs = 50,
+        [int]$licenseTotalThreshold_normalSKUs = 10,
         [int]$licensePercentageThreshold_importantSKUs = 5,
         [int]$licenseTotalThreshold_importantSKUs = 50,
         [int]$warningPercentageThreshold = 80,
