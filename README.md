@@ -9,13 +9,13 @@
 :x: Check for advanced license availability, based on calculated information
 
 ### User level
-:x: Check for Microsoft's pre-defined, mutually exclusive licenses
+:x: Check for Microsoft's pre-defined mutually exclusive licenses
 
-:heavy_check_mark: Check for company's specified, interchangeable licenses
+:heavy_check_mark: Check for company's specified interchangeable licenses
 
-:heavy_check_mark: Check for calculated, optimizable licenses
+:heavy_check_mark: Check for calculated optimizable licenses
 
-:heavy_check_mark: Check for calculated, removable licenses
+:heavy_check_mark: Check for calculated removable licenses
 
 ## Preparations
 1. Create Azure automation account
