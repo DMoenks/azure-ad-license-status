@@ -4,13 +4,18 @@
 
 ## Feature overview
 ### Organization level
-- [x] Check for basic license availability, based on Azure AD licensing information and multiple user-defined thresholds
-- [ ] Check for advanced license availability, based on calculated information
+:heavy_check_mark: Check for basic license availability, based on Azure AD licensing information and company's specified thresholds
+
+:x: Check for advanced license availability, based on calculated information
+
 ### User level
-- [x] Check for pre-defined, mutually exclusive licenses
-- [x] Check for calculated, replaceable licenses
-- [ ] Check for user-defined, mutually exclusive licenses
-- [ ] Check for calculated, removable licenses
+:x: Check for Microsoft's pre-defined, mutually exclusive licenses
+
+:heavy_check_mark: Check for company's specified, interchangeable licenses
+
+:heavy_check_mark: Check for calculated, optimizable licenses
+
+:heavy_check_mark: Check for calculated, removable licenses
 
 ## Preparations
 1. Create Azure automation account
