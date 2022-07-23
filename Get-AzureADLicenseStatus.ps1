@@ -1,20 +1,43 @@
 <#
 .SYNOPSIS
+Create an Azure AD license report for operative tasks based on license consumption and assignments
 .DESCRIPTION
+This script is meant to conquer side-effects of semi-automatic license assignments for Microsoft services in Azure AD,
+i.e. the combination of group-based licensing with manual group membership management,
+by regularly reporting both on the amount of available liceenses per SKU and any conflicting license assignments per user account.
+This allows for somewhat easier license management without either implementing a full-fledged software asset management solution or hiring a licensing service provider.
+
 SKU IDs and names are in accordance with https://docs.microsoft.com/en-us/azure/active-directory/enterprise-users/licensing-service-plan-reference
 .PARAMETER directoryID
+Specifies the directory to connect to
 .PARAMETER applicationID
+Specifies the application in target directory to authenticate with
 .PARAMETER subscriptionID
+Specifies the subscription in target directory to access
 .PARAMETER keyVaultName
+Specifies the key vault in target subscription to access
 .PARAMETER certificateName
-.PARAMETER emailSender
-.PARAMETER emailNormalRecipients
-.PARAMETER emailCriticalRecipients
-.PARAMETER licenseTestThreshold
-.PARAMETER licensePercentageThreshold
-.PARAMETER licenseTotalThreshold
+Specifies the certificate in target key vault to to use for authentication
+.PARAMETER senderAddress
+Specifies the sender address to be used for report delivery
+.PARAMETER normalRecipientsAddresses
+Specifies the recipient addresses to be used for report delivery
+.PARAMETER criticalRecipientsAddresses
+Specifies the additional recipient addresses to be used for report delivery in critical cases
+.PARAMETER licenseIgnoreThreshold
+Specifies the minimum enabled license threshold for SKUs to be taken into account for the report
+.PARAMETER licensePercentageThreshold_normalSKUs
+Specifies the minimum available license amount threshold for SKUs to be included in the report
+.PARAMETER licenseTotalThreshold_normalSKUs
+Specifies the minimum available license percentage threshold for SKUs to be included in the report
+.PARAMETER licensePercentageThreshold_importantSKUs
+Specifies the minimum available license amount threshold for SKUs to be included in the report
+.PARAMETER licenseTotalThreshold_importantSKUs
+Specifies the minimum available license percentage threshold for SKUs to be included in the report
 .PARAMETER warningPercentageThreshold
+Specifies the warning percentage threshold to be used during report creation
 .PARAMETER criticalPercentageThreshold
+Specifies the critical percentage threshold to be used during report creation
 #>
 
 [OutputType([string])]
