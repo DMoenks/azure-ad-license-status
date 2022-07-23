@@ -66,39 +66,21 @@ param ([Parameter(Mandatory=$true)]
 
 #region: Process configuration
 # Friendly SKU names
-$skuTranslate = @{'c52ea49f-fe5d-4e95-93ba-1de91d380f89' = 'AIP P1';
-                    '52c9382a-40f7-4fd4-aeec-e6faea7725c1' = 'AIP P2';
-                    '078d2b04-f1bd-4111-bbd4-b4b1b354cef4' = 'AzureAD P1';
-                    '84a661c4-e949-4bd2-a560-ed7766fcaf2b' = 'AzureAD P2';
-                    '98defdf7-f6c1-44f5-a1f6-943b6764e7a5' = 'DefenderIdentity';
-                    '3dd6cf57-d688-4eed-ba52-9e40b5468c3e' = 'DefenderOffice P2';
-                    'efccb6f7-5641-4e0e-bd10-b4976e1bf68e' = 'EMS E3';
-                    '66b55226-6b4f-492c-910c-a3b7a3c9d993' = 'Microsoft365 F3'
-                    '05e9a617-0261-4cee-bb44-138d3ef5d965' = 'Microsoft365 E3';
-                    '18181a46-0d4e-45cd-891e-60aabd171b4e' = 'Office365 E1';
+$skuTranslate = @{'18181a46-0d4e-45cd-891e-60aabd171b4e' = 'Office365 E1';
                     '6fd2c87f-b296-42f0-b197-1e91e994b900' = 'Office365 E3';
                     'c7df2760-2c81-4ef7-b578-5b5392b571df' = 'Office365 E5';
                     '4b585984-651b-448a-9e53-3b10f069cf7f' = 'Office365 F3';
-                    '2b317a4a-77a6-4188-9437-b68a77b4e2c6' = 'IntuneDevice';
-                    '99fc2803-fa72-42d3-ae78-b055e177d275' = 'IntuneUser';
-                    'e43b5b99-8dfb-405f-9987-dc307f34bcbd' = 'PhoneSystem';
-                    '0c266dff-15dd-4b49-8397-2bb16070ed52' = 'AudioConferencing';
-                    'f8a1db68-be16-40ed-86d5-cb42ce701560' = 'PowerBI Pro';
-                    '09015f9f-377f-4538-bbb5-f75ceb09358a' = 'Project P5';
                     '53818b1b-4a27-454b-8896-0dba576410e6' = 'Project P3';
-                    'c5928f49-12ba-48f7-ada3-0d743a3601d5' = 'Visio P2';
-                    '4b244418-9658-4451-a2b8-b5e2b364e9bd' = 'Visio P1'}                    
+                    '09015f9f-377f-4538-bbb5-f75ceb09358a' = 'Project P5';
+                    '4b244418-9658-4451-a2b8-b5e2b364e9bd' = 'Visio P1';
+                    'c5928f49-12ba-48f7-ada3-0d743a3601d5' = 'Visio P2'}                    
 # Important SKUs
-$importantSKUs = @('4b585984-651b-448a-9e53-3b10f069cf7f',
-                    '18181a46-0d4e-45cd-891e-60aabd171b4e',
-                    '6fd2c87f-b296-42f0-b197-1e91e994b900',
-                    '05e9a617-0261-4cee-bb44-138d3ef5d965')
+$importantSKUs = @('18181a46-0d4e-45cd-891e-60aabd171b4e',
+                    '6fd2c87f-b296-42f0-b197-1e91e994b900')
 # Theoretically interchangeable SKUs, ordered from most to least preferred
 $interchangeableSKUs_specified = @('4b585984-651b-448a-9e53-3b10f069cf7f',
                                     '18181a46-0d4e-45cd-891e-60aabd171b4e',
                                     '6fd2c87f-b296-42f0-b197-1e91e994b900',
-                                    '66b55226-6b4f-492c-910c-a3b7a3c9d993',
-                                    '05e9a617-0261-4cee-bb44-138d3ef5d965',
                                     'c7df2760-2c81-4ef7-b578-5b5392b571df')
 # Practically interchangeable SKUs, calculated later on
 $interchangeableSKUs_calculatedOrganization_replacedBy = @{}
@@ -369,9 +351,18 @@ if ($resultsSKU.Keys.Count -gt 0 -or $resultsUsers.Keys.Count -gt 0)
         {
             $output.AppendLine('<tr>') | Out-Null
             $output.AppendLine("<td>$user</td>") | Out-Null
-            $output.AppendLine("<td>$(($resultsUsers[$user]['Interchangeable'] | Where-Object{$null -ne $_} | ForEach-Object{if($skuTranslate.ContainsKey($_)){$skuTranslate[$_]}else{$_}} | Sort-Object) -join '<br>')</td>") | Out-Null
-            $output.AppendLine("<td>$(($resultsUsers[$user]['Optimizable'] | Where-Object{$null -ne $_} | ForEach-Object{if($skuTranslate.ContainsKey($_)){$skuTranslate[$_]}else{$_}} | Sort-Object) -join '<br>')</td>") | Out-Null
-            $output.AppendLine("<td>$(($resultsUsers[$user]['Removable'] | Where-Object{$null -ne $_} | ForEach-Object{if($skuTranslate.ContainsKey($_)){$skuTranslate[$_]}else{$_}} | Sort-Object) -join '<br>')</td>") | Out-Null
+            $output.AppendLine("<td>$(($resultsUsers[$user]['Interchangeable'] |
+                                        Where-Object{$null -ne $_} |
+                                        ForEach-Object{if($skuTranslate.ContainsKey($_)){$skuTranslate[$_]}else{$_}} |
+                                        Sort-Object) -join '<br>')</td>") | Out-Null
+            $output.AppendLine("<td>$(($resultsUsers[$user]['Optimizable'] |
+                                        Where-Object{$null -ne $_} |
+                                        ForEach-Object{if($skuTranslate.ContainsKey($_)){$skuTranslate[$_]}else{$_}} |
+                                        Sort-Object) -join '<br>')</td>") | Out-Null
+            $output.AppendLine("<td>$(($resultsUsers[$user]['Removable'] |
+                                        Where-Object{$null -ne $_} |
+                                        ForEach-Object{if($skuTranslate.ContainsKey($_)){$skuTranslate[$_]}else{$_}} |
+                                        Sort-Object) -join '<br>')</td>") | Out-Null
             $output.AppendLine('</tr>') | Out-Null
         }
         $output.AppendLine('</table></p>') | Out-Null
