@@ -66,15 +66,6 @@ param ([Parameter(Mandatory=$true)]
         [int]$criticalPercentageThreshold = 20)
 
 #region: Process configuration
-# Friendly SKU names
-$skuTranslate = @{'18181a46-0d4e-45cd-891e-60aabd171b4e' = 'Office365 E1';
-                    '6fd2c87f-b296-42f0-b197-1e91e994b900' = 'Office365 E3';
-                    'c7df2760-2c81-4ef7-b578-5b5392b571df' = 'Office365 E5';
-                    '4b585984-651b-448a-9e53-3b10f069cf7f' = 'Office365 F3';
-                    '53818b1b-4a27-454b-8896-0dba576410e6' = 'Project P3';
-                    '09015f9f-377f-4538-bbb5-f75ceb09358a' = 'Project P5';
-                    '4b244418-9658-4451-a2b8-b5e2b364e9bd' = 'Visio P1';
-                    'c5928f49-12ba-48f7-ada3-0d743a3601d5' = 'Visio P2'}                    
 # Important SKUs
 $importantSKUs = @('18181a46-0d4e-45cd-891e-60aabd171b4e',
                     '6fd2c87f-b296-42f0-b197-1e91e994b900')
@@ -127,6 +118,26 @@ th, td {
 "@
 #endregion
 
+#region: Functions
+function Get-SKUName
+{
+	[CmdletBinding()]
+	param
+	(
+		[string]$SKU
+	)
+	if ($null -ne ($skuName = ($skuTranslate | Where-Object{$_.GUID -eq $SKU}).Product_Display_Name | Select-Object -Unique))
+	{
+		$skuName = [cultureinfo]::new('en-US').TextInfo.ToTitleCase($skuName.ToLower())
+	}
+	else
+	{
+		$skuName = $SKU
+	}
+	return $skuName
+}
+#endregion
+
 #region: Establish connections
 # Connect to Azure
 Connect-AzAccount -Identity -Subscription $subscriptionID | Out-Null
@@ -139,6 +150,8 @@ Connect-MgGraph -Certificate $x509Cert -TenantId $directoryID -ClientId $applica
 #endregion
 
 #region: SKUs
+# Get SKU IDs and names
+$skuTranslate = [string]::new([char[]]((Invoke-WebRequest -Uri 'https://download.microsoft.com/download/e/3/e/e3e9faf2-f28b-490a-9ada-c6089a1fc5b0/Product%20names%20and%20service%20plan%20identifiers%20for%20licensing.csv' -UseBasicParsing).Content)) | ConvertFrom-Csv
 # Get SKUs
 $SKUs = [System.Collections.Generic.List[hashtable]]::new()
 $URI = 'https://graph.microsoft.com/v1.0/subscribedSkus?$select=skuId,prepaidUnits,consumedUnits,servicePlans'
@@ -328,7 +341,7 @@ if ($resultsSKU.Keys.Count -gt 0 -or $resultsUsers.Keys.Count -gt 0)
         {
             $differenceCount = $resultsSKU[$SKU]['availableCount'] - $resultsSKU[$SKU]['minimumCount']
             $output.AppendLine('<tr>') | Out-Null
-            $output.AppendLine("<td>$(if($skuTranslate.ContainsKey($SKU)){$skuTranslate[$SKU]}else{$SKU})</td>") | Out-Null
+            $output.AppendLine("<td>$(Get-SKUName -SKU $SKU)</td>") | Out-Null
             $output.AppendLine("<td>$($resultsSKU[$SKU]['availableCount'])</td>") | Out-Null
             $output.AppendLine("<td>$($resultsSKU[$SKU]['minimumCount'])</td>") | Out-Null
             if ($resultsSKU[$SKU]['availableCount'] / $resultsSKU[$SKU]['minimumCount'] * 100 -ge $warningPercentageThreshold)
@@ -361,18 +374,9 @@ if ($resultsSKU.Keys.Count -gt 0 -or $resultsUsers.Keys.Count -gt 0)
         {
             $output.AppendLine('<tr>') | Out-Null
             $output.AppendLine("<td>$user</td>") | Out-Null
-            $output.AppendLine("<td>$(($resultsUsers[$user]['Interchangeable'] |
-                                        Where-Object{$null -ne $_} |
-                                        ForEach-Object{if($skuTranslate.ContainsKey($_)){$skuTranslate[$_]}else{$_}} |
-                                        Sort-Object) -join '<br>')</td>") | Out-Null
-            $output.AppendLine("<td>$(($resultsUsers[$user]['Optimizable'] |
-                                        Where-Object{$null -ne $_} |
-                                        ForEach-Object{if($skuTranslate.ContainsKey($_)){$skuTranslate[$_]}else{$_}} |
-                                        Sort-Object) -join '<br>')</td>") | Out-Null
-            $output.AppendLine("<td>$(($resultsUsers[$user]['Removable'] |
-                                        Where-Object{$null -ne $_} |
-                                        ForEach-Object{if($skuTranslate.ContainsKey($_)){$skuTranslate[$_]}else{$_}} |
-                                        Sort-Object) -join '<br>')</td>") | Out-Null
+            $output.AppendLine("<td>$(($resultsUsers[$user]['Interchangeable'] | Where-Object{$null -ne $_} | ForEach-Object{Get-SKUName -SKU $_} | Sort-Object) -join '<br>')</td>") | Out-Null
+			$output.AppendLine("<td>$(($resultsUsers[$user]['Optimizable'] | Where-Object{$null -ne $_} | ForEach-Object{Get-SKUName -SKU $_} | Sort-Object) -join '<br>')</td>") | Out-Null
+			$output.AppendLine("<td>$(($resultsUsers[$user]['Removable'] | Where-Object{$null -ne $_} | ForEach-Object{Get-SKUName -SKU $_} | Sort-Object) -join '<br>')</td>") | Out-Null
             $output.AppendLine('</tr>') | Out-Null
         }
         $output.AppendLine('</table></p>') | Out-Null
