@@ -9,13 +9,17 @@ The main motivation for this script was to conquer side-effects of semi-automati
 ### Organization level
 
 :heavy_check_mark: Check for basic license availability, based on Azure AD licensing information and company's specified thresholds
+
 :x: Check for advanced license availability, based on calculated information
 
 ### User level
 
 :x: Check for Microsoft's pre-defined mutually exclusive licenses
+
 :heavy_check_mark: Check for company's specified interchangeable licenses
+
 :heavy_check_mark: Check for calculated optimizable licenses
+
 :heavy_check_mark: Check for calculated removable licenses
 
 ## Preparations
