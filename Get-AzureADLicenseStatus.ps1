@@ -39,6 +39,9 @@ Specifies the minimum available license percentage threshold for SKUs to be incl
 Specifies the warning percentage threshold to be used during report creation
 .PARAMETER criticalPercentageThreshold
 Specifies the critical percentage threshold to be used during report creation
+.PARAMETER advancedCheckups
+Specifies if advanced license checkups should be run.
+ATTENTION: Advanced checkups require additional access permissions and will increase the scripts runtime.
 #>
 
 [OutputType([string])]
@@ -63,7 +66,8 @@ param ([Parameter(Mandatory=$true)]
         [int]$licensePercentageThreshold_importantSKUs = 5,
         [int]$licenseTotalThreshold_importantSKUs = 50,
         [int]$warningPercentageThreshold = 80,
-        [int]$criticalPercentageThreshold = 20)
+        [int]$criticalPercentageThreshold = 20,
+        [switch]$advancedCheckups)
 
 #region: Process configuration
 # Important SKUs
@@ -322,6 +326,10 @@ Possible advanced checkups:
 - AAD P1 based on MFA-enabled users
 - AAD P2 based on PIM-enabled users
 #>
+if ($advancedCheckups.IsPresent)
+{
+    
+}
 #endregion
 
 #region: Report
