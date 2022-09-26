@@ -39,9 +39,6 @@ Specifies the minimum available license percentage threshold for SKUs to be incl
 Specifies the warning percentage threshold to be used during report creation
 .PARAMETER criticalPercentageThreshold
 Specifies the critical percentage threshold to be used during report creation
-.PARAMETER advancedCheckups
-Specifies if advanced license checkups should be run.
-ATTENTION: Advanced checkups require additional access permissions and will increase the scripts runtime.
 #>
 
 [OutputType([string])]
@@ -66,8 +63,7 @@ param ([Parameter(Mandatory=$true)]
         [int]$licensePercentageThreshold_importantSKUs = 5,
         [int]$licenseTotalThreshold_importantSKUs = 50,
         [int]$warningPercentageThreshold = 80,
-        [int]$criticalPercentageThreshold = 20,
-        [switch]$advancedCheckups)
+        [int]$criticalPercentageThreshold = 20)
 
 #region: Process configuration
 # Important SKUs
@@ -186,6 +182,7 @@ foreach ($SKU in $SKUs | Where-Object{$_.prepaidUnits.enabled -gt $licenseIgnore
         $resultsSKU[$SKU.skuId].Add('minimumCount', $minimumCount)
     }
 }
+# Possibly turn into function, see line 267
 foreach ($referenceSKU in $SKUs)
 {
     foreach ($differenceSKU in $SKUs | Where-Object{$_.skuId -ne $referenceSKU.skuId})
@@ -262,6 +259,7 @@ foreach ($user in $users)
                 $skuid_enabledPlans[$skuid].AddRange([string[]]@((($SKUs | Where-Object{$_.skuid -eq $skuid}).servicePlans | Where-Object{$_.servicePlanId -notin $assignment.disabledplans -and $_.appliesTo -eq 'User'}).servicePlanId))
             }
         }
+        # Possibly turn into function, see line 190
         foreach ($referenceSKU in $skuid_enabledPlans.Keys)
         {
             foreach ($differenceSKU in $skuid_enabledPlans.Keys | Where-Object{$_ -ne $referenceSKU})
@@ -316,19 +314,6 @@ foreach ($user in $users)
             }
         }
     }
-}
-#endregion
-
-#region: Advanced
-<#
-Possible advanced checkups:
-- ATP based on existing mailboxes
-- AAD P1 based on MFA-enabled users
-- AAD P2 based on PIM-enabled users
-#>
-if ($advancedCheckups.IsPresent)
-{
-    
 }
 #endregion
 
