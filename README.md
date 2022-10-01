@@ -10,7 +10,14 @@ The main motivation for this script was to conquer side-effects of semi-automati
 
 :heavy_check_mark: Check for basic license availability, based on Azure AD licensing information and company's specified thresholds
 
-:x: Check for advanced license availability, based on calculated information
+:x: Check for advanced license availability, based on calculated information, needing additional permissions:
+
+- AAD P1 based on dynamic group memberships > GroupMember.Read.All
+- AAD P1 based on enterprise applications using group assignments > Application.Read.All
+- AAD P1 based on enterprise applications using application proxy > Application.Read.All
+- AAD P1 based on MFA-enabled users > Policy.Read.ConditionalAccess
+- AAD P2 based on PIM-enabled users > PrivilegedAccess.Read.AzureAD
+- ATP based on existing mailboxes > MailboxSettings.Read
 
 ### User level
 

@@ -67,7 +67,7 @@ param ([Parameter(Mandatory=$true)]
         [int]$licenseTotalThreshold_importantSKUs = 50,
         [int]$warningPercentageThreshold = 80,
         [int]$criticalPercentageThreshold = 20,
-        [switch]advancedCheckups)
+        [switch]$advancedCheckups)
 
 #region: Process configuration
 # Important SKUs
@@ -325,8 +325,23 @@ foreach ($user in $users)
 <#
 Possible advanced checkups:
 - ATP based on existing mailboxes
+    > Exchange Online
+    > MailboxSettings.Read
 - AAD P1 based on MFA-enabled users
+    > Conditional Access
+    > Policy.Read.ConditionalAccess
 - AAD P2 based on PIM-enabled users
+    > Privileged Identity Management
+    > PrivilegedAccess.Read.AzureAD
+- AAD P1 based on dynamic group memberships
+    > Azure AD
+    > GroupMember.Read.All
+- AAD P1 based on application group assignments
+    > Enterprise Applications
+    > Application.Read.All
+- AAD P1 based on application proxy
+    > Enterprise Applications
+    > Application.Read.All
 #>
 if ($advancedCheckups.IsPresent)
 {
