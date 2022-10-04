@@ -4,7 +4,7 @@
 
 The main motivation for this script was to conquer side-effects of semi-automatic license assignments for Microsoft services in Azure AD, i.e. the combination of group-based licensing with manual group membership management, by regularly reporting both on the amount of available licenses per SKU and any conflicting license assignments per user account. This allows for somewhat easier license management without either implementing a full-fledged software asset management solution or hiring a licensing service provider.
 
-> DISCLAIMER: The script can merely aid in complying with license terms and agreements. It cannot lower or even replace the liability to actually comply with all the default or custom license terms and agreements applying to you.
+> DISCLAIMER: The script can merely aid in complying with license terms and agreements. It cannot and never will lower or replace the liability to actually comply with the default or even custom license terms and agreements applying to you.
 
 ## Feature overview
 
