@@ -4,6 +4,8 @@
 
 The main motivation for this script was to conquer side-effects of semi-automatic license assignments for Microsoft services in Azure AD, i.e. the combination of group-based licensing with manual group membership management, by regularly reporting both on the amount of available licenses per SKU and any conflicting license assignments per user account. This allows for somewhat easier license management without either implementing a full-fledged software asset management solution or hiring a licensing service provider.
 
+> DISCLAIMER: The script can merely aid in complying with license terms and agreements. It cannot lower or even replace the liability to actually comply with all the default or custom license terms and agreements applying to you.
+
 ## Feature overview
 
 ### Organization level
@@ -17,11 +19,9 @@ The main motivation for this script was to conquer side-effects of semi-automati
 - AAD P1 based on enterprise applications using application proxy > Application.Read.All
 - AAD P1 based on MFA-enabled users > Policy.Read.ConditionalAccess
 - AAD P2 based on PIM-enabled users > PrivilegedAccess.Read.AzureAD
-- ATP based on existing mailboxes > MailboxSettings.Read
+- ATP based on existing mailboxes > MailboxSettings.Read (might conflict with using an application access policy)
 
 ### User level
-
-:x: Check for Microsoft's pre-defined mutually exclusive licenses
 
 :heavy_check_mark: Check for company's specified interchangeable licenses
 
@@ -45,7 +45,7 @@ The main motivation for this script was to conquer side-effects of semi-automati
 
 ## Links
 
-- [Azure automation runbook](https://docs.microsoft.com/en-us/azure/automation/quickstarts/create-account-portal)
-- [Azure key vault](https://docs.microsoft.com/en-us/azure/key-vault/general/quick-create-portal)
-- [Azure AD application](https://docs.microsoft.com/en-us/azure/active-directory/develop/quickstart-register-app)
-- [Exchange Online application access policy](https://docs.microsoft.com/en-us/azure/key-vault/general/quick-create-portal)
+- [Azure automation runbook](https://docs.microsoft.com/azure/automation/quickstarts/create-account-portal)
+- [Azure key vault](https://docs.microsoft.com/azure/key-vault/general/quick-create-portal)
+- [Azure AD application](https://docs.microsoft.com/azure/active-directory/develop/quickstart-register-app)
+- [Exchange Online application access policy](https://docs.microsoft.com/azure/key-vault/general/quick-create-portal)
