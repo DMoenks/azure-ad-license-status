@@ -31,28 +31,38 @@ The main motivation for this script was to conquer side-effects of semi-automati
    1. Create self-signed certificate
    2. Grant access for managed identity to certificate
 3. Create Azure AD application
-   1. Grant following _Application_ permissions for basic checkups
+   1. Attach certificate
+   2. Grant _Application_ permissions for basic checkups
       - _Organization.Read.All_
       - _User.Read.All_
-   2. (optional) Grant following _Application_ permissions for advanced checkups
+   3. (optional) Grant _Application_ permissions for advanced checkups
+      - _Application.Read.All_
+      - _GroupMember.Read.All_
       - _Mail.ReadBasic.All_
       - _Policy.Read.All_
       - _RoleManagement.Read.Directory_
-      - _GroupMember.Read.All_
-      - _Application.Read.All_
-   3. Grant _Delegated_ permissions for report delivery
+   4. Grant _Delegated_ permissions for report delivery
       - _Mail.Send_
-   4. Attach certificate
-4. (optional) Create Exchange Online application access policy
-   1. Limit Azure AD application's permission to intended sender mailbox
-   2. https://learn.microsoft.com/en-us/graph/api/oauth2permissiongrant-post?view=graph-rest-1.0&tabs=http
+   5. Create OAuth2 permission grant
+
+      ```powershell
+      $grant = @{
+         clientId = "<Client ID>"
+         consentType = "Principal"
+         principalId = "<User ID>"
+         resourceId = "<Microsoft Graph/Exchange Online ID>"
+         scope = "Mail.Send"
+      }
+
+      Invoke-MgGraphRequest -Method POST -Uri 'https://graph.microsoft.com/v1.0/oauth2PermissionGrants' -Body $grant ContentType 'application/json'
+      ```
 
 > TIP: To simplify permission management, the following permissions can be replaced with the _Directory.Read.All_ permission
 >
+>- _Application.Read.All_
+>- _GroupMember.Read.All_
 >- _Organization.Read.All_
 >- _User.Read.All_
->- _GroupMember.Read.All_
->- _Application.Read.All_
 
 ## Links
 
