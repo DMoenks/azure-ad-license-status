@@ -12,14 +12,7 @@ The main motivation for this script was to conquer side-effects of semi-automati
 
 :heavy_check_mark: Check for basic license availability, based on Azure AD licensing information and company's specified thresholds
 
-:x: Check for advanced license availability, based on calculated information, needing additional permissions:
-
-- AAD P1 based on dynamic group memberships > GroupMember.Read.All
-- AAD P1 based on enterprise applications using group assignments > Application.Read.All
-- AAD P1 based on enterprise applications using application proxy > Application.Read.All
-- AAD P1 based on MFA-enabled users > Policy.Read.ConditionalAccess
-- AAD P2 based on PIM-enabled users > PrivilegedAccess.Read.AzureAD
-- ATP based on existing mailboxes > MailboxSettings.Read (might conflict with using an application access policy)
+:x: Check for advanced license availability, based on calculated information
 
 ### User level
 
@@ -38,10 +31,28 @@ The main motivation for this script was to conquer side-effects of semi-automati
    1. Create self-signed certificate
    2. Grant access for managed identity to certificate
 3. Create Azure AD application
-   1. Grant application permissions _Directory.Read.All_, _Organization.Read.All_, _Mail.Send_
-   2. Attach certificate
+   1. Grant following _Application_ permissions for basic checkups
+      - _Organization.Read.All_
+      - _User.Read.All_
+   2. (optional) Grant following _Application_ permissions for advanced checkups
+      - _Mail.ReadBasic.All_
+      - _Policy.Read.All_
+      - _RoleManagement.Read.Directory_
+      - _GroupMember.Read.All_
+      - _Application.Read.All_
+   3. Grant _Delegated_ permissions for report delivery
+      - _Mail.Send_
+   4. Attach certificate
 4. (optional) Create Exchange Online application access policy
    1. Limit Azure AD application's permission to intended sender mailbox
+   2. https://learn.microsoft.com/en-us/graph/api/oauth2permissiongrant-post?view=graph-rest-1.0&tabs=http
+
+> TIP: To simplify permission management, the following permissions can be replaced with the _Directory.Read.All_ permission
+>
+>- _Organization.Read.All_
+>- _User.Read.All_
+>- _GroupMember.Read.All_
+>- _Application.Read.All_
 
 ## Links
 

@@ -186,7 +186,6 @@ foreach ($SKU in $SKUs | Where-Object{$_.prepaidUnits.enabled -gt $licenseIgnore
 		$resultsSKU[$SKU.skuId].Add('minimumCount', $minimumCount)
 	}
 }
-# Possibly turn into function, see line 267
 foreach ($referenceSKU in $SKUs)
 {
 	foreach ($differenceSKU in $SKUs | Where-Object{$_.skuId -ne $referenceSKU.skuId})
@@ -263,7 +262,6 @@ foreach ($user in $users)
 				$skuid_enabledPlans[$skuid].AddRange([string[]]@((($SKUs | Where-Object{$_.skuid -eq $skuid}).servicePlans | Where-Object{$_.servicePlanId -notin $assignment.disabledplans -and $_.appliesTo -eq 'User'}).servicePlanId))
 			}
 		}
-		# Possibly turn into function, see line 190
 		foreach ($referenceSKU in $skuid_enabledPlans.Keys)
 		{
 			foreach ($differenceSKU in $skuid_enabledPlans.Keys | Where-Object{$_ -ne $referenceSKU})
@@ -325,9 +323,9 @@ foreach ($user in $users)
 if ($advancedCheckups.IsPresent)
 {
 	$availableScopes = (Get-MgContext).Scopes
-	if ($availableScopes -contains 'MailboxSettings.Read')
+	if ($availableScopes -contains 'Mail.ReadBasic.All')
 	{
-		# ATP based on existing mailboxes or existing Office/Exchange licenses
+		# ATP based on existing mailboxes or existing Office/Exchange licenses or users with mailFolders
 		# https://learn.microsoft.com/en-us/office365/servicedescriptions/office-365-advanced-threat-protection-service-description#licensing-terms
 	}
 	if ($availableScopes -contains 'Policy.Read.ConditionalAccess')
@@ -338,14 +336,14 @@ if ($advancedCheckups.IsPresent)
 	{
 		# AAD P2 based on PIM-enabled users
 	}
-    if ($availableScopes -contains 'GroupMember.Read.All')
+	if ($availableScopes -contains 'GroupMember.Read.All')
 	{
 		# AAD P1 based on dynamic group memberships
 	}
-    if ($availableScopes -contains 'Application.Read.All')
+	if ($availableScopes -contains 'Application.Read.All')
 	{
 		# AAD P1 based on application group assignments
-        # AAD P1 based on application proxy
+		# AAD P1 based on application proxy
 	}
 }
 #endregion
