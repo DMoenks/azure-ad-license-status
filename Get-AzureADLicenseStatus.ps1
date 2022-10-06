@@ -40,8 +40,8 @@ Specifies the warning percentage threshold to be used during report creation
 .PARAMETER criticalPercentageThreshold
 Specifies the critical percentage threshold to be used during report creation
 .PARAMETER advancedCheckups
-Specifies if advanced license checkups should be run.
-ATTENTION: Advanced checkups require additional access permissions and will increase the scripts runtime.
+Specifies if advanced license checkups should be run
+ATTENTION: Advanced checkups require additional access permissions and will increase the scripts runtime
 #>
 
 param ([Parameter(Mandatory=$true)]
@@ -413,24 +413,24 @@ if ($resultsSKU.Keys.Count -gt 0 -or $resultsUsers.Keys.Count -gt 0)
 	}
 	# Configure basic email settings
 	$email = @{
-				'message' = @{
-						'subject' = 'License counts below specified thresholds';
-						'importance' = 'normal';
-						'body' = @{
-							'contentType' = 'HTML';
-							'content' = $output.ToString()
-						};
-					}
-				}
+		'message' = @{
+			'subject' = 'License counts below specified thresholds';
+			'importance' = 'normal';
+			'body' = @{
+				'contentType' = 'HTML';
+				'content' = $output.ToString()
+			};
+		}
+	}
 	# Add normal email recipients
 	$email['message'].Add('toRecipients', [System.Collections.Generic.List[hashtable]]::new())
 	foreach ($recipientAddress in $normalRecipientsAddresses)
 	{
 		$email['message']['toRecipients'].Add(@{
-													'emailAddress' = @{
-														'address' = $recipientAddress
-													}
-												})
+			'emailAddress' = @{
+				'address' = $recipientAddress
+			}
+		})
 	}
 	# Check criticality
 	if ($critical)
@@ -443,10 +443,10 @@ if ($resultsSKU.Keys.Count -gt 0 -or $resultsUsers.Keys.Count -gt 0)
 		foreach ($recipientAddress in $criticalRecipientsAddresses)
 		{
 			$email['message']['ccRecipients'].Add(@{
-														'emailAddress' = @{
-															'address' = $recipientAddress
-														}
-													})
+				'emailAddress' = @{
+					'address' = $recipientAddress
+				}
+			})
 		}
 	}
 	# Initiate email delivery
