@@ -44,7 +44,6 @@ Specifies if advanced license checkups should be run.
 ATTENTION: Advanced checkups require additional access permissions and will increase the scripts runtime.
 #>
 
-[OutputType([string])]
 param ([Parameter(Mandatory=$true)]
 		[string]$directoryID,
 		[Parameter(Mandatory=$true)]
@@ -323,27 +322,30 @@ foreach ($user in $users)
 if ($advancedCheckups.IsPresent)
 {
 	$availableScopes = (Get-MgContext).Scopes
-	if ($availableScopes -contains 'Mail.ReadBasic.All')
+	# Defender for Office 365 P1/P2 based on user and shared mailboxes
+	if ($availableScopes -contains 'Exchange.ManageAsApp')
 	{
-		# ATP based on existing mailboxes or existing Office/Exchange licenses or users with mailFolders
-		# https://learn.microsoft.com/en-us/office365/servicedescriptions/office-365-advanced-threat-protection-service-description#licensing-terms
+		#(Get-Mailbox -Filter 'RecipientTypeDetails -eq "SharedMailbox" -or RecipientTypeDetails -eq "UserMailbox"' -ResultSize Unlimited).count
 	}
-	if ($availableScopes -contains 'Policy.Read.ConditionalAccess')
+	# Azure AD P1 based on MFA-enabled users
+	if ($availableScopes -contains 'Policy.Read.All')
 	{
-		# AAD P1 based on MFA-enabled users
+		
 	}
-	if ($availableScopes -contains 'PrivilegedAccess.Read.AzureAD')
+	# Azure AD P2 based on PIM-managed users
+	if ($availableScopes -contains 'RoleManagement.Read.All')
 	{
-		# AAD P2 based on PIM-enabled users
+		
 	}
+	# Azure AD P1 based on dynamic groups
 	if ($availableScopes -contains 'GroupMember.Read.All')
 	{
-		# AAD P1 based on dynamic group memberships
+		
 	}
+	# Azure AD P1 based on group-based application assignments and applications using application proxy
 	if ($availableScopes -contains 'Application.Read.All')
 	{
-		# AAD P1 based on application group assignments
-		# AAD P1 based on application proxy
+		
 	}
 }
 #endregion
