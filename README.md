@@ -31,25 +31,25 @@ The main motivation for this script was to conquer side-effects of semi-automati
    1. Create self-signed certificate
    2. Grant access for managed identity to certificate
 3. Create Azure AD application
-   1. Attach certificate
-   2. Grant _Application_ permissions for basic checkups
+   1. Add certificate to application
+   2. Grant _Microsoft Graph_ **Application** permissions for basic checkups
       - _Organization.Read.All_
       - _User.Read.All_
-   3. (optional) Grant _Application_ permissions for advanced checkups
+   3. (optional) Grant _Microsoft Graph_ **Application** permissions for advanced checkups
       - _Application.Read.All_
       - _GroupMember.Read.All_
       - _Mail.ReadBasic.All_
       - _Policy.Read.All_
       - _RoleManagement.Read.Directory_
-   4. Grant _Delegated_ permissions for report delivery
+   4. Grant _Microsoft Graph_ **Delegated** permissions for report delivery
       - _Mail.Send_
-   5. Create OAuth2 permission grant
+   5. Consent to **Delegated** permissions on behalf of report delivery user
 
       ```powershell
       $grant = @{
-         clientId = "<Client ID>"
+         clientId = "<Azure AD application's Client ID>"
          consentType = "Principal"
-         principalId = "<User ID>"
+         principalId = "<Report delivery user's Object ID>"
          resourceId = "<Microsoft Graph/Exchange Online ID>"
          scope = "Mail.Send"
       }
@@ -69,4 +69,4 @@ The main motivation for this script was to conquer side-effects of semi-automati
 - [Azure automation runbook](https://docs.microsoft.com/azure/automation/quickstarts/create-account-portal)
 - [Azure key vault](https://docs.microsoft.com/azure/key-vault/general/quick-create-portal)
 - [Azure AD application](https://docs.microsoft.com/azure/active-directory/develop/quickstart-register-app)
-- [Exchange Online application access policy](https://docs.microsoft.com/azure/key-vault/general/quick-create-portal)
+- [OAuth2 permission grant](https://learn.microsoft.com/graph/api/oauth2permissiongrant-post?view=graph-rest-1.0&tabs=http)
