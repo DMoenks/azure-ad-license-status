@@ -11,9 +11,9 @@ Specifies the sender address to be used for report delivery
 #>
 
 param ([Parameter(Mandatory=$true)]
-		[string]$applicationID,
-		[Parameter(Mandatory=$true)]
-		[string]$senderAddress)
+        [string]$applicationID,
+        [Parameter(Mandatory=$true)]
+        [string]$senderAddress)
 
 # Retrieve object ID for Microsoft Graph service principal
 $resourceId = (Invoke-MgGraphRequest -Method GET -Uri 'https://graph.microsoft.com/v1.0/serviceprincipals?$filter=appId eq ''00000003-0000-0000-c000-000000000000''&$select=id').value.id
@@ -26,13 +26,13 @@ if ($null -ne $clientId -and
     $null -ne $principalId -and
     $null -ne $resourceId)
 {
-	$grant = @{
-		clientId = $clientId
-		consentType = "Principal"
-		principalId = $principalId
-		resourceId = $resourceId
-		scope = "Mail.Send"
-	}
-	
-	Invoke-MgGraphRequest -Method POST -Uri 'https://graph.microsoft.com/v1.0/oauth2PermissionGrants' -Body $grant -ContentType 'application/json'
+    $grant = @{
+        clientId = $clientId
+        consentType = "Principal"
+        principalId = $principalId
+        resourceId = $resourceId
+        scope = "Mail.Send"
+    }
+    
+    Invoke-MgGraphRequest -Method POST -Uri 'https://graph.microsoft.com/v1.0/oauth2PermissionGrants' -Body $grant -ContentType 'application/json'
 }

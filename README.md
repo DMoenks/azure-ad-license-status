@@ -25,13 +25,18 @@ The main motivation for this script was to conquer side-effects of semi-automati
 ## Preparations
 
 1. Create Azure automation account
-   1. Create PowerShell runbook
-   2. Enable managed identity
+   1. Create PowerShell runbook with content of _Get-AzureADLicenseStatus.ps1_
+   2. Add modules
+      - _Az.Accounts_
+      - _Az.KeyVault_
+      - _Microsoft.Graph_
+      - (optional)_ExchangeOnlineManagement_
+   3. Enable system-assigned managed identity
 2. Create Azure key vault
    1. Create self-signed certificate
-   2. Grant access for managed identity to certificate
+   2. Grant Azure role _Key Vault Secrets User_ for automation account to certificate
 3. Create Azure AD application
-   1. Add certificate to application
+   1. Add certificate
    2. Grant **Application** permissions for basic checkups, script won't adapt to actually provided permissions
       - Microsoft Graph permission _Organization.Read.All_
       - Microsoft Graph permission _User.Read.All_
@@ -46,9 +51,9 @@ The main motivation for this script was to conquer side-effects of semi-automati
         Azure AD P2 based on PIM-managed users
       - Office 365 Exchange Online permission _Exchange.ManageAsApp_ and Azure AD role _Exchange Recipient Administrator_  
         Defender for Office 365 P1/P2 based on user and shared mailboxes
-   4. Grant **Delegated** permissions for report delivery
+   4. Grant **Delegated** permission for report delivery
       - Microsoft Graph permission _Mail.Send_
-   5. Consent to **Delegated** permissions on behalf of report delivery user by running Create-AzureADLicenseStatusGrant.ps1
+   5. Consent to **Delegated** permission by running _Create-AzureADLicenseStatusGrant.ps1_
 
       ```powershell
       Create-AzureADLicenseStatusGrant.ps1 -applicationID "<Azure AD application's ID>" -senderAddress "<Report delivery user's email address>"
