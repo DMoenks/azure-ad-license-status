@@ -323,34 +323,64 @@ if ($advancedCheckups.IsPresent)
 {
     $availableScopes = (Get-MgContext).Scopes
     # Defender for Office 365 P1/P2 based on user and shared mailboxes
-    if ($availableScopes -contains 'Exchange.ManageAsApp')
-    {
-        # Read organization from Azure AD
-        Connect-ExchangeOnline -AppId $applicationID -Certificate $x509Cert -Organization "contoso.onmicrosoft.com"
-        @(Get-EXOMailbox -Filter 'RecipientTypeDetails -eq "SharedMailbox" -or RecipientTypeDetails -eq "UserMailbox"' -ResultSize Unlimited).Count
-        Disconnect-ExchangeOnline
-    }
+    # Read organization from Azure AD
+    $orgDomain = (Invoke-MgGraphRequest -Method GET -Uri 'https://graph.microsoft.com/v1.0/organization?$select=verifiedDomains').value.verifiedDomains | Where-Object{$_.isInitial -eq $true}
+    Connect-ExchangeOnline -AppId $applicationID -Certificate $x509Cert -Organization $orgDomain.name
+    @(Get-EXOMailbox -Filter 'RecipientTypeDetails -eq "SharedMailbox" -or RecipientTypeDetails -eq "UserMailbox"' -ResultSize Unlimited).Count
+    Disconnect-ExchangeOnline
     # Azure AD P1 based on MFA-enabled users
-    if ($availableScopes -contains 'Policy.Read.All')
+    $conditionalAccessPolicies = [System.Collections.Generic.List[hashtable]]::new()
+    $URI = 'https://graph.microsoft.com/v1.0/identity/conditionalAccess/policies?$select=conditions,state'
+    while ($null -ne $URI)
     {
-        
+        $data = Invoke-MgGraphRequest -Method GET -Uri $URI
+        $conditionalAccessPolicies.AddRange([hashtable[]]($data.value))
+        $URI = $data['@odata.nextLink']
+    }
+    $conditionalAccessUsers = [System.Collections.Generic.List[string]]::new()
+    foreach ($enabledConditionalAccessPolicies in $conditionalAccessPolicies | Where-Object{$_.state -eq 'enabled'})
+    {
+        Compare-Object -ReferenceObject $enabledConditionalAccessPolicies.conditions.users.includeUsers -DifferenceObject $enabledConditionalAccessPolicies.conditions.users.excludeUsers
     }
     # Azure AD P2 based on PIM-managed users
-    if ($availableScopes -contains 'RoleManagement.Read.All')
+    $eligibleRoleMembers = [System.Collections.Generic.List[hashtable]]::new()
+    $URI = 'https://graph.microsoft.com/v1.0/roleManagement/directory/roleEligibilitySchedules?$select=principalId,scheduleInfo'
+    while ($null -ne $URI)
     {
-        
+        $data = Invoke-MgGraphRequest -Method GET -Uri $URI
+        $eligibleRoleMembers.AddRange([hashtable[]]($data.value))
+        $URI = $data['@odata.nextLink']
     }
+    $eligiblePIMUsers = ($eligibleRoleMembers | Where-Object{$_.scheduleInfo.startDateTime -le [datetime]::Today -and ($_.scheduleInfo.expiration.endDateTime -ge [datetime]::Today -or $_.scheduleInfo.expiration.type -like '*noExpiration*')}).principalId | Select-Object -Unique
     # Azure AD P1 based on dynamic groups
-    if ($availableScopes -contains 'GroupMember.Read.All' -or
-        $availableScopes -contains 'Directory.Read.All')
+    $groups = [System.Collections.Generic.List[hashtable]]::new()
+    $URI = 'https://graph.microsoft.com/v1.0/groups?$select=id,groupTypes'
+    while ($null -ne $URI)
     {
-        
+        $data = Invoke-MgGraphRequest -Method GET -Uri $URI
+        $groups.AddRange([hashtable[]]($data.value))
+        $URI = $data['@odata.nextLink']
     }
-    # Azure AD P1 based on group-based application assignments and applications using application proxy
-    if ($availableScopes -contains 'Application.Read.All' -or
-        $availableScopes -contains 'Directory.Read.All')
+    $dynamicGroupMembers = [System.Collections.Generic.List[hashtable]]::new()
+    foreach ($group in $groups | Where-Object{$_.groupTypes -contains 'DynamicMembership'})
     {
-        
+        $URI = 'https://graph.microsoft.com/v1.0/groups/{0}/members?$select=id' -f $group.id
+        while ($null -ne $URI)
+        {
+            $data = Invoke-MgGraphRequest -Method GET -Uri $URI
+            $dynamicGroupMembers.AddRange([hashtable[]]($data.value))
+            $URI = $data['@odata.nextLink']
+        }
+    }
+    $dynamicGroupMembers.id | Select-Object -Unique
+    # Azure AD P1 based on group-based application assignments and applications using application proxy
+    $applications = [System.Collections.Generic.List[hashtable]]::new()
+    $URI = 'https://graph.microsoft.com/v1.0/servicePrincipals?$filter=servicePrincipalType eq ''Application''&$select=id,samlSingleSignOnSettings'
+    while ($null -ne $URI)
+    {
+        $data = Invoke-MgGraphRequest -Method GET -Uri $URI
+        $applications.AddRange([hashtable[]]($data.value))
+        $URI = $data['@odata.nextLink']
     }
 }
 #endregion
