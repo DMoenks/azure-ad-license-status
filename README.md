@@ -16,6 +16,10 @@ The main motivation for this script was to conquer side-effects of semi-automati
 
 ### User level
 
+:x: Check for Microsoft's pre-defined mutually exclusive licenses
+
+:x: Check for Microsoft's interchangeable licenses
+
 :heavy_check_mark: Check for company's specified interchangeable licenses
 
 :heavy_check_mark: Check for calculated optimizable licenses

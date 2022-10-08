@@ -122,6 +122,17 @@ th, td {
 #endregion
 
 #region: Functions
+$emailBody = [System.Text.StringBuilder]::new()
+function Add-Output
+{
+    [CmdletBinding()]
+    param
+    (
+        [string]$Output
+    )
+    $emailBody.AppendLine($Output) | Out-Null
+}
+
 function Get-SKUName
 {
     [CmdletBinding()]
@@ -389,71 +400,78 @@ if ($advancedCheckups.IsPresent)
 # Report SKUs
 if ($resultsSKU.Keys.Count -gt 0 -or $resultsUsers.Keys.Count -gt 0)
 {
-    $output = [System.Text.StringBuilder]::new()
-    $output.AppendLine($style) | Out-Null
+    Add-Output -Output $style
     $critical = $false
     # Output licenses with issues
     if ($resultsSKU.Keys.Count -gt 0)
     {
-        $output.AppendLine('<p class=gray>License checkup</p>') | Out-Null
-        $output.AppendLine('<p>Please check license counts for the following products and <a href="https://www.microsoft.com/licensing/servicecenter">reserve</a> additional licenses:</p>') | Out-Null
-        $output.AppendLine('<p><table><tr><th>License type</th><th>Available count</th><th>Minimum count</th><th>Difference</th></tr>') | Out-Null
+        Add-Output -Output '<p class=gray>Basic checkup - Products</p> `
+                            <p>Please check license counts for the following products and <a href="https://www.microsoft.com/licensing/servicecenter">reserve</a> additional licenses:</p> `
+                            <p><table><tr><th>License type</th><th>Available count</th><th>Minimum count</th><th>Difference</th></tr>'
         foreach ($SKU in $resultsSKU.Keys)
         {
             $differenceCount = $resultsSKU[$SKU]['availableCount'] - $resultsSKU[$SKU]['minimumCount']
-            $output.AppendLine('<tr>') | Out-Null
-            $output.AppendLine("<td>$(Get-SKUName -SKU $SKU)</td>") | Out-Null
-            $output.AppendLine("<td>$($resultsSKU[$SKU]['availableCount'])</td>") | Out-Null
-            $output.AppendLine("<td>$($resultsSKU[$SKU]['minimumCount'])</td>") | Out-Null
+            Add-Output -Output "<tr> `
+                                <td>$(Get-SKUName -SKU $SKU)</td> `
+                                <td>$($resultsSKU[$SKU]['availableCount'])</td> `
+                                <td>$($resultsSKU[$SKU]['minimumCount'])</td>"
             if ($resultsSKU[$SKU]['availableCount'] / $resultsSKU[$SKU]['minimumCount'] * 100 -ge $warningPercentageThreshold)
             {
-                $output.AppendLine("<td class=green>$differenceCount</td>") | Out-Null
+                Add-Output -Output "<td class=green>$differenceCount</td>"
             }
             elseif ($resultsSKU[$SKU]['availableCount'] / $resultsSKU[$SKU]['minimumCount'] * 100 -le $criticalPercentageThreshold)
             {
                 $critical = $true
-                $output.AppendLine("<td class=red>$differenceCount</td>") | Out-Null
+                Add-Output -Output "<td class=red>$differenceCount</td>"
             }
             else
             {
-                $output.AppendLine("<td class=yellow>$differenceCount</td>") | Out-Null
+                Add-Output -Output "<td class=yellow>$differenceCount</td>"
             }
-            $output.AppendLine('</tr>') | Out-Null
+            Add-Output -Output '</tr>'
         }
-        $output.AppendLine('</table></p>') | Out-Null
-        $output.AppendLine("<p>The following criteria were used during the checkup:<ul><li>Check products with >$licenseIgnoreThreshold total licenses</li> `
+        Add-Output -Output "</table></p> `
+                            <p>The following criteria were used during the checkup:<ul><li>Check products with >$licenseIgnoreThreshold total licenses</li> `
                             <li>Report normal products having both <$licenseTotalThreshold_normalSKUs licenses and <$licensePercentageThreshold_normalSKUs% of their total licenses available</li> `
-                            <li>Report important products having both <$licenseTotalThreshold_importantSKUs licenses and <$licensePercentageThreshold_importantSKUs% of their total licenses available</li></ul></p>") | Out-Null
+                            <li>Report important products having both <$licenseTotalThreshold_importantSKUs licenses and <$licensePercentageThreshold_importantSKUs% of their total licenses available</li></ul></p>"
     }
     # Output accounts with issues
     if ($resultsUsers.Keys.Count -gt 0)
     {
-        $output.AppendLine('<p class=gray>User checkup</p>') | Out-Null
-        $output.AppendLine('<p>Please check license assignments for the following accounts and mitigate impact:</p>') | Out-Null
-        $output.AppendLine('<p><table><tr><th>Account</th><th>Interchangeable</th><th>Optimizable</th><th>Removable</th></tr>') | Out-Null
+        Add-Output -Output '<p class=gray>Basic checkup - Users</p> `
+                            <p>Please check license assignments for the following accounts and mitigate impact:</p> `
+                            <p><table><tr><th>Account</th><th>Interchangeable</th><th>Optimizable</th><th>Removable</th></tr>'
         foreach ($user in $resultsUsers.Keys | Sort-Object)
         {
-            $output.AppendLine('<tr>') | Out-Null
-            $output.AppendLine("<td>$user</td>") | Out-Null
-            $output.AppendLine("<td>$(($resultsUsers[$user]['Interchangeable'] | Where-Object{$null -ne $_} | ForEach-Object{Get-SKUName -SKU $_} | Sort-Object) -join '<br>')</td>") | Out-Null
-            $output.AppendLine("<td>$(($resultsUsers[$user]['Optimizable'] | Where-Object{$null -ne $_} | ForEach-Object{Get-SKUName -SKU $_} | Sort-Object) -join '<br>')</td>") | Out-Null
-            $output.AppendLine("<td>$(($resultsUsers[$user]['Removable'] | Where-Object{$null -ne $_} | ForEach-Object{Get-SKUName -SKU $_} | Sort-Object) -join '<br>')</td>") | Out-Null
-            $output.AppendLine('</tr>') | Out-Null
+            Add-Output -Output "<tr> `
+                                <td>$user</td> `
+                                <td>$(($resultsUsers[$user]['Interchangeable'] | Where-Object{$null -ne $_} | ForEach-Object{Get-SKUName -SKU $_} | Sort-Object) -join '<br>')</td> `
+                                <td>$(($resultsUsers[$user]['Optimizable'] | Where-Object{$null -ne $_} | ForEach-Object{Get-SKUName -SKU $_} | Sort-Object) -join '<br>')</td> `
+                                <td>$(($resultsUsers[$user]['Removable'] | Where-Object{$null -ne $_} | ForEach-Object{Get-SKUName -SKU $_} | Sort-Object) -join '<br>')</td> `
+                                </tr>"
         }
-        $output.AppendLine('</table></p>') | Out-Null
-        $output.AppendLine("<p>The following criteria were used during the checkup:<ul><li>Check accounts with any number of assigned licenses</li> `
+        Add-Output -Output '</table></p> `
+                            <p>The following criteria were used during the checkup:<ul><li>Check accounts with any number of assigned licenses</li> `
                             <li>Report theoretically exclusive licenses as <strong>interchangeable</strong>, based on specified SKUs</li> `
                             <li>Report practically inclusive licenses as <strong>optimizable</strong>, based on available SKU features</li> `
-                            <li>Report actually inclusive licenses as <strong>removable</strong>, based on enabled SKU features</li></ul></p>") | Out-Null
+                            <li>Report actually inclusive licenses as <strong>removable</strong>, based on enabled SKU features</li></ul></p>'
+    }
+    if ($advancedCheckups)
+    {
+        Add-Output -Output '<p class=gray>Avanced checkup - Features</p> `
+                            <p>Please check license counts for the following products and <a href="https://www.microsoft.com/licensing/servicecenter">reserve</a> additional licenses:</p> `
+                            <p><table><tr><th>License type</th><th>Available count</th><th>Minimum count</th><th>Difference</th></tr>'
+
+        Add-Output -Output '</table></p>'
     }
     # Configure basic email settings
     $email = @{
         'message' = @{
-            'subject' = 'License counts below specified thresholds';
+            'subject' = 'Azure AD licenses need attention';
             'importance' = 'normal';
             'body' = @{
                 'contentType' = 'HTML';
-                'content' = $output.ToString()
+                'content' = $emailBody.ToString()
             };
         }
     }
@@ -471,7 +489,7 @@ if ($resultsSKU.Keys.Count -gt 0 -or $resultsUsers.Keys.Count -gt 0)
     if ($critical)
     {
         # Replace subject and importance
-        $email['message']['subject'] = 'License counts far below specified thresholds'
+        $email['message']['subject'] = 'Azure AD licenses need urgent attention'
         $email['message']['importance'] = 'high'
         # Add critical email recipients
         $email['message'].Add('ccRecipients', [System.Collections.Generic.List[hashtable]]::new())
