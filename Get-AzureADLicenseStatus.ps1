@@ -119,6 +119,8 @@ function Add-Output
     [CmdletBinding()]
     param
     (
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
         [string]$Output
     )
     $outputs.AppendLine($Output) | Out-Null
@@ -130,8 +132,31 @@ function Add-Result
     [CmdletBinding()]
     param
     (
-        [string]$Type,
-        [string]$Result
+        [Parameter(Mandatory=$true, ParameterSetName='Advanced')]
+        [Parameter(Mandatory=$true, ParameterSetName='SKU')]
+        [ValidateNotNullOrEmpty()]
+        [guid]$SKUID,
+        [Parameter(Mandatory=$true, ParameterSetName='Advanced')]
+        [ValidateNotNullOrEmpty()]
+        [int]$EnabledCount,
+        [Parameter(Mandatory=$true, ParameterSetName='Advanced')]
+        [ValidateNotNullOrEmpty()]
+        [int]$NeededCount,
+        [Parameter(Mandatory=$true, ParameterSetName='SKU')]
+        [ValidateNotNullOrEmpty()]
+        [int]$AvailableCount,
+        [Parameter(Mandatory=$true, ParameterSetName='SKU')]
+        [ValidateNotNullOrEmpty()]
+        [int]$MinimumCount,
+        [Parameter(Mandatory=$true, ParameterSetName='User')]
+        [ValidateNotNullOrEmpty()]
+        [string]$UserPrincipalName,
+        [Parameter(Mandatory=$true, ParameterSetName='User')]
+        [ValidateSet('Interchangeable','Optimizable','Removable')]
+        [string]$ConflictType,
+        [Parameter(Mandatory=$true, ParameterSetName='User')]
+        [ValidateNotNullOrEmpty()]
+        [guid[]]$ConflictSKUs
     )
     $results.Add($Type, $Result)
 }
@@ -141,7 +166,9 @@ function Get-SKUName
     [CmdletBinding()]
     param
     (
-        [string]$SKU
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]    
+        [guid]$SKUID
     )
     if ($null -ne ($skuName = ($skuTranslate |
                                 Where-Object{$_.GUID -eq $SKU}).Product_Display_Name |
@@ -340,7 +367,6 @@ foreach ($user in $users)
 #endregion
 
 #region: Advanced
-$resultsAdvanced = @{}
 if ($advancedCheckups.IsPresent)
 {
     $AADP1Users = [System.Collections.Generic.List[string]]::new()
@@ -454,29 +480,41 @@ if ($advancedCheckups.IsPresent)
     #TODO: Missing better count calculations
     if ($AADP1Users.Count -gt 0)
     {
-        $resultsAdvanced.Add('078d2b04-f1bd-4111-bbd4-b4b1b354cef4', @{})
-        $resultsAdvanced['078d2b04-f1bd-4111-bbd4-b4b1b354cef4'].Add('availableCount', $availableCount)
-        $resultsAdvanced['078d2b04-f1bd-4111-bbd4-b4b1b354cef4'].Add('minimumCount', ($AADP1Users | Select-Object -Unique).Count)
+        Add-Result -Type Advanced -Result @{
+            '078d2b04-f1bd-4111-bbd4-b4b1b354cef4' = @{
+                'enabledCount' = $availableCount;
+                'neededCount' = ($AADP1Users | Select-Object -Unique).Count
+            }
+        }
     }
     if ($AADP2Users.Count -gt 0)
     {
-        $resultsAdvanced.Add('84a661c4-e949-4bd2-a560-ed7766fcaf2b', @{})
-        $resultsAdvanced['84a661c4-e949-4bd2-a560-ed7766fcaf2b'].Add('availableCount', $availableCount)
-        $resultsAdvanced['078d2b04-f1bd-4111-bbd4-b4b1b354cef4'].Add('minimumCount', ($AADP2Users | Select-Object -Unique).Count)
+        Add-Result -Type Advanced -Result @{
+            '84a661c4-e949-4bd2-a560-ed7766fcaf2b' = @{
+                'enabledCount' = $availableCount;
+                'neededCount' = ($AADP2Users | Select-Object -Unique).Count
+            }
+        }
     }
     if ($ATPUsers.Count -gt 0)
     {
         if ($SKUs.skuId -contains '3dd6cf57-d688-4eed-ba52-9e40b5468c3e')
         {
-            $resultsAdvanced.Add('3dd6cf57-d688-4eed-ba52-9e40b5468c3e', @{})
-            $resultsAdvanced['3dd6cf57-d688-4eed-ba52-9e40b5468c3e'].Add('availableCount', $availableCount)
-            $resultsAdvanced['3dd6cf57-d688-4eed-ba52-9e40b5468c3e'].Add('minimumCount', ($ATPUsers | Select-Object -Unique).Count)
+            Add-Result -Type Advanced -Result @{
+                '3dd6cf57-d688-4eed-ba52-9e40b5468c3e' = @{
+                    'enabledCount' = $availableCount;
+                    'neededCount' = ($ATPUsers | Select-Object -Unique).Count
+                }
+            }
         }
         else
         {
-            $resultsAdvanced.Add('4ef96642-f096-40de-a3e9-d83fb2f90211', @{})
-            $resultsAdvanced['4ef96642-f096-40de-a3e9-d83fb2f90211'].Add('availableCount', $availableCount)
-            $resultsAdvanced['4ef96642-f096-40de-a3e9-d83fb2f90211'].Add('minimumCount', ($ATPUsers | Select-Object -Unique).Count)
+            Add-Result -Type Advanced -Result @{
+                '4ef96642-f096-40de-a3e9-d83fb2f90211' = @{
+                    'enabledCount' = $availableCount;
+                    'neededCount' = ($ATPUsers | Select-Object -Unique).Count
+                }
+            }
         }
     }
 }
@@ -499,7 +537,7 @@ if ($resultsSKU.Keys.Count -gt 0 -or
         {
             $differenceCount = $resultsSKU[$SKU]['availableCount'] - $resultsSKU[$SKU]['minimumCount']
             Add-Output -Output "<tr> `
-                                <td>$(Get-SKUName -SKU $SKU)</td> `
+                                <td>$(Get-SKUName -SKUID $SKU)</td> `
                                 <td>$($resultsSKU[$SKU]['availableCount'])</td> `
                                 <td>$($resultsSKU[$SKU]['minimumCount'])</td>"
             if ($resultsSKU[$SKU]['availableCount'] / $resultsSKU[$SKU]['minimumCount'] * 100 -ge $warningPercentageThreshold)
@@ -534,15 +572,15 @@ if ($resultsSKU.Keys.Count -gt 0 -or
                                 <td>$user</td> `
                                 <td>$(($resultsUsers[$user]['Interchangeable'] |
                                         Where-Object{$null -ne $_} |
-                                        ForEach-Object{Get-SKUName -SKU $_} |
+                                        ForEach-Object{Get-SKUName -SKUID $_} |
                                         Sort-Object) -join '<br>')</td> `
                                 <td>$(($resultsUsers[$user]['Optimizable'] |
                                         Where-Object{$null -ne $_} |
-                                        ForEach-Object{Get-SKUName -SKU $_} |
+                                        ForEach-Object{Get-SKUName -SKUID $_} |
                                         Sort-Object) -join '<br>')</td> `
                                 <td>$(($resultsUsers[$user]['Removable'] |
                                         Where-Object{$null -ne $_} |
-                                        ForEach-Object{Get-SKUName -SKU $_} |
+                                        ForEach-Object{Get-SKUName -SKUID $_} |
                                         Sort-Object) -join '<br>')</td> `
                                 </tr>"
         }
