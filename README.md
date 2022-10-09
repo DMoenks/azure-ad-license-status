@@ -34,7 +34,7 @@ The main motivation for this script was to conquer side-effects of semi-automati
       - _Az.Accounts_
       - _Az.KeyVault_
       - _Microsoft.Graph_
-      - (optional) _ExchangeOnlineManagement_
+      - _ExchangeOnlineManagement_
    3. Enable system-assigned managed identity
 2. Create Azure key vault
    1. Create self-signed certificate
