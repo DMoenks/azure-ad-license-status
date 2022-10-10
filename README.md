@@ -32,40 +32,50 @@ The main motivation for this script was to conquer side-effects of semi-automati
 
 :heavy_check_mark: Check for calculated removable licenses
 
+## Requirements
+
+To use the script for either basic or advanced checkups, it needs the following:
+
+- Permissions for basic checkups
+  - Microsoft Graph permission _Organization.Read.All_
+  - Microsoft Graph permission _Mail.Send_
+  - Microsoft Graph permission _User.Read.All_
+- Permissions for advanced checkups
+  - Microsoft Graph permission _Application.Read.All_
+  - Microsoft Graph permission _GroupMember.Read.All_
+  - Microsoft Graph permission _Policy.Read.All_
+  - Microsoft Graph permission _RoleManagement.Read.All_
+  - Office 365 Exchange Online permission _Exchange.ManageAsApp_ and Azure AD role _Exchange Recipient Administrator_
+- PowerShell modules for basic checkups
+  - _Az.Accounts_
+  - _Az.KeyVault_
+  - _Microsoft.Graph_
+- PowerShell modules for advanced checkups
+  - _ExchangeOnlineManagement_
+
+> HINT: To simplify permission management, the following permissions can be replaced with the _Directory.Read.All_ permission. As this would provide the script with additional, probably unnecessary permissions, consider this at your own discretion.
+>
+>- _Application.Read.All_
+>- _GroupMember.Read.All_
+>- _Organization.Read.All_
+>- _User.Read.All_
+
 ## Preparations
+
+To use the script for automation purposes with Azure services, configure the following:
 
 1. Create Azure automation account
    1. Create PowerShell runbook
-   2. Add modules
-      - _Az.Accounts_
-      - _Az.KeyVault_
-      - _Microsoft.Graph_
-      - (optional) _ExchangeOnlineManagement_
+   2. Add required modules
    3. Enable system-assigned managed identity
 2. Create Azure key vault
    1. Create self-signed certificate
    2. Grant Azure role _Key Vault Secrets User_ for automation account to certificate
 3. Create Azure AD application
    1. Add certificate
-   2. Grant **Application** permissions for basic checkups
-      - Microsoft Graph permission _Organization.Read.All_
-      - Microsoft Graph permission _Mail.Send_
-      - Microsoft Graph permission _User.Read.All_
-   3. (optional) Grant additional **Application** permissions for advanced checkups
-      - Microsoft Graph permission _Application.Read.All_  
-      - Microsoft Graph permission _GroupMember.Read.All_  
-      - Microsoft Graph permission _Policy.Read.All_  
-      - Microsoft Graph permission _RoleManagement.Read.All_  
-      - Office 365 Exchange Online permission _Exchange.ManageAsApp_ and Azure AD role _Exchange Recipient Administrator_  
+   2. Grant required permissions
 4. (optional) Create Exchange Online application access policy
    1. Limit Azure AD application's permission to intended sender mailbox
-
-> HINT: To simplify permission management, the following permissions can be replaced with the _Directory.Read.All_ permission
->
->- _Application.Read.All_
->- _GroupMember.Read.All_
->- _Organization.Read.All_
->- _User.Read.All_
 
 ## Links
 
