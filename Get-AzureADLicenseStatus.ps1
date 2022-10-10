@@ -69,12 +69,16 @@ param (
     [int]$licenseTotalThreshold_importantSKUs = 50,
     [int]$warningPercentageThreshold = 80,
     [int]$criticalPercentageThreshold = 20,
-    [guid[]]$importantSKUs = @('18181a46-0d4e-45cd-891e-60aabd171b4e',
-                                '6fd2c87f-b296-42f0-b197-1e91e994b900'),
-    [guid[]]$interchangeableSKUs_specified = @('4b585984-651b-448a-9e53-3b10f069cf7f',
-                                                '18181a46-0d4e-45cd-891e-60aabd171b4e',
-                                                '6fd2c87f-b296-42f0-b197-1e91e994b900',
-                                                'c7df2760-2c81-4ef7-b578-5b5392b571df'),
+    [guid[]]$importantSKUs = @(
+        '18181a46-0d4e-45cd-891e-60aabd171b4e',
+        '6fd2c87f-b296-42f0-b197-1e91e994b900'
+    ),
+    [guid[]]$interchangeableSKUs_specified = @(
+        '4b585984-651b-448a-9e53-3b10f069cf7f',
+        '18181a46-0d4e-45cd-891e-60aabd171b4e',
+        '6fd2c87f-b296-42f0-b197-1e91e994b900',
+        'c7df2760-2c81-4ef7-b578-5b5392b571df'
+    ),
     [switch]$advancedCheckups
 )
 
@@ -177,7 +181,7 @@ function Add-Result {
             }
         }
         'User' {
-            if (-not $results[$PSCmdlet.ParameterSetName].ContainsKey($SKUID)) {
+            if (-not $results[$PSCmdlet.ParameterSetName].ContainsKey($UserPrincipalName)) {
                 $results[$PSCmdlet.ParameterSetName].Add($UserPrincipalName, @{})
             }
             if (-not $results[$PSCmdlet.ParameterSetName][$UserPrincipalName].ContainsKey($ConflictType)) {
@@ -187,6 +191,7 @@ function Add-Result {
     }
 }
 
+$skuTranslate = [string]::new([char[]]((Invoke-WebRequest -Uri 'https://download.microsoft.com/download/e/3/e/e3e9faf2-f28b-490a-9ada-c6089a1fc5b0/Product%20names%20and%20service%20plan%20identifiers%20for%20licensing.csv' -UseBasicParsing).Content)) | ConvertFrom-Csv
 function Get-SKUName {
     [CmdletBinding()]
     param (
@@ -195,12 +200,12 @@ function Get-SKUName {
         [guid]$SKUID
     )
     if ($null -ne ($skuName = ($skuTranslate |
-    Where-Object{$_.GUID -eq $SKU}).Product_Display_Name |
+    Where-Object{$_.GUID -eq $SKUID}).Product_Display_Name |
     Select-Object -Unique)) {
         $skuName = [cultureinfo]::new('en-US').TextInfo.ToTitleCase($skuName.ToLower())
     }
     else {
-        $skuName = $SKU
+        $skuName = $SKUID
     }
     return $skuName
 }
@@ -217,8 +222,6 @@ Disconnect-AzAccount
 Connect-MgGraph -Certificate $x509Cert -TenantId $directoryID -ClientId $applicationID | Out-Null
 
 #region: SKUs
-# Get SKU IDs and names
-$skuTranslate = [string]::new([char[]]((Invoke-WebRequest -Uri 'https://download.microsoft.com/download/e/3/e/e3e9faf2-f28b-490a-9ada-c6089a1fc5b0/Product%20names%20and%20service%20plan%20identifiers%20for%20licensing.csv' -UseBasicParsing).Content)) | ConvertFrom-Csv
 # Get SKUs
 $SKUs = [System.Collections.Generic.List[hashtable]]::new()
 $URI = 'https://graph.microsoft.com/v1.0/subscribedSkus?$select=skuId,prepaidUnits,consumedUnits,servicePlans'
@@ -228,7 +231,6 @@ while ($null -ne $URI) {
     $URI = $data['@odata.nextLink']
 }
 # Calculate SKU usage
-$resultsSKU = @{}
 foreach ($SKU in $SKUs | Where-Object{$_.prepaidUnits.enabled -gt $licenseIgnoreThreshold}) {
     $availableCount = $SKU.prepaidUnits.enabled - $SKU.consumedUnits
     $totalCount = $SKU.prepaidUnits.enabled
@@ -239,9 +241,7 @@ foreach ($SKU in $SKUs | Where-Object{$_.prepaidUnits.enabled -gt $licenseIgnore
         $minimumCount = (@([System.Math]::Ceiling($totalCount * $licensePercentageThreshold_normalSKUs / 100), $licenseTotalThreshold_normalSKUs) | Measure-Object -Minimum).Minimum
     }
     if ($availableCount -lt $minimumCount) {
-        $resultsSKU.Add($SKU.skuId, @{})
-        $resultsSKU[$SKU.skuId].Add('availableCount', $availableCount)
-        $resultsSKU[$SKU.skuId].Add('minimumCount', $minimumCount)
+        Add-Result -SKUID $SKU.skuId -AvailableCount $availableCount -MinimumCount $minimumCount
     }
 }
 $interchangeableSKUs_calculatedOrganization_replaces = @{}
@@ -270,21 +270,20 @@ foreach ($referenceSKU in $SKUs) {
 #region: Users
 # Get users
 $users = [System.Collections.Generic.List[hashtable]]::new()
-$URI = 'https://graph.microsoft.com/v1.0/users?$select=userPrincipalName,licenseAssignmentStates&$top=500'
+$URI = 'https://graph.microsoft.com/v1.0/users?$select=id,licenseAssignmentStates,userPrincipalName&$top=500'
 while ($null -ne $URI) {
     $data = Invoke-MgGraphRequest -Method GET -Uri $URI
     $users.AddRange([hashtable[]]($data.value))
     $URI = $data['@odata.nextLink']
 }
 # Analyze users
-$resultsUsers = @{}
 foreach ($user in $users) {
     if ($user.licenseAssignmentStates.count -gt 0) {
         $userSKUs = ($user.licenseAssignmentStates | Where-Object{$_.state -eq 'Active' -or $_.error -in @('CountViolation', 'MutuallyExclusiveViolation')}).skuId
         foreach ($countViolation in ($user.licenseAssignmentStates |
         Where-Object{$_.error -eq 'CountViolation'}).skuId |
         Select-Object -Unique) {
-            $resultsSKU[$countViolation]['availableCount'] -= 1
+            $results['SKU'][$countViolation]['availableCount'] -= 1
         }
         # Identify interchangeable SKUs, based on earlier specifications
         if ($null -ne $userSKUs) {
@@ -306,7 +305,7 @@ foreach ($user in $users) {
                 $skuid_enabledPlans.Add($skuid, [System.Collections.Generic.List[string]]::new())
             }
             foreach ($assignment in $user.licenseAssignmentStates | Where-Object{$_.skuid -eq $skuid}) {
-                $skuid_enabledPlans[$skuid].AddRange([string[]]@((($SKUs | Where-Object{$_.skuid -eq $skuid}).servicePlans | Where-Object{$_.servicePlanId -notin $assignment.disabledplans -and $_.appliesTo -eq 'User'}).servicePlanId))
+                $skuid_enabledPlans[$skuid].AddRange([guid[]]@((($SKUs | Where-Object{$_.skuid -eq $skuid}).servicePlans | Where-Object{$_.servicePlanId -notin $assignment.disabledplans -and $_.appliesTo -eq 'User'}).servicePlanId))
             }
         }
         $interchangeableSKUs_calculatedUser_replaces = @{}
@@ -342,15 +341,14 @@ foreach ($user in $users) {
         if ($comparisonInterchangeable.Count -gt 1 -or
         $null -ne $comparisonOptimizable -or
         $null -ne $comparisonRemovable) {
-            $resultsUsers.Add($user.userPrincipalName, @{})
             if ($comparisonInterchangeable.Count -gt 1) {
-                $resultsUsers[$user.userPrincipalName].Add('Interchangeable', $comparisonInterchangeable)
+                Add-Result -UserPrincipalName $user.userPrincipalName -ConflictType Interchangeable -ConflictSKUs $comparisonInterchangeable
             }
             if ($null -ne $comparisonOptimizable) {
-                $resultsUsers[$user.userPrincipalName].Add('Optimizable', $comparisonOptimizable)
+                Add-Result -UserPrincipalName $user.userPrincipalName -ConflictType Optimizable -ConflictSKUs $comparisonOptimizable
             }
             if ($null -ne $comparisonRemovable) {
-                $resultsUsers[$user.userPrincipalName].Add('Removable', $comparisonRemovable)
+                Add-Result -UserPrincipalName $user.userPrincipalName -ConflictType Removable -ConflictSKUs $comparisonRemovable
             }
         }
     }
@@ -380,7 +378,7 @@ if ($advancedCheckups.IsPresent) {
             $URI = $data['@odata.nextLink']
         }
     }
-    $AADP1Users.AddRange(($dynamicGroupMembers.id | Select-Object -Unique))
+    $AADP1Users.AddRange([guid[]]($dynamicGroupMembers.id | Select-Object -Unique))
     # Azure AD P1 based on group-based application assignments and applications using application proxy
     $applications = [System.Collections.Generic.List[hashtable]]::new()
     $URI = 'https://graph.microsoft.com/v1.0/servicePrincipals?$expand=appRoleAssignedTo'
@@ -399,39 +397,47 @@ if ($advancedCheckups.IsPresent) {
             $URI = $data['@odata.nextLink']
         }
     }
-    $AADP1Users.AddRange(($applicationGroupMembers.id | Select-Object -Unique))
+    $AADP1Users.AddRange([guid[]]($applicationGroupMembers.id | Select-Object -Unique))
     # Azure AD P1 based on MFA-enabled users
     $conditionalAccessPolicies = [System.Collections.Generic.List[hashtable]]::new()
-    $URI = 'https://graph.microsoft.com/v1.0/identity/conditionalAccess/policies?$select=conditions'
+    $URI = 'https://graph.microsoft.com/v1.0/identity/conditionalAccess/policies?$select=conditions,state'
     while ($null -ne $URI) {
         $data = Invoke-MgGraphRequest -Method GET -Uri $URI
         $conditionalAccessPolicies.AddRange([hashtable[]]($data.value))
         $URI = $data['@odata.nextLink']
     }
     $conditionalAccessUsers = [System.Collections.Generic.List[string]]::new()
+    #TODO: Missing better user/group matching, especially for nested groups
     foreach ($conditionalAccessPolicy in $conditionalAccessPolicies | Where-Object{$_.state -eq 'enabled'}) {
         if ($conditionalAccessPolicy.conditions.users.includeUsers -eq 'All') {
-            $conditionalAccessUsers.AddRange((Compare-Object -ReferenceObject $users.id -DifferenceObject $conditionalAccessPolicy.conditions.users.excludeUsers | Where-Object{$_.SideIndicator -eq '<='}))
+            $includeUsers = (Compare-Object -ReferenceObject $users.id -DifferenceObject $conditionalAccessPolicy.conditions.users.excludeUsers | Where-Object{$_.SideIndicator -eq '<='}).InputObject
         }
         else {
-            $conditionalAccessUsers.AddRange((Compare-Object -ReferenceObject $conditionalAccessPolicy.conditions.users.includeUsers -DifferenceObject $conditionalAccessPolicy.conditions.users.excludeUsers | Where-Object{$_.SideIndicator -eq '<='}))
+            $includeUsers = (Compare-Object -ReferenceObject $conditionalAccessPolicy.conditions.users.includeUsers -DifferenceObject $conditionalAccessPolicy.conditions.users.excludeUsers | Where-Object{$_.SideIndicator -eq '<='}).InputObject
+        }
+        if ($null -ne $includeUsers) {
+            $conditionalAccessUsers.AddRange([guid[]]$includeUsers)
         }
         if ($conditionalAccessPolicy.conditions.users.includeGroups -eq 'All') {
-            $conditionalAccessGroups = Compare-Object -ReferenceObject $groups.id -DifferenceObject $conditionalAccessPolicy.conditions.users.excludeGroups | Where-Object{$_.SideIndicator -eq '<='}
+            $conditionalAccessGroups = (Compare-Object -ReferenceObject $groups.id -DifferenceObject $conditionalAccessPolicy.conditions.users.excludeGroups | Where-Object{$_.SideIndicator -eq '<='}).InputObject
         }
         else {
-            $conditionalAccessGroups = Compare-Object -ReferenceObject $conditionalAccessPolicy.conditions.users.includeGroups -DifferenceObject $conditionalAccessPolicy.conditions.users.excludeGroups | Where-Object{$_.SideIndicator -eq '<='}
+            $conditionalAccessGroups = (Compare-Object -ReferenceObject $conditionalAccessPolicy.conditions.users.includeGroups -DifferenceObject $conditionalAccessPolicy.conditions.users.excludeGroups | Where-Object{$_.SideIndicator -eq '<='}).InputObject
         }
-        foreach ($group in $conditionalAccessGroups) {
-            $URI = 'https://graph.microsoft.com/v1.0/groups/{0}/members?$select=id' -f $group
+        $conditionalAccessGroupUsers = [System.Collections.Generic.List[hashtable]]::new()
+        foreach ($conditionalAccessGroup in $conditionalAccessGroups) {
+            $URI = 'https://graph.microsoft.com/v1.0/groups/{0}/members?$select=id' -f $conditionalAccessGroup
             while ($null -ne $URI) {
                 $data = Invoke-MgGraphRequest -Method GET -Uri $URI
-                $conditionalAccessUsers.AddRange([hashtable[]]($data.value))
+                $conditionalAccessGroupUsers.AddRange([hashtable[]]($data.value))
                 $URI = $data['@odata.nextLink']
             }
         }
+        if ($null -ne $conditionalAccessGroupUsers.id) {
+            $conditionalAccessUsers.AddRange([guid[]]($conditionalAccessGroupUsers.id | Select-Object -Unique))
+        }
     }
-    $AADP1Users.AddRange(($conditionalAccessUsers.id | Select-Object -Unique))
+    $AADP1Users.AddRange([guid[]]($conditionalAccessUsers | Select-Object -Unique))
     # Azure AD P2 based on PIM-managed users
     $eligibleRoleMembers = [System.Collections.Generic.List[hashtable]]::new()
     $URI = 'https://graph.microsoft.com/v1.0/roleManagement/directory/roleEligibilitySchedules?$select=principalId,scheduleInfo'
@@ -440,57 +446,54 @@ if ($advancedCheckups.IsPresent) {
         $eligibleRoleMembers.AddRange([hashtable[]]($data.value))
         $URI = $data['@odata.nextLink']
     }
-    $AADP2Users.AddRange((($eligibleRoleMembers |
+    $AADP2Users.AddRange([guid[]](($eligibleRoleMembers |
                             Where-Object{$_.scheduleInfo.startDateTime -le [datetime]::Today -and
                                 ($_.scheduleInfo.expiration.endDateTime -ge [datetime]::Today -or
                                 $_.scheduleInfo.expiration.type -eq 'noExpiration')}).principalId |
                             Select-Object -Unique))
     # Defender for Office 365 P1/P2 based on user and shared mailboxes
-    #TODO: Missing user ID from mailbox
     $orgDomain = (Invoke-MgGraphRequest -Method GET -Uri 'https://graph.microsoft.com/v1.0/organization?$select=verifiedDomains').value.verifiedDomains | Where-Object{$_.isInitial -eq $true}
-    Connect-ExchangeOnline -AppId $applicationID -Certificate $x509Cert -Organization $orgDomain.name -CommandName Get-EXOMailbox
-    $ATPUsers.AddRange((Get-EXOMailbox -Filter 'RecipientTypeDetails -eq "SharedMailbox" -or RecipientTypeDetails -eq "UserMailbox"' -ResultSize Unlimited).'MissingIDAttribute')
-    Disconnect-ExchangeOnline
+    Connect-ExchangeOnline -AppId $applicationID -Certificate $x509Cert -Organization $orgDomain.name -CommandName Get-Mailbox
+    $ATPUsers.AddRange([guid[]](Get-EXOMailbox -RecipientTypeDetails 'SharedMailbox', 'UserMailbox' -ResultSize Unlimited).ExternalDirectoryObjectId)
+    Disconnect-ExchangeOnline -Confirm:$false
     # Results
     #TODO: Missing better count calculations
     if ($AADP1Users.Count -gt 0) {
-        Add-Result -SKUID '078d2b04-f1bd-4111-bbd4-b4b1b354cef4' -EnabledCount $availableCount -NeededCount ($AADP1Users | Select-Object -Unique).Count
+        Add-Result -SKUID '078d2b04-f1bd-4111-bbd4-b4b1b354cef4' -EnabledCount ($SKUs | Where-Object{$_.skuid -eq '078d2b04-f1bd-4111-bbd4-b4b1b354cef4'}).prepaidUnits.enabled -NeededCount ($AADP1Users | Select-Object -Unique).Count
     }
     if ($AADP2Users.Count -gt 0) {
-        Add-Result -SKUID '84a661c4-e949-4bd2-a560-ed7766fcaf2b' -EnabledCount $availableCount -NeededCount ($AADP2Users | Select-Object -Unique).Count
+        Add-Result -SKUID '84a661c4-e949-4bd2-a560-ed7766fcaf2b' -EnabledCount ($SKUs | Where-Object{$_.skuid -eq '84a661c4-e949-4bd2-a560-ed7766fcaf2b'}).prepaidUnits.enabled -NeededCount ($AADP2Users | Select-Object -Unique).Count
     }
     if ($ATPUsers.Count -gt 0) {
         if ($SKUs.skuId -contains '3dd6cf57-d688-4eed-ba52-9e40b5468c3e') {
-            Add-Result -SKUID '3dd6cf57-d688-4eed-ba52-9e40b5468c3e'-EnabledCount $availableCount -NeededCount ($ATPUsers | Select-Object -Unique).Count
+            Add-Result -SKUID '3dd6cf57-d688-4eed-ba52-9e40b5468c3e'-EnabledCount ($SKUs | Where-Object{$_.skuid -eq '3dd6cf57-d688-4eed-ba52-9e40b5468c3e'}).prepaidUnits.enabled -NeededCount ($ATPUsers | Select-Object -Unique).Count
         }
         else {
-            Add-Result -SKUID '4ef96642-f096-40de-a3e9-d83fb2f90211' -EnabledCount $availableCount -NeededCount ($ATPUsers | Select-Object -Unique).Count
+            Add-Result -SKUID '4ef96642-f096-40de-a3e9-d83fb2f90211' -EnabledCount ($SKUs | Where-Object{$_.skuid -eq '4ef96642-f096-40de-a3e9-d83fb2f90211'}).prepaidUnits.enabled -NeededCount ($ATPUsers | Select-Object -Unique).Count
         }
     }
 }
 #endregion
 
 #region: Report
-# Report SKUs
-if ($resultsSKU.Keys.Count -gt 0 -or
-$resultsUsers.Keys.Count -gt 0) {
+if ($results.Values.Count -gt 0) {
     Add-Output -Output $style
     $critical = $false
     # Output licenses with issues
-    if ($resultsSKU.Keys.Count -gt 0) {
-        Add-Output -Output '<p class=gray>Basic checkup - Products</p> `
-                            <p>Please check license counts for the following products and <a href="https://www.microsoft.com/licensing/servicecenter">reserve</a> additional licenses:</p> `
+    if ($results['SKU'].Keys.Count -gt 0) {
+        Add-Output -Output '<p class=gray>Basic checkup - Products</p>
+                            <p>Please check license counts for the following products and <a href="https://www.microsoft.com/licensing/servicecenter">reserve</a> additional licenses:</p>
                             <p><table><tr><th>License type</th><th>Available count</th><th>Minimum count</th><th>Difference</th></tr>'
-        foreach ($SKU in $resultsSKU.Keys) {
-            $differenceCount = $resultsSKU[$SKU]['availableCount'] - $resultsSKU[$SKU]['minimumCount']
+        foreach ($SKU in $results['SKU'].Keys) {
+            $differenceCount = $results['SKU'][$SKU]['availableCount'] - $results['SKU'][$SKU]['minimumCount']
             Add-Output -Output "<tr> `
                                 <td>$(Get-SKUName -SKUID $SKU)</td> `
-                                <td>$($resultsSKU[$SKU]['availableCount'])</td> `
-                                <td>$($resultsSKU[$SKU]['minimumCount'])</td>"
-            if ($resultsSKU[$SKU]['availableCount'] / $resultsSKU[$SKU]['minimumCount'] * 100 -ge $warningPercentageThreshold) {
+                                <td>$($results['SKU'][$SKU]['availableCount'])</td> `
+                                <td>$($results['SKU'][$SKU]['minimumCount'])</td>"
+            if ($results['SKU'][$SKU]['availableCount'] / $results['SKU'][$SKU]['minimumCount'] * 100 -ge $warningPercentageThreshold) {
                 Add-Output -Output "<td class=green>$differenceCount</td>"
             }
-            elseif ($resultsSKU[$SKU]['availableCount'] / $resultsSKU[$SKU]['minimumCount'] * 100 -le $criticalPercentageThreshold) {
+            elseif ($results['SKU'][$SKU]['availableCount'] / $results['SKU'][$SKU]['minimumCount'] * 100 -le $criticalPercentageThreshold) {
                 $critical = $true
                 Add-Output -Output "<td class=red>$differenceCount</td>"
             }
@@ -500,44 +503,69 @@ $resultsUsers.Keys.Count -gt 0) {
             Add-Output -Output '</tr>'
         }
         Add-Output -Output "</table></p> `
-                            <p>The following criteria were used during the checkup:<ul><li>Check products with >$licenseIgnoreThreshold total licenses</li> `
+                            <p>The following criteria were used during the checkup:<ul>
+                            <li>Check products with >$licenseIgnoreThreshold total licenses</li> `
                             <li>Report normal products having both <$licenseTotalThreshold_normalSKUs licenses and <$licensePercentageThreshold_normalSKUs% of their total licenses available</li> `
                             <li>Report important products having both <$licenseTotalThreshold_importantSKUs licenses and <$licensePercentageThreshold_importantSKUs% of their total licenses available</li></ul></p>"
     }
     # Output accounts with issues
-    if ($resultsUsers.Keys.Count -gt 0) {
-        Add-Output -Output '<p class=gray>Basic checkup - Users</p> `
-                            <p>Please check license assignments for the following accounts and mitigate impact:</p> `
+    if ($results['User'].Keys.Count -gt 0) {
+        Add-Output -Output '<p class=gray>Basic checkup - Users</p>
+                            <p>Please check license assignments for the following accounts and mitigate impact:</p>
                             <p><table><tr><th>Account</th><th>Interchangeable</th><th>Optimizable</th><th>Removable</th></tr>'
-        foreach ($user in $resultsUsers.Keys | Sort-Object) {
+        foreach ($user in $results['User'].Keys | Sort-Object) {
             Add-Output -Output "<tr> `
                                 <td>$user</td> `
-                                <td>$(($resultsUsers[$user]['Interchangeable'] |
+                                <td>$(($results['User'][$user]['Interchangeable'] |
                                         Where-Object{$null -ne $_} |
                                         ForEach-Object{Get-SKUName -SKUID $_} |
                                         Sort-Object) -join '<br>')</td> `
-                                <td>$(($resultsUsers[$user]['Optimizable'] |
+                                <td>$(($results['User'][$user]['Optimizable'] |
                                         Where-Object{$null -ne $_} |
                                         ForEach-Object{Get-SKUName -SKUID $_} |
                                         Sort-Object) -join '<br>')</td> `
-                                <td>$(($resultsUsers[$user]['Removable'] |
+                                <td>$(($results['User'][$user]['Removable'] |
                                         Where-Object{$null -ne $_} |
                                         ForEach-Object{Get-SKUName -SKUID $_} |
                                         Sort-Object) -join '<br>')</td> `
                                 </tr>"
         }
-        Add-Output -Output '</table></p> `
-                            <p>The following criteria were used during the checkup:<ul><li>Check accounts with any number of assigned licenses</li> `
-                            <li>Report theoretically exclusive licenses as <strong>interchangeable</strong>, based on specified SKUs</li> `
-                            <li>Report practically inclusive licenses as <strong>optimizable</strong>, based on available SKU features</li> `
+        Add-Output -Output '</table></p>
+                            <p>The following criteria were used during the checkup:<ul>
+                            <li>Check accounts with any number of assigned licenses</li>
+                            <li>Report theoretically exclusive licenses as <strong>interchangeable</strong>, based on specified SKUs</li>
+                            <li>Report practically inclusive licenses as <strong>optimizable</strong>, based on available SKU features</li>
                             <li>Report actually inclusive licenses as <strong>removable</strong>, based on enabled SKU features</li></ul></p>'
     }
-    if ($advancedCheckups) {
-        Add-Output -Output '<p class=gray>Avanced checkup - Features</p> `
-                            <p>Please check license counts for the following products and <a href="https://www.microsoft.com/licensing/servicecenter">reserve</a> additional licenses:</p> `
-                            <p><table><tr><th>License type</th><th>Available count</th><th>Minimum count</th><th>Difference</th></tr>'
-        #TODO: Output for advanced checkups
-        Add-Output -Output '</table></p>'
+    if ($results['Advanced'].Keys.Count -gt 0) {
+        Add-Output -Output '<p class=gray>Advanced checkup - Features</p>
+                            <p>Please check license counts for the following products and <a href="https://www.microsoft.com/licensing/servicecenter">reserve</a> additional licenses:</p>
+                            <p><table><tr><th>License type</th><th>Enabled count</th><th>Needed count</th><th>Difference</th></tr>'
+        foreach ($SKU in $results['Advanced'].Keys) {
+            $differenceCount = $results['Advanced'][$SKU]['enabledCount'] - $results['Advanced'][$SKU]['neededCount']
+            Add-Output -Output "<tr> `
+                                <td>$(Get-SKUName -SKUID $SKU)</td> `
+                                <td>$($results['Advanced'][$SKU]['enabledCount'])</td> `
+                                <td>$($results['Advanced'][$SKU]['neededCount'])</td>"
+            if ($results['Advanced'][$SKU]['enabledCount'] / $results['Advanced'][$SKU]['neededCount'] * 100 -ge $warningPercentageThreshold) {
+                Add-Output -Output "<td class=green>$differenceCount</td>"
+            }
+            elseif ($results['Advanced'][$SKU]['enabledCount'] / $results['Advanced'][$SKU]['neededCount'] * 100 -le $criticalPercentageThreshold) {
+                $critical = $true
+                Add-Output -Output "<td class=red>$differenceCount</td>"
+            }
+            else {
+                Add-Output -Output "<td class=yellow>$differenceCount</td>"
+            }
+            Add-Output -Output '</tr>'
+        }
+        Add-Output -Output "</table></p> `
+                            <p>The following criteria were used during the checkup:<ul>
+                            <li>Check <i>Azure AD P1</i> based on group-based application assignments</li> `
+                            <li>Check <i>Azure AD P1</i> based on dynamic group memberships</li> `
+                            <li>Check <i>Azure AD P1</i> based on MFA-enabled users</li> `
+                            <li>Check <i>Azure AD P2</i> based on PIM-managed users</li> `
+                            <li>Check <i>Defender for Office 365 P1/P2</i> based on user and shared mailboxes</li></ul></p>"
     }
     # Configure basic email settings
     $email = @{
