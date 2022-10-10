@@ -12,11 +12,11 @@ The main motivation for this script was to conquer side-effects of semi-automati
 
 #### 2.1.1 Basic
 
-:heavy_check_mark: Check for license availability based on Azure AD licensing information and company's specified thresholds
+:heavy_check_mark: Check for license availability based on Azure AD licensing information and company's thresholds
 
 #### 2.1.2 Advanced
 
-:heavy_check_mark: Check for license availability based on calculated information:
+:heavy_check_mark: Check for license availability based on Azure AD and Office feature information:
 
 - Azure Active Directory Premium P1 based on group-based application assignments
 - Azure Active Directory Premium P1 based on dynamic group memberships
@@ -28,11 +28,11 @@ The main motivation for this script was to conquer side-effects of semi-automati
 
 #### 2.2.1 Basic
 
-:heavy_check_mark: Check for Microsoft's pre-defined mutually exclusive licenses
+:heavy_check_mark: Check for Microsoft's mutually exclusive licenses
 
 :x: Check for Microsoft's interchangeable licenses
 
-:heavy_check_mark: Check for company's specified interchangeable licenses
+:heavy_check_mark: Check for company's interchangeable licenses
 
 :heavy_check_mark: Check for calculated optimizable licenses
 
@@ -40,15 +40,27 @@ The main motivation for this script was to conquer side-effects of semi-automati
 
 ## 3 Requirements
 
-### 3.1 Permissions
+### 3.1 Modules
 
 #### 3.1.1 Basic
+
+- _Az.Accounts_
+- _Az.KeyVault_
+- _Microsoft.Graph_
+
+#### 3.1.2 Advanced
+
+- _ExchangeOnlineManagement_
+
+### 3.2 Permissions
+
+#### 3.2.1 Basic
 
 - Microsoft Graph permission _Organization.Read.All_
 - Microsoft Graph permission _Mail.Send_
 - Microsoft Graph permission _User.Read.All_
 
-#### 3.1.2 Advanced
+#### 3.2.2 Advanced
 
 - Microsoft Graph permission _Application.Read.All_
 - Microsoft Graph permission _GroupMember.Read.All_
@@ -62,18 +74,6 @@ The main motivation for this script was to conquer side-effects of semi-automati
 >- _GroupMember.Read.All_
 >- _Organization.Read.All_
 >- _User.Read.All_
-
-### 3.2 PowerShell modules
-
-#### 3.2.1 Basic
-
-- _Az.Accounts_
-- _Az.KeyVault_
-- _Microsoft.Graph_
-
-#### 3.2.2 Advanced
-
-- _ExchangeOnlineManagement_
 
 ## 4 Preparations
 
