@@ -450,6 +450,7 @@ if ($advancedCheckups.IsPresent) {
                                 $_.scheduleInfo.expiration.type -eq 'noExpiration')}).principalId |
                             Select-Object -Unique))
     # Defender for Office 365 P1/P2 based on user and shared mailboxes
+    #TODO: Improve calculations by checking for license requirements other than Exchange Online mailboxes :https://learn.microsoft.com/office365/servicedescriptions/office-365-advanced-threat-protection-service-description#licensing-terms
     $orgDomain = (Invoke-MgGraphRequest -Method GET -Uri 'https://graph.microsoft.com/v1.0/organization?$select=verifiedDomains').value.verifiedDomains | Where-Object{$_.isInitial -eq $true}
     Connect-ExchangeOnline -AppId $applicationID -Certificate $x509Cert -Organization $orgDomain.name -CommandName Get-Mailbox
     $ATPUsers.AddRange([guid[]](Get-EXOMailbox -RecipientTypeDetails 'SharedMailbox', 'UserMailbox' -ResultSize Unlimited).ExternalDirectoryObjectId)

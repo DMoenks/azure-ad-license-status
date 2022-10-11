@@ -12,11 +12,13 @@ The main motivation for this script was to conquer side-effects of semi-automati
 
 #### 2.1.1 Basic
 
-:heavy_check_mark: Check for license availability based on Azure AD licensing information and company's thresholds
+:heavy_check_mark: Check for license availability based on Azure AD license information
+
+:heavy_check_mark: Calculate report importance based on organization's thresholds
 
 #### 2.1.2 Advanced
 
-:heavy_check_mark: Check for license availability based on Azure AD and Office feature information:
+:heavy_check_mark: Check for license need based on Azure AD and Office feature information:
 
 - Azure Active Directory Premium P1 based on group-based application assignments
 - Azure Active Directory Premium P1 based on dynamic group memberships
@@ -32,11 +34,11 @@ The main motivation for this script was to conquer side-effects of semi-automati
 
 :x: Check for Microsoft's interchangeable licenses
 
-:heavy_check_mark: Check for company's interchangeable licenses
+:heavy_check_mark: Check for organization's interchangeable licenses
 
-:heavy_check_mark: Check for calculated optimizable licenses
+:heavy_check_mark: Calculate optimizable licenses based on available features
 
-:heavy_check_mark: Check for calculated removable licenses
+:heavy_check_mark: Calculate removable licenses based on enabled features
 
 ## 3 Requirements
 
@@ -77,8 +79,6 @@ The main motivation for this script was to conquer side-effects of semi-automati
 
 ## 4 Preparations
 
-To use the script for automation purposes with Azure services, configure the following:
-
 1. Create Azure automation account
    1. Create PowerShell runbook
    2. Add required modules
@@ -90,7 +90,7 @@ To use the script for automation purposes with Azure services, configure the fol
    1. Add certificate
    2. Grant required permissions
 4. (optional) Create Exchange Online application access policy
-   1. Limit Azure AD application's permission to intended sender mailbox
+   1. Restrict Azure AD application's _Mail.Send_ permission to intended sender mailbox
 
 ## 5 Links
 
