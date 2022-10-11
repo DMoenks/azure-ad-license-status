@@ -44,7 +44,7 @@ Specifies the advanced warning percentage threshold to be used during report cre
 .PARAMETER criticalPercentageThreshold_advanced
 Specifies the advanced critical percentage threshold to be used during report creation
 .PARAMETER importantSKUs
-.PARAMETER interchangeableSKUs_specified
+.PARAMETER interchangeableSKUs
 .PARAMETER advancedCheckups
 Specifies if advanced license checkups should be run
 ATTENTION: Advanced checkups require additional access permissions and will increase the scripts runtime
@@ -79,7 +79,7 @@ param (
         '18181a46-0d4e-45cd-891e-60aabd171b4e',
         '6fd2c87f-b296-42f0-b197-1e91e994b900'
     ),
-    [guid[]]$interchangeableSKUs_specified = @(
+    [guid[]]$interchangeableSKUs = @(
         '4b585984-651b-448a-9e53-3b10f069cf7f',
         '18181a46-0d4e-45cd-891e-60aabd171b4e',
         '6fd2c87f-b296-42f0-b197-1e91e994b900',
@@ -248,23 +248,18 @@ foreach ($SKU in $SKUs | Where-Object{$_.prepaidUnits.enabled -gt $licenseIgnore
         Add-Result -SKUID $SKU.skuId -AvailableCount $availableCount -MinimumCount $minimumCount
     }
 }
-$interchangeableSKUs_calculatedOrganization_replaces = @{}
-$interchangeableSKUs_calculatedOrganization_replacedBy = @{}
+$superiorSKUs_organization = @{}
 foreach ($referenceSKU in $SKUs) {
     foreach ($differenceSKU in $SKUs | Where-Object{$_.skuId -ne $referenceSKU.skuId}) {
         if ($null -ne ($referenceServicePlans = $referenceSKU.servicePlans | Where-Object{$_.appliesTo -eq 'User'}) -and
         $null -ne ($differenceServicePlans = $differenceSKU.servicePlans | Where-Object{$_.appliesTo -eq 'User'})) {
             if ($null -ne ($comparisonSKU = Compare-Object $referenceServicePlans.servicePlanId $differenceServicePlans.servicePlanId -IncludeEqual) -and
-            ($comparisonSKU.SideIndicator | Select-Object -Unique) -contains '==' -and
-            ($comparisonSKU.SideIndicator | Select-Object -Unique) -notcontains '=>') {
-                if (-not $interchangeableSKUs_calculatedOrganization_replaces.ContainsKey($referenceSKU.skuId)) {
-                    $interchangeableSKUs_calculatedOrganization_replaces.Add($referenceSKU.skuId, [System.Collections.Generic.List[guid]]::new())
+            $comparisonSKU.SideIndicator -contains '==' -and
+            $comparisonSKU.SideIndicator -notcontains '=>') {
+                if (-not $superiorSKUs_organization.ContainsKey($differenceSKU.skuId)) {
+                    $superiorSKUs_organization.Add($differenceSKU.skuId, [System.Collections.Generic.List[guid]]::new())
                 }
-                $interchangeableSKUs_calculatedOrganization_replaces[$referenceSKU.skuId].Add($differenceSKU.skuId)
-                if (-not $interchangeableSKUs_calculatedOrganization_replacedBy.ContainsKey($differenceSKU.skuId)) {
-                    $interchangeableSKUs_calculatedOrganization_replacedBy.Add($differenceSKU.skuId, [System.Collections.Generic.List[guid]]::new())
-                }
-                $interchangeableSKUs_calculatedOrganization_replacedBy[$differenceSKU.skuId].Add($referenceSKU.skuId)
+                $superiorSKUs_organization[$differenceSKU.skuId].Add($referenceSKU.skuId)
             }
         }
     }
@@ -291,14 +286,14 @@ foreach ($user in $users) {
         }
         # Identify interchangeable SKUs, based on earlier specifications
         if ($null -ne $userSKUs) {
-            $comparisonInterchangeable = (Compare-Object $userSKUs $interchangeableSKUs_specified -ExcludeDifferent -IncludeEqual).InputObject
+            $comparisonInterchangeable = (Compare-Object $userSKUs $interchangeableSKUs -ExcludeDifferent -IncludeEqual).InputObject
         }
         # Identify optimizable SKUs, based on organization-level calculations
         if ($null -ne ($comparison_replaceableOrganization = $userSKUs |
-        Where-Object{$_ -in $interchangeableSKUs_calculatedOrganization_replacedBy.Keys} |
-        ForEach-Object{$interchangeableSKUs_calculatedOrganization_replacedBy[$_]})) {
+        Where-Object{$_ -in $superiorSKUs_organization.Keys} |
+        ForEach-Object{$superiorSKUs_organization[$_]})) {
             $comparisonOptimizable = Compare-Object -ReferenceObject $userSKUs -DifferenceObject $comparison_replaceableOrganization -ExcludeDifferent -IncludeEqual |
-                                        ForEach-Object{$interchangeableSKUs_calculatedOrganization_replaces[$_.InputObject]} |
+                                        ForEach-Object{$superiorSKUs_organization.Keys | Where-Object{$superiorSKUs_organization[$_] -contains $_.InputObject}} |
                                         Where-Object{$_ -in $userSKUs} |
                                         Select-Object -Unique
         }
@@ -312,32 +307,27 @@ foreach ($user in $users) {
                 $skuid_enabledPlans[$skuid].AddRange([guid[]]@((($SKUs | Where-Object{$_.skuid -eq $skuid}).servicePlans | Where-Object{$_.servicePlanId -notin $assignment.disabledplans -and $_.appliesTo -eq 'User'}).servicePlanId))
             }
         }
-        $interchangeableSKUs_calculatedUser_replaces = @{}
-        $interchangeableSKUs_calculatedUser_replacedBy = @{}
+        $superiorSKUs_user = @{}
         foreach ($referenceSKU in $skuid_enabledPlans.Keys) {
             foreach ($differenceSKU in $skuid_enabledPlans.Keys | Where-Object{$_ -ne $referenceSKU}) {
                 if ($null -ne ($referenceServicePlans = $skuid_enabledPlans[$referenceSKU]) -and
                 $null -ne ($differenceServicePlans = $skuid_enabledPlans[$differenceSKU])) {
                     if ($null -ne ($comparisonSKU = Compare-Object $referenceServicePlans $differenceServicePlans -IncludeEqual) -and
-                    ($comparisonSKU.SideIndicator | Select-Object -Unique) -contains '==' -and
-                    ($comparisonSKU.SideIndicator | Select-Object -Unique) -notcontains '=>') {
-                        if (-not $interchangeableSKUs_calculatedUser_replaces.ContainsKey($referenceSKU)) {
-                            $interchangeableSKUs_calculatedUser_replaces.Add($referenceSKU, [System.Collections.Generic.List[guid]]::new())
+                    $comparisonSKU.SideIndicator -contains '==' -and
+                    $comparisonSKU.SideIndicator -notcontains '=>') {
+                        if (-not $superiorSKUs_user.ContainsKey($differenceSKU)) {
+                            $superiorSKUs_user.Add($differenceSKU, [System.Collections.Generic.List[guid]]::new())
                         }
-                        $interchangeableSKUs_calculatedUser_replaces[$referenceSKU].Add($differenceSKU)
-                        if (-not $interchangeableSKUs_calculatedUser_replacedBy.ContainsKey($differenceSKU)) {
-                            $interchangeableSKUs_calculatedUser_replacedBy.Add($differenceSKU, [System.Collections.Generic.List[guid]]::new())
-                        }
-                        $interchangeableSKUs_calculatedUser_replacedBy[$differenceSKU].Add($referenceSKU)
+                        $superiorSKUs_user[$differenceSKU].Add($referenceSKU)
                     }
                 }
             }
         }
         if ($null -ne ($comparison_replaceableUser = $userSKUs |
-        Where-Object{$_ -in $interchangeableSKUs_calculatedUser_replacedBy.Keys} |
-        ForEach-Object{$interchangeableSKUs_calculatedUser_replacedBy[$_]})) {
+        Where-Object{$_ -in $superiorSKUs_user.Keys} |
+        ForEach-Object{$superiorSKUs_user[$_]})) {
             $comparisonRemovable = Compare-Object -ReferenceObject $userSKUs -DifferenceObject $comparison_replaceableUser -ExcludeDifferent -IncludeEqual |
-                                    ForEach-Object{$interchangeableSKUs_calculatedUser_replaces[$_.InputObject]} |
+                                    ForEach-Object{$superiorSKUs_user.Keys | Where-Object{$superiorSKUs_user[$_] -contains $_.InputObject}} |
                                     Where-Object{$_ -in $userSKUs} |
                                     Select-Object -Unique
         }
@@ -465,14 +455,14 @@ if ($advancedCheckups.IsPresent) {
     #TODO: Missing better count calculations
     if ($AADP1Users.Count -gt 0) {
         $AADP1Licenses = ($SKUs | Where-Object{$_.skuid -eq '078d2b04-f1bd-4111-bbd4-b4b1b354cef4'}).prepaidUnits.enabled
-        foreach ($SKU in $interchangeableSKUs_calculatedOrganization_replacedBy['078d2b04-f1bd-4111-bbd4-b4b1b354cef4']) {
+        foreach ($SKU in $superiorSKUs_organization['078d2b04-f1bd-4111-bbd4-b4b1b354cef4']) {
             $AADP1Licenses += ($SKUs | Where-Object{$_.skuid -eq $SKU}).prepaidUnits.enabled
         }
         Add-Result -SKUID '078d2b04-f1bd-4111-bbd4-b4b1b354cef4' -EnabledCount $AADP1Licenses -NeededCount ($AADP1Users | Select-Object -Unique).Count
     }
     if ($AADP2Users.Count -gt 0) {
         $AADP2Licenses = ($SKUs | Where-Object{$_.skuid -eq '84a661c4-e949-4bd2-a560-ed7766fcaf2b'}).prepaidUnits.enabled
-        foreach ($SKU in $interchangeableSKUs_calculatedOrganization_replacedBy['84a661c4-e949-4bd2-a560-ed7766fcaf2b']) {
+        foreach ($SKU in $superiorSKUs_organization['84a661c4-e949-4bd2-a560-ed7766fcaf2b']) {
             $AADP2Licenses += ($SKUs | Where-Object{$_.skuid -eq $SKU}).prepaidUnits.enabled
         }
         Add-Result -SKUID '84a661c4-e949-4bd2-a560-ed7766fcaf2b' -EnabledCount $AADP2Licenses -NeededCount ($AADP2Users | Select-Object -Unique).Count
@@ -480,14 +470,14 @@ if ($advancedCheckups.IsPresent) {
     if ($ATPUsers.Count -gt 0) {
         if ($SKUs.skuId -contains '3dd6cf57-d688-4eed-ba52-9e40b5468c3e') {
             $ATPLicenses = ($SKUs | Where-Object{$_.skuid -eq '3dd6cf57-d688-4eed-ba52-9e40b5468c3e'}).prepaidUnits.enabled
-            foreach ($SKU in $interchangeableSKUs_calculatedOrganization_replacedBy['3dd6cf57-d688-4eed-ba52-9e40b5468c3e']) {
+            foreach ($SKU in $superiorSKUs_organization['3dd6cf57-d688-4eed-ba52-9e40b5468c3e']) {
                 $ATPLicenses += ($SKUs | Where-Object{$_.skuid -eq $SKU}).prepaidUnits.enabled
             }
             Add-Result -SKUID '3dd6cf57-d688-4eed-ba52-9e40b5468c3e'-EnabledCount $ATPLicenses -NeededCount ($ATPUsers | Select-Object -Unique).Count
         }
         else {
             $ATPLicenses = ($SKUs | Where-Object{$_.skuid -eq '4ef96642-f096-40de-a3e9-d83fb2f90211'}).prepaidUnits.enabled
-            foreach ($SKU in $interchangeableSKUs_calculatedOrganization_replacedBy['4ef96642-f096-40de-a3e9-d83fb2f90211']) {
+            foreach ($SKU in $superiorSKUs_organization['4ef96642-f096-40de-a3e9-d83fb2f90211']) {
                 $ATPLicenses += ($SKUs | Where-Object{$_.skuid -eq $SKU}).prepaidUnits.enabled
             }
             Add-Result -SKUID '4ef96642-f096-40de-a3e9-d83fb2f90211' -EnabledCount $ATPLicenses -NeededCount ($ATPUsers | Select-Object -Unique).Count
