@@ -293,7 +293,7 @@ foreach ($user in $users) {
         Where-Object{$_ -in $superiorSKUs_organization.Keys} |
         ForEach-Object{$superiorSKUs_organization[$_]})) {
             $comparisonOptimizable = Compare-Object -ReferenceObject $userSKUs -DifferenceObject $comparison_replaceableOrganization -ExcludeDifferent -IncludeEqual |
-                                        ForEach-Object{$superiorSKUs_organization.Keys | Where-Object{$superiorSKUs_organization[$_] -contains $_.InputObject}} |
+            ForEach-Object{$superiorSKU = $_.InputObject; $superiorSKUs_organization.Keys | Where-Object{$superiorSKUs_organization[$_] -contains $superiorSKU}} |
                                         Where-Object{$_ -in $userSKUs} |
                                         Select-Object -Unique
         }
@@ -327,23 +327,19 @@ foreach ($user in $users) {
         Where-Object{$_ -in $superiorSKUs_user.Keys} |
         ForEach-Object{$superiorSKUs_user[$_]})) {
             $comparisonRemovable = Compare-Object -ReferenceObject $userSKUs -DifferenceObject $comparison_replaceableUser -ExcludeDifferent -IncludeEqual |
-                                    ForEach-Object{$superiorSKUs_user.Keys | Where-Object{$superiorSKUs_user[$_] -contains $_.InputObject}} |
+            ForEach-Object{$superiorSKU = $_.InputObject; $superiorSKUs_user.Keys | Where-Object{$superiorSKUs_user[$_] -contains $superiorSKU}} |
                                     Where-Object{$_ -in $userSKUs} |
                                     Select-Object -Unique
         }
         # Add intermediate results to total results
-        if ($comparisonInterchangeable.Count -gt 1 -or
-        $null -ne $comparisonOptimizable -or
-        $null -ne $comparisonRemovable) {
-            if ($comparisonInterchangeable.Count -gt 1) {
-                Add-Result -UserPrincipalName $user.userPrincipalName -ConflictType Interchangeable -ConflictSKUs $comparisonInterchangeable
-            }
-            if ($null -ne $comparisonOptimizable) {
-                Add-Result -UserPrincipalName $user.userPrincipalName -ConflictType Optimizable -ConflictSKUs $comparisonOptimizable
-            }
-            if ($null -ne $comparisonRemovable) {
-                Add-Result -UserPrincipalName $user.userPrincipalName -ConflictType Removable -ConflictSKUs $comparisonRemovable
-            }
+        if ($comparisonInterchangeable.Count -gt 1) {
+            Add-Result -UserPrincipalName $user.userPrincipalName -ConflictType Interchangeable -ConflictSKUs $comparisonInterchangeable
+        }
+        if ($null -ne $comparisonOptimizable) {
+            Add-Result -UserPrincipalName $user.userPrincipalName -ConflictType Optimizable -ConflictSKUs $comparisonOptimizable
+        }
+        if ($null -ne $comparisonRemovable) {
+            Add-Result -UserPrincipalName $user.userPrincipalName -ConflictType Removable -ConflictSKUs $comparisonRemovable
         }
     }
 }
@@ -373,7 +369,7 @@ if ($advancedCheckups.IsPresent) {
         }
     }
     $AADP1Users.AddRange([guid[]]($dynamicGroupMembers.id | Select-Object -Unique))
-    # Azure AD P1 based on group-based application assignments and applications using application proxy
+    # Azure AD P1 based on group-based application assignments
     $applications = [System.Collections.Generic.List[hashtable]]::new()
     $URI = 'https://graph.microsoft.com/v1.0/servicePrincipals?$expand=appRoleAssignedTo'
     while ($null -ne $URI) {
@@ -458,29 +454,32 @@ if ($advancedCheckups.IsPresent) {
         foreach ($SKU in $superiorSKUs_organization['078d2b04-f1bd-4111-bbd4-b4b1b354cef4']) {
             $AADP1Licenses += ($SKUs | Where-Object{$_.skuid -eq $SKU}).prepaidUnits.enabled
         }
-        Add-Result -SKUID '078d2b04-f1bd-4111-bbd4-b4b1b354cef4' -EnabledCount $AADP1Licenses -NeededCount ($AADP1Users | Select-Object -Unique).Count
+        if ($AADP1Licenses -lt ($neededCount = ($AADP1Users | Select-Object -Unique).Count)) {
+            Add-Result -SKUID '078d2b04-f1bd-4111-bbd4-b4b1b354cef4' -EnabledCount $AADP1Licenses -NeededCount $neededCount
+        }
     }
     if ($AADP2Users.Count -gt 0) {
         $AADP2Licenses = ($SKUs | Where-Object{$_.skuid -eq '84a661c4-e949-4bd2-a560-ed7766fcaf2b'}).prepaidUnits.enabled
         foreach ($SKU in $superiorSKUs_organization['84a661c4-e949-4bd2-a560-ed7766fcaf2b']) {
             $AADP2Licenses += ($SKUs | Where-Object{$_.skuid -eq $SKU}).prepaidUnits.enabled
         }
-        Add-Result -SKUID '84a661c4-e949-4bd2-a560-ed7766fcaf2b' -EnabledCount $AADP2Licenses -NeededCount ($AADP2Users | Select-Object -Unique).Count
+        if ($AADP2Licenses -lt ($neededCount = ($AADP2Users | Select-Object -Unique).Count)) {
+            Add-Result -SKUID '078d2b04-f1bd-4111-bbd4-b4b1b354cef4' -EnabledCount $AADP2Licenses -NeededCount $neededCount
+        }
     }
     if ($ATPUsers.Count -gt 0) {
         if ($SKUs.skuId -contains '3dd6cf57-d688-4eed-ba52-9e40b5468c3e') {
-            $ATPLicenses = ($SKUs | Where-Object{$_.skuid -eq '3dd6cf57-d688-4eed-ba52-9e40b5468c3e'}).prepaidUnits.enabled
-            foreach ($SKU in $superiorSKUs_organization['3dd6cf57-d688-4eed-ba52-9e40b5468c3e']) {
-                $ATPLicenses += ($SKUs | Where-Object{$_.skuid -eq $SKU}).prepaidUnits.enabled
-            }
-            Add-Result -SKUID '3dd6cf57-d688-4eed-ba52-9e40b5468c3e'-EnabledCount $ATPLicenses -NeededCount ($ATPUsers | Select-Object -Unique).Count
+            $checkSKU = '3dd6cf57-d688-4eed-ba52-9e40b5468c3e'
         }
         else {
-            $ATPLicenses = ($SKUs | Where-Object{$_.skuid -eq '4ef96642-f096-40de-a3e9-d83fb2f90211'}).prepaidUnits.enabled
-            foreach ($SKU in $superiorSKUs_organization['4ef96642-f096-40de-a3e9-d83fb2f90211']) {
-                $ATPLicenses += ($SKUs | Where-Object{$_.skuid -eq $SKU}).prepaidUnits.enabled
-            }
-            Add-Result -SKUID '4ef96642-f096-40de-a3e9-d83fb2f90211' -EnabledCount $ATPLicenses -NeededCount ($ATPUsers | Select-Object -Unique).Count
+            $checkSKU = '4ef96642-f096-40de-a3e9-d83fb2f90211'
+        }
+        $ATPLicenses = ($SKUs | Where-Object{$_.skuid -eq $checkSKU}).prepaidUnits.enabled
+        foreach ($SKU in $superiorSKUs_organization[$checkSKU]) {
+            $ATPLicenses += ($SKUs | Where-Object{$_.skuid -eq $SKU}).prepaidUnits.enabled
+        }
+        if ($ATPLicenses -lt ($neededCount = ($ATPUsers | Select-Object -Unique).Count)) {
+            Add-Result -SKUID '078d2b04-f1bd-4111-bbd4-b4b1b354cef4' -EnabledCount $ATPLicenses -NeededCount $neededCount
         }
     }
 }
