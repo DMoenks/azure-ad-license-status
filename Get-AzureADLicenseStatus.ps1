@@ -195,6 +195,34 @@ function Add-Result {
     }
 }
 
+$groups = [System.Collections.Generic.List[hashtable]]::new()
+function Get-GroupMembers {
+    [OutputType([string])]
+    param (
+        [guid[]]$GroupIDs,
+        [switch]$TransitiveMembers
+    )
+    if ($TransitiveMembers.IsPresent) {
+        $memberProperty = 'transitiveMembers'
+    }
+    else {
+        $memberProperty = 'members'
+    }
+    foreach ($groupID in $GroupIDs) {
+        if ($null -eq $groups[$groupID][$memberProperty]) {
+            $groupMembers = [System.Collections.Generic.List[hashtable]]::new()
+            $URI = 'https://graph.microsoft.com/v1.0/groups/{0}/{1}?$select=id' -f $groupID, $memberProperty
+            while ($null -ne $URI) {
+                $data = Invoke-MgGraphRequest -Method GET -Uri $URI
+                $groupMembers.AddRange([hashtable[]]($data.value))
+                $URI = $data['@odata.nextLink']
+            }
+            $groups[$groupID].Add($memberProperty, $groupMembers)
+        }
+    }
+    return ($groups | Where-Object{$_.id -in $GroupIDs})[$memberProperty].id
+}
+
 $skuTranslate = [string]::new([char[]]((Invoke-WebRequest -Uri 'https://download.microsoft.com/download/e/3/e/e3e9faf2-f28b-490a-9ada-c6089a1fc5b0/Product%20names%20and%20service%20plan%20identifiers%20for%20licensing.csv' -UseBasicParsing).Content)) | ConvertFrom-Csv
 function Get-SKUName {
     [OutputType([string])]
@@ -269,7 +297,7 @@ foreach ($referenceSKU in $SKUs) {
 #region: Users
 # Get users
 $users = [System.Collections.Generic.List[hashtable]]::new()
-$URI = 'https://graph.microsoft.com/v1.0/users?$select=id,licenseAssignmentStates,userPrincipalName&$top=500'
+$URI = 'https://graph.microsoft.com/v1.0/users?$select=id,licenseAssignmentStates,userPrincipalName&$top=999'
 while ($null -ne $URI) {
     $data = Invoke-MgGraphRequest -Method GET -Uri $URI
     $users.AddRange([hashtable[]]($data.value))
@@ -350,44 +378,26 @@ if ($advancedCheckups.IsPresent) {
     $AADP1Users = [System.Collections.Generic.List[guid]]::new()
     $AADP2Users = [System.Collections.Generic.List[guid]]::new()
     $ATPUsers = [System.Collections.Generic.List[guid]]::new()
-    # Retrieve groups, used for multiple checkups
-    $groups = [System.Collections.Generic.List[hashtable]]::new()
-    $URI = 'https://graph.microsoft.com/v1.0/groups?$select=id,groupTypes'
+    # Retrieve basic group information
+    $URI = 'https://graph.microsoft.com/v1.0/groups?$select=id,groupTypes&$top=999'
     while ($null -ne $URI) {
         $data = Invoke-MgGraphRequest -Method GET -Uri $URI
         $groups.AddRange([hashtable[]]($data.value))
         $URI = $data['@odata.nextLink']
     }
     # Azure AD P1 based on dynamic groups
-    $dynamicGroupMembers = [System.Collections.Generic.List[hashtable]]::new()
-    foreach ($group in $groups | Where-Object{$_.groupTypes -contains 'DynamicMembership'}) {
-        $URI = 'https://graph.microsoft.com/v1.0/groups/{0}/members?$select=id' -f $group.id
-        while ($null -ne $URI) {
-            $data = Invoke-MgGraphRequest -Method GET -Uri $URI
-            $dynamicGroupMembers.AddRange([hashtable[]]($data.value))
-            $URI = $data['@odata.nextLink']
-        }
-    }
-    $AADP1Users.AddRange([guid[]]($dynamicGroupMembers.id | Select-Object -Unique))
+    $dynamicGroups = $groups | Where-Object{$_.groupTypes -contains 'DynamicMembership'}
+    $AADP1Users.AddRange((Get-GroupMembers -GroupIDs $dynamicGroups.id -TransitiveMembers))
     # Azure AD P1 based on group-based application assignments
     $applications = [System.Collections.Generic.List[hashtable]]::new()
-    $URI = 'https://graph.microsoft.com/v1.0/servicePrincipals?$expand=appRoleAssignedTo'
+    $URI = 'https://graph.microsoft.com/v1.0/servicePrincipals?$expand=appRoleAssignedTo&$top=999'
     while ($null -ne $URI) {
         $data = Invoke-MgGraphRequest -Method GET -Uri $URI
         $applications.AddRange([hashtable[]]($data.value))
         $URI = $data['@odata.nextLink']
     }
     $applicationGroups = ($applications | Where-Object{$_.accountEnabled -eq $true -and $_.appRoleAssignmentRequired -eq $true -and $_.servicePrincipalType -eq 'Application'}).appRoleAssignedTo | Where-Object{$_.principalType -eq 'Group'}
-    $applicationGroupMembers = [System.Collections.Generic.List[hashtable]]::new()
-    foreach ($group in $applicationGroups) {
-        $URI = 'https://graph.microsoft.com/v1.0/groups/{0}/members?$select=id' -f $group.principalId
-        while ($null -ne $URI) {
-            $data = Invoke-MgGraphRequest -Method GET -Uri $URI
-            $applicationGroupMembers.AddRange([hashtable[]]($data.value))
-            $URI = $data['@odata.nextLink']
-        }
-    }
-    $AADP1Users.AddRange([guid[]]($applicationGroupMembers.id | Select-Object -Unique))
+    $AADP1Users.AddRange((Get-GroupMembers -GroupIDs $applicationGroups.id -TransitiveMembers))
     # Azure AD P1 based on MFA-enabled users
     $conditionalAccessPolicies = [System.Collections.Generic.List[hashtable]]::new()
     $URI = 'https://graph.microsoft.com/v1.0/identity/conditionalAccess/policies?$select=conditions,state'
@@ -396,38 +406,24 @@ if ($advancedCheckups.IsPresent) {
         $conditionalAccessPolicies.AddRange([hashtable[]]($data.value))
         $URI = $data['@odata.nextLink']
     }
-    $conditionalAccessUsers = [System.Collections.Generic.List[guid]]::new()
-    #TODO: Missing better user/group matching, especially for nested groups
     foreach ($conditionalAccessPolicy in $conditionalAccessPolicies | Where-Object{$_.state -eq 'enabled'}) {
         if ($conditionalAccessPolicy.conditions.users.includeUsers -eq 'All') {
-            $includeUsers = (Compare-Object -ReferenceObject $users.id -DifferenceObject $conditionalAccessPolicy.conditions.users.excludeUsers | Where-Object{$_.SideIndicator -eq '<='}).InputObject | Where-Object{$_ -ne 'GuestsOrExternalUsers'}
+            $includeUsers = $users.id
         }
         else {
-            $includeUsers = (Compare-Object -ReferenceObject $conditionalAccessPolicy.conditions.users.includeUsers -DifferenceObject $conditionalAccessPolicy.conditions.users.excludeUsers | Where-Object{$_.SideIndicator -eq '<='}).InputObject | Where-Object{$_ -ne 'GuestsOrExternalUsers'}
+            $includeUsers = $conditionalAccessPolicy.conditions.users.includeUsers
         }
-        if ($null -ne $includeUsers) {
-            $conditionalAccessUsers.AddRange([guid[]]$includeUsers)
-        }
+        $conditionalAccessUsers = (Compare-Object -ReferenceObject $includeUsers -DifferenceObject $conditionalAccessPolicy.conditions.users.excludeUsers | Where-Object{$_.SideIndicator -eq '<='}).InputObject | Where-Object{$_ -ne 'GuestsOrExternalUsers'}
+        $AADP1Users.AddRange([guid[]]$conditionalAccessUsers)
         if ($conditionalAccessPolicy.conditions.users.includeGroups -eq 'All') {
-            $conditionalAccessGroups = (Compare-Object -ReferenceObject $groups.id -DifferenceObject $conditionalAccessPolicy.conditions.users.excludeGroups | Where-Object{$_.SideIndicator -eq '<='}).InputObject
+            $includeGroups = $groups.id
         }
         else {
-            $conditionalAccessGroups = (Compare-Object -ReferenceObject $conditionalAccessPolicy.conditions.users.includeGroups -DifferenceObject $conditionalAccessPolicy.conditions.users.excludeGroups | Where-Object{$_.SideIndicator -eq '<='}).InputObject
+            $includeGroups = $conditionalAccessPolicy.conditions.users.includeGroups
         }
-        $conditionalAccessGroupUsers = [System.Collections.Generic.List[hashtable]]::new()
-        foreach ($conditionalAccessGroup in $conditionalAccessGroups) {
-            $URI = 'https://graph.microsoft.com/v1.0/groups/{0}/members?$select=id' -f $conditionalAccessGroup
-            while ($null -ne $URI) {
-                $data = Invoke-MgGraphRequest -Method GET -Uri $URI
-                $conditionalAccessGroupUsers.AddRange([hashtable[]]($data.value))
-                $URI = $data['@odata.nextLink']
-            }
-        }
-        if ($null -ne $conditionalAccessGroupUsers.id) {
-            $conditionalAccessUsers.AddRange([guid[]]($conditionalAccessGroupUsers.id | Select-Object -Unique))
-        }
+        $conditionalAccessGroups = (Compare-Object -ReferenceObject $includeGroups -DifferenceObject $conditionalAccessPolicy.conditions.users.excludeGroups | Where-Object{$_.SideIndicator -eq '<='}).InputObject
+        $AADP1Users.AddRange((Get-GroupMembers -GroupIDs $conditionalAccessGroups.id -TransitiveMembers))
     }
-    $AADP1Users.AddRange([guid[]]($conditionalAccessUsers | Select-Object -Unique))
     # Azure AD P2 based on PIM-managed users
     $eligibleRoleMembers = [System.Collections.Generic.List[hashtable]]::new()
     $URI = 'https://graph.microsoft.com/v1.0/roleManagement/directory/roleEligibilitySchedules?$select=principalId,scheduleInfo'
@@ -439,8 +435,7 @@ if ($advancedCheckups.IsPresent) {
     $AADP2Users.AddRange([guid[]](($eligibleRoleMembers |
                             Where-Object{$_.scheduleInfo.startDateTime -le [datetime]::Today -and
                                 ($_.scheduleInfo.expiration.endDateTime -ge [datetime]::Today -or
-                                $_.scheduleInfo.expiration.type -eq 'noExpiration')}).principalId |
-                            Select-Object -Unique))
+                                $_.scheduleInfo.expiration.type -eq 'noExpiration')}).principalId))
     # Defender for Office 365 P1/P2 based on user and shared mailboxes
     #TODO: Improve calculations by checking for license requirements other than Exchange Online mailboxes :https://learn.microsoft.com/office365/servicedescriptions/office-365-advanced-threat-protection-service-description#licensing-terms
     $orgDomain = (Invoke-MgGraphRequest -Method GET -Uri 'https://graph.microsoft.com/v1.0/organization?$select=verifiedDomains').value.verifiedDomains | Where-Object{$_.isInitial -eq $true}
@@ -450,36 +445,38 @@ if ($advancedCheckups.IsPresent) {
     # Results
     #TODO: Missing better count calculations
     if ($AADP1Users.Count -gt 0) {
-        $AADP1Licenses = ($SKUs | Where-Object{$_.skuid -eq '078d2b04-f1bd-4111-bbd4-b4b1b354cef4'}).prepaidUnits.enabled
-        foreach ($SKU in $superiorSKUs_organization['078d2b04-f1bd-4111-bbd4-b4b1b354cef4']) {
+        $skuid = '078d2b04-f1bd-4111-bbd4-b4b1b354cef4'
+        $AADP1Licenses = ($SKUs | Where-Object{$_.skuid -eq $skuid}).prepaidUnits.enabled
+        foreach ($SKU in $superiorSKUs_organization[$skuid]) {
             $AADP1Licenses += ($SKUs | Where-Object{$_.skuid -eq $SKU}).prepaidUnits.enabled
         }
         if ($AADP1Licenses -lt ($neededCount = ($AADP1Users | Select-Object -Unique).Count)) {
-            Add-Result -SKUID '078d2b04-f1bd-4111-bbd4-b4b1b354cef4' -EnabledCount $AADP1Licenses -NeededCount $neededCount
+            Add-Result -SKUID $skuid -EnabledCount $AADP1Licenses -NeededCount $neededCount
         }
     }
     if ($AADP2Users.Count -gt 0) {
-        $AADP2Licenses = ($SKUs | Where-Object{$_.skuid -eq '84a661c4-e949-4bd2-a560-ed7766fcaf2b'}).prepaidUnits.enabled
-        foreach ($SKU in $superiorSKUs_organization['84a661c4-e949-4bd2-a560-ed7766fcaf2b']) {
+        $skuid = '84a661c4-e949-4bd2-a560-ed7766fcaf2b'
+        $AADP2Licenses = ($SKUs | Where-Object{$_.skuid -eq $skuid}).prepaidUnits.enabled
+        foreach ($SKU in $superiorSKUs_organization[$skuid]) {
             $AADP2Licenses += ($SKUs | Where-Object{$_.skuid -eq $SKU}).prepaidUnits.enabled
         }
         if ($AADP2Licenses -lt ($neededCount = ($AADP2Users | Select-Object -Unique).Count)) {
-            Add-Result -SKUID '078d2b04-f1bd-4111-bbd4-b4b1b354cef4' -EnabledCount $AADP2Licenses -NeededCount $neededCount
+            Add-Result -SKUID $skuid -EnabledCount $AADP2Licenses -NeededCount $neededCount
         }
     }
     if ($ATPUsers.Count -gt 0) {
         if ($SKUs.skuId -contains '3dd6cf57-d688-4eed-ba52-9e40b5468c3e') {
-            $checkSKU = '3dd6cf57-d688-4eed-ba52-9e40b5468c3e'
+            $skuid = '3dd6cf57-d688-4eed-ba52-9e40b5468c3e'
         }
         else {
-            $checkSKU = '4ef96642-f096-40de-a3e9-d83fb2f90211'
+            $skuid = '4ef96642-f096-40de-a3e9-d83fb2f90211'
         }
-        $ATPLicenses = ($SKUs | Where-Object{$_.skuid -eq $checkSKU}).prepaidUnits.enabled
-        foreach ($SKU in $superiorSKUs_organization[$checkSKU]) {
+        $ATPLicenses = ($SKUs | Where-Object{$_.skuid -eq $skuid}).prepaidUnits.enabled
+        foreach ($SKU in $superiorSKUs_organization[$skuid]) {
             $ATPLicenses += ($SKUs | Where-Object{$_.skuid -eq $SKU}).prepaidUnits.enabled
         }
         if ($ATPLicenses -lt ($neededCount = ($ATPUsers | Select-Object -Unique).Count)) {
-            Add-Result -SKUID '078d2b04-f1bd-4111-bbd4-b4b1b354cef4' -EnabledCount $ATPLicenses -NeededCount $neededCount
+            Add-Result -SKUID $skuid -EnabledCount $ATPLicenses -NeededCount $neededCount
         }
     }
 }
