@@ -199,8 +199,10 @@ function Add-Result {
 
 $groups = [System.Collections.Generic.List[hashtable]]::new()
 function Get-GroupMembers {
-    [OutputType([string])]
+    [OutputType([guid[]])]
     param (
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
         [guid[]]$GroupIDs,
         [switch]$TransitiveMembers
     )
@@ -211,7 +213,8 @@ function Get-GroupMembers {
         $memberProperty = 'members'
     }
     foreach ($groupID in $GroupIDs) {
-        if ($null -eq $groups[$groupID][$memberProperty]) {
+        $group = $groups | Where-Object{$_.id -eq $groupID}
+        if ($null -eq $group.$memberProperty) {
             $groupMembers = [System.Collections.Generic.List[hashtable]]::new()
             $URI = 'https://graph.microsoft.com/v1.0/groups/{0}/{1}?$select=id' -f $groupID, $memberProperty
             while ($null -ne $URI) {
@@ -219,10 +222,10 @@ function Get-GroupMembers {
                 $groupMembers.AddRange([hashtable[]]($data.value))
                 $URI = $data['@odata.nextLink']
             }
-            $groups[$groupID].Add($memberProperty, $groupMembers)
+            $group.Add($memberProperty, $groupMembers)
         }
     }
-    return ($groups | Where-Object{$_.id -in $GroupIDs})[$memberProperty].id
+    Write-Output ([guid[]]@(($groups | Where-Object{$_.id -in $GroupIDs}).$memberProperty.id | Select-Object -Unique)) -NoEnumerate
 }
 
 $skuTranslate = [string]::new([char[]]((Invoke-WebRequest -Uri 'https://download.microsoft.com/download/e/3/e/e3e9faf2-f28b-490a-9ada-c6089a1fc5b0/Product%20names%20and%20service%20plan%20identifiers%20for%20licensing.csv' -UseBasicParsing).Content)) | ConvertFrom-Csv
@@ -230,7 +233,7 @@ function Get-SKUName {
     [OutputType([string])]
     param (
         [Parameter(Mandatory=$true)]
-        [ValidateNotNullOrEmpty()]    
+        [ValidateNotNullOrEmpty()]
         [guid]$SKUID
     )
     if ($null -ne ($skuName = ($skuTranslate |
@@ -241,7 +244,7 @@ function Get-SKUName {
     else {
         $skuName = $SKUID
     }
-    return $skuName
+    Write-Output $skuName
 }
 #endregion
 
@@ -264,7 +267,7 @@ while ($null -ne $URI) {
     $SKUs.AddRange([hashtable[]]($data.value))
     $URI = $data['@odata.nextLink']
 }
-# Calculate SKU usage
+# Analyze SKUs
 foreach ($SKU in $SKUs | Where-Object{$_.prepaidUnits.enabled -gt $licenseIgnoreThreshold}) {
     $totalCount = $SKU.prepaidUnits.enabled
     $availableCount = $SKU.prepaidUnits.enabled - $SKU.consumedUnits
@@ -317,7 +320,7 @@ foreach ($user in $users) {
         Select-Object -Unique) {
             $results['SKU'][$countViolation]['availableCount'] -= 1
         }
-        # Identify interchangeable SKUs, based on earlier specifications
+        # Identify interchangeable SKUs, based on specifications
         if ($null -ne $userSKUs) {
             $comparisonInterchangeable = (Compare-Object $userSKUs $interchangeableSKUs -ExcludeDifferent -IncludeEqual).InputObject
         }
@@ -364,7 +367,7 @@ foreach ($user in $users) {
                                     Where-Object{$_ -in $userSKUs} |
                                     Select-Object -Unique
         }
-        # Add intermediate results to total results
+        # Add results
         if ($comparisonInterchangeable.Count -gt 1) {
             Add-Result -UserPrincipalName $user.userPrincipalName -ConflictType Interchangeable -ConflictSKUs $comparisonInterchangeable
         }
@@ -402,7 +405,7 @@ if ($advancedCheckups.IsPresent) {
         $URI = $data['@odata.nextLink']
     }
     $applicationGroups = ($applications | Where-Object{$_.accountEnabled -eq $true -and $_.appRoleAssignmentRequired -eq $true -and $_.servicePrincipalType -eq 'Application'}).appRoleAssignedTo | Where-Object{$_.principalType -eq 'Group'}
-    $AADP1Users.AddRange((Get-GroupMembers -GroupIDs $applicationGroups.id -TransitiveMembers))
+    $AADP1Users.AddRange((Get-GroupMembers -GroupIDs $applicationGroups.principalId -TransitiveMembers))
     # Azure AD P1 based on MFA-enabled users
     $conditionalAccessPolicies = [System.Collections.Generic.List[hashtable]]::new()
     $URI = 'https://graph.microsoft.com/v1.0/identity/conditionalAccess/policies?$select=conditions,state'
@@ -418,16 +421,18 @@ if ($advancedCheckups.IsPresent) {
         else {
             $includeUsers = $conditionalAccessPolicy.conditions.users.includeUsers
         }
-        $conditionalAccessUsers = (Compare-Object -ReferenceObject $includeUsers -DifferenceObject $conditionalAccessPolicy.conditions.users.excludeUsers | Where-Object{$_.SideIndicator -eq '<='}).InputObject | Where-Object{$_ -ne 'GuestsOrExternalUsers'}
-        $AADP1Users.AddRange([guid[]]$conditionalAccessUsers)
+        if ($null -ne ($conditionalAccessUsers = (Compare-Object -ReferenceObject $includeUsers -DifferenceObject $conditionalAccessPolicy.conditions.users.excludeUsers | Where-Object{$_.SideIndicator -eq '<='}).InputObject | Where-Object{$_ -ne 'GuestsOrExternalUsers'})) {
+            $AADP1Users.AddRange([guid[]]@($conditionalAccessUsers))
+        }
         if ($conditionalAccessPolicy.conditions.users.includeGroups -eq 'All') {
             $includeGroups = $groups.id
         }
         else {
             $includeGroups = $conditionalAccessPolicy.conditions.users.includeGroups
         }
-        $conditionalAccessGroups = (Compare-Object -ReferenceObject $includeGroups -DifferenceObject $conditionalAccessPolicy.conditions.users.excludeGroups | Where-Object{$_.SideIndicator -eq '<='}).InputObject
-        $AADP1Users.AddRange((Get-GroupMembers -GroupIDs $conditionalAccessGroups.id -TransitiveMembers))
+        if ($null -ne ($conditionalAccessGroups = (Compare-Object -ReferenceObject $includeGroups -DifferenceObject $conditionalAccessPolicy.conditions.users.excludeGroups | Where-Object{$_.SideIndicator -eq '<='}).InputObject)) {
+            $AADP1Users.AddRange((Get-GroupMembers -GroupIDs $conditionalAccessGroups -TransitiveMembers))
+        }
     }
     # Azure AD P2 based on PIM-managed users
     $eligibleRoleMembers = [System.Collections.Generic.List[hashtable]]::new()
@@ -442,13 +447,11 @@ if ($advancedCheckups.IsPresent) {
                                 ($_.scheduleInfo.expiration.endDateTime -ge [datetime]::Today -or
                                 $_.scheduleInfo.expiration.type -eq 'noExpiration')}).principalId))
     # Defender for Office 365 P1/P2 based on user and shared mailboxes
-    #TODO: Improve calculations by checking for license requirements other than Exchange Online mailboxes :https://learn.microsoft.com/office365/servicedescriptions/office-365-advanced-threat-protection-service-description#licensing-terms
     $orgDomain = (Invoke-MgGraphRequest -Method GET -Uri 'https://graph.microsoft.com/v1.0/organization?$select=verifiedDomains').value.verifiedDomains | Where-Object{$_.isInitial -eq $true}
     Connect-ExchangeOnline -AppId $applicationID -Certificate $x509Cert -Organization $orgDomain.name -CommandName Get-Mailbox
     $ATPUsers.AddRange([guid[]](Get-EXOMailbox -RecipientTypeDetails 'SharedMailbox', 'UserMailbox' -ResultSize Unlimited).ExternalDirectoryObjectId)
     Disconnect-ExchangeOnline -Confirm:$false
-    # Results
-    #TODO: Lacking better count calculations
+    # Add results
     if ($AADP1Users.Count -gt 0) {
         $skuid = '078d2b04-f1bd-4111-bbd4-b4b1b354cef4'
         $AADP1Licenses = ($SKUs | Where-Object{$_.skuid -eq $skuid}).prepaidUnits.enabled
@@ -491,7 +494,7 @@ if ($advancedCheckups.IsPresent) {
 if ($results.Values.Count -gt 0) {
     Add-Output -Output $style
     $critical = $false
-    # Output licenses with issues
+    # Output basic SKU results
     if ($results['SKU'].Keys.Count -gt 0) {
         Add-Output -Output '<p class=gray>Basic checkup - Products</p>
                             <p>Please check license counts for the following product SKUs and <a href="https://www.microsoft.com/licensing/servicecenter">reserve</a> additional licenses:</p>
@@ -520,7 +523,7 @@ if ($results.Values.Count -gt 0) {
                             <li>Report normal products having both <$licenseTotalThreshold_normalSKUs licenses and <$licensePercentageThreshold_normalSKUs% of their total licenses available</li> `
                             <li>Report important products having both <$licenseTotalThreshold_importantSKUs licenses and <$licensePercentageThreshold_importantSKUs% of their total licenses available</li></ul></p>"
     }
-    # Output accounts with issues
+    # Output basic user results
     if ($results['User'].Keys.Count -gt 0) {
         Add-Output -Output '<p class=gray>Basic checkup - Users</p>
                             <p>Please check license assignments for the following user accounts and mitigate impact:</p>
@@ -549,6 +552,7 @@ if ($results.Values.Count -gt 0) {
                             <li>Report practically inclusive licenses as <strong>optimizable</strong>, based on available SKU features</li>
                             <li>Report actually inclusive licenses as <strong>removable</strong>, based on enabled SKU features</li></ul></p>'
     }
+    # Output advanced SKU results
     if ($results['Advanced'].Keys.Count -gt 0) {
         Add-Output -Output '<p class=gray>Advanced checkup - Features</p>
                             <p>Please check license counts for the following product SKUs and <a href="https://www.microsoft.com/licensing/servicecenter">reserve</a> additional licenses:</p>
@@ -579,7 +583,7 @@ if ($results.Values.Count -gt 0) {
                             <li>Check <i>Azure AD P2</i> based on PIM-managed users</li>
                             <li>Check <i>Defender for Office 365 P1/P2</i> based on user and shared mailboxes</li></ul></p>'
     }
-    # Configure basic email settings
+    # Configure and send email
     $email = @{
         'message' = @{
             'subject' = 'Azure AD licenses need attention';
@@ -590,7 +594,6 @@ if ($results.Values.Count -gt 0) {
             };
         }
     }
-    # Add normal email recipients
     $email['message'].Add('toRecipients', [System.Collections.Generic.List[hashtable]]::new())
     foreach ($recipientAddress in $normalRecipientsAddresses) {
         $email['message']['toRecipients'].Add(@{
@@ -599,12 +602,9 @@ if ($results.Values.Count -gt 0) {
             }
         })
     }
-    # Check criticality
     if ($critical) {
-        # Replace subject and importance
         $email['message']['subject'] = 'Azure AD licenses need urgent attention'
         $email['message']['importance'] = 'high'
-        # Add critical email recipients
         $email['message'].Add('ccRecipients', [System.Collections.Generic.List[hashtable]]::new())
         foreach ($recipientAddress in $criticalRecipientsAddresses) {
             $email['message']['ccRecipients'].Add(@{
@@ -614,7 +614,6 @@ if ($results.Values.Count -gt 0) {
             })
         }
     }
-    # Initiate email delivery
     Invoke-MgGraphRequest -Method POST -Uri ('https://graph.microsoft.com/v1.0/users/{0}/sendMail' -f $senderAddress) -Body $email -ContentType 'application/json'
 }
 #endregion
