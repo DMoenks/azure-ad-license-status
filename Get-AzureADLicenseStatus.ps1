@@ -44,10 +44,12 @@ Specifies the advanced warning percentage threshold to be used during report cre
 .PARAMETER criticalPercentageThreshold_advanced
 Specifies the advanced critical percentage threshold to be used during report creation
 .PARAMETER importantSKUs
+Specifies the SKUs which are deemed important, so different thresholds are used for calculation
 .PARAMETER interchangeableSKUs
+Specifies a single list of SKUs which are deemed interchangeable, e.g Office 365 E1 and Office 365 E3
 .PARAMETER advancedCheckups
 Specifies if advanced license checkups should be run
-ATTENTION: Advanced checkups require additional access permissions and will increase the scripts runtime
+ATTENTION: Advanced checkups require additional access permissions and might increase the checkup duration
 #>
 
 param (
@@ -264,14 +266,17 @@ while ($null -ne $URI) {
 }
 # Calculate SKU usage
 foreach ($SKU in $SKUs | Where-Object{$_.prepaidUnits.enabled -gt $licenseIgnoreThreshold}) {
-    $availableCount = $SKU.prepaidUnits.enabled - $SKU.consumedUnits
     $totalCount = $SKU.prepaidUnits.enabled
+    $availableCount = $SKU.prepaidUnits.enabled - $SKU.consumedUnits
     if ($SKU.skuId -in $importantSKUs) {
-        $minimumCount = (@([System.Math]::Ceiling($totalCount * $licensePercentageThreshold_importantSKUs / 100), $licenseTotalThreshold_importantSKUs) | Measure-Object -Minimum).Minimum
+        $percentageThreshold = $licensePercentageThreshold_importantSKUs
+        $totalThreshold = $licenseTotalThreshold_importantSKUs
     }
     else {
-        $minimumCount = (@([System.Math]::Ceiling($totalCount * $licensePercentageThreshold_normalSKUs / 100), $licenseTotalThreshold_normalSKUs) | Measure-Object -Minimum).Minimum
+        $percentageThreshold = $licensePercentageThreshold_normalSKUs
+        $totalThreshold = $licenseTotalThreshold_normalSKUs
     }
+    $minimumCount = (@([System.Math]::Ceiling($totalCount * $percentageThreshold / 100), $totalThreshold) | Measure-Object -Minimum).Minimum
     if ($availableCount -lt $minimumCount) {
         Add-Result -SKUID $SKU.skuId -AvailableCount $availableCount -MinimumCount $minimumCount
     }
@@ -443,7 +448,7 @@ if ($advancedCheckups.IsPresent) {
     $ATPUsers.AddRange([guid[]](Get-EXOMailbox -RecipientTypeDetails 'SharedMailbox', 'UserMailbox' -ResultSize Unlimited).ExternalDirectoryObjectId)
     Disconnect-ExchangeOnline -Confirm:$false
     # Results
-    #TODO: Missing better count calculations
+    #TODO: Lacking better count calculations
     if ($AADP1Users.Count -gt 0) {
         $skuid = '078d2b04-f1bd-4111-bbd4-b4b1b354cef4'
         $AADP1Licenses = ($SKUs | Where-Object{$_.skuid -eq $skuid}).prepaidUnits.enabled
@@ -489,7 +494,7 @@ if ($results.Values.Count -gt 0) {
     # Output licenses with issues
     if ($results['SKU'].Keys.Count -gt 0) {
         Add-Output -Output '<p class=gray>Basic checkup - Products</p>
-                            <p>Please check license counts for the following products and <a href="https://www.microsoft.com/licensing/servicecenter">reserve</a> additional licenses:</p>
+                            <p>Please check license counts for the following product SKUs and <a href="https://www.microsoft.com/licensing/servicecenter">reserve</a> additional licenses:</p>
                             <p><table><tr><th>License type</th><th>Available count</th><th>Minimum count</th><th>Difference</th></tr>'
         foreach ($SKU in $results['SKU'].Keys) {
             $differenceCount = $results['SKU'][$SKU]['availableCount'] - $results['SKU'][$SKU]['minimumCount']
@@ -518,7 +523,7 @@ if ($results.Values.Count -gt 0) {
     # Output accounts with issues
     if ($results['User'].Keys.Count -gt 0) {
         Add-Output -Output '<p class=gray>Basic checkup - Users</p>
-                            <p>Please check license assignments for the following accounts and mitigate impact:</p>
+                            <p>Please check license assignments for the following user accounts and mitigate impact:</p>
                             <p><table><tr><th>Account</th><th>Interchangeable</th><th>Optimizable</th><th>Removable</th></tr>'
         foreach ($user in $results['User'].Keys | Sort-Object) {
             Add-Output -Output "<tr> `
@@ -546,7 +551,7 @@ if ($results.Values.Count -gt 0) {
     }
     if ($results['Advanced'].Keys.Count -gt 0) {
         Add-Output -Output '<p class=gray>Advanced checkup - Features</p>
-                            <p>Please check license counts for the following products and <a href="https://www.microsoft.com/licensing/servicecenter">reserve</a> additional licenses:</p>
+                            <p>Please check license counts for the following product SKUs and <a href="https://www.microsoft.com/licensing/servicecenter">reserve</a> additional licenses:</p>
                             <p><table><tr><th>License type</th><th>Enabled count</th><th>Needed count</th><th>Difference</th></tr>'
         foreach ($SKU in $results['Advanced'].Keys) {
             $differenceCount = $results['Advanced'][$SKU]['enabledCount'] - $results['Advanced'][$SKU]['neededCount']
