@@ -166,61 +166,61 @@ function Get-AzureADLicenseStatus {
     This script is meant to conquer side-effects of semi-automatic license assignments for Microsoft services in Azure AD, i.e. the combination of group-based licensing with manual group membership management, by regularly reporting both on the amount of available licenses per SKU and any conflicting license assignments per user account. This allows for somewhat easier license management without either implementing a full-fledged software asset management solution or hiring a licensing service provider.
 
     SKU IDs and names are in accordance with https://docs.microsoft.com/en-us/azure/active-directory/enterprise-users/licensing-service-plan-reference
-    .PARAMETER directoryID
+    .PARAMETER DirectoryID
     Specifies the directory to connect to
-    .PARAMETER applicationID
+    .PARAMETER ApplicationID
     Specifies the application in target directory to authenticate with
-    .PARAMETER subscriptionID
+    .PARAMETER SubscriptionID
     Specifies the subscription in target directory to access
-    .PARAMETER keyVaultName
+    .PARAMETER KeyVaultName
     Specifies the key vault in target subscription to access
-    .PARAMETER certificate
+    .PARAMETER CertificateName
+    Specifies the certificate name in target key vault to use for authentication
+    .PARAMETER Certificate
     Specifies the certificate to use for authentication
-    .PARAMETER certificateName
-    Specifies the certificate name in target key vault or local certificate store to use for authentication
-    .PARAMETER certificateThumbprint
+    .PARAMETER CertificateThumbprint
     Specifies the certificate thumbprint in local certificate store to use for authentication
-    .PARAMETER senderAddress
+    .PARAMETER SenderAddress
     Specifies the sender address to be used for report delivery
-    .PARAMETER normalRecipientsAddresses
+    .PARAMETER RecipientAddresses_normal
     Specifies the recipient addresses to be used for report delivery
-    .PARAMETER criticalRecipientsAddresses
+    .PARAMETER RecipientAddresses_critical
     Specifies the additional recipient addresses to be used for report delivery in critical cases
-    .PARAMETER licenseIgnoreThreshold
+    .PARAMETER SKUIgnoreThreshold
     Specifies the minimum enabled license threshold for SKUs to be taken into account for the report
-    .PARAMETER licensePercentageThreshold_normalSKUs
+    .PARAMETER SKUPercentageThreshold_normal
     Specifies the minimum available license percentage threshold for SKUs to be included in the report
-    .PARAMETER licenseTotalThreshold_normalSKUs
+    .PARAMETER SKUTotalThreshold_normal
     Specifies the minimum available license amount threshold for SKUs to be included in the report
-    .PARAMETER licensePercentageThreshold_importantSKUs
+    .PARAMETER SKUPercentageThreshold_important
     Specifies the minimum available license percentage threshold for SKUs to be included in the report
-    .PARAMETER licenseTotalThreshold_importantSKUs
+    .PARAMETER SKUTotalThreshold_important
     Specifies the minimum available license amount threshold for SKUs to be included in the report
-    .PARAMETER warningPercentageThreshold_basic
-    Specifies the basic warning percentage threshold to be used during report creation
-    .PARAMETER criticalPercentageThreshold_basic
-    Specifies the basic critical percentage threshold to be used during report creation
-    .PARAMETER $warningPercentageThreshold_advanced
-    Specifies the advanced warning percentage threshold to be used during report creation
-    .PARAMETER criticalPercentageThreshold_advanced
-    Specifies the advanced critical percentage threshold to be used during report creation
-    .PARAMETER importantSKUs
+    .PARAMETER WarningPercentageThreshold_basic
+    Specifies the warning percentage threshold to be used during report creation for basic checkups
+    .PARAMETER CriticalPercentageThreshold_basic
+    Specifies the critical percentage threshold to be used during report creation for basic checkups
+    .PARAMETER WarningPercentageThreshold_advanced
+    Specifies the warning percentage threshold to be used during report creation for advanced checkups
+    .PARAMETER CriticalPercentageThreshold_advanced
+    Specifies the critical percentage threshold to be used during report creation for advanced checkups
+    .PARAMETER ImportantSKUs
     Specifies the SKUs which are deemed important, so different thresholds are used for calculation
-    .PARAMETER interchangeableSKUs
+    .PARAMETER InterchangeableSKUs
     Specifies a single list of SKUs which are deemed interchangeable, e.g Office 365 E1 and Office 365 E3
-    .PARAMETER advancedCheckups
+    .PARAMETER AdvancedCheckups
     Specifies if advanced license checkups should be run
     ATTENTION: Advanced checkups require additional access permissions and might increase the checkup duration
     .EXAMPLE
-    Get-AzureADLicenseStatus -directoryID '00000000-0000-0000-0000-000000000000' -applicationID '00000000-0000-0000-0000-000000000000' -certificateName 'MyCertificate' -senderAddress 'sender@example.com' -normalRecipientsAddresses @('recipient_1@example.com','recipient_2@example.com')
+    Get-AzureADLicenseStatus -DirectoryID '00000000-0000-0000-0000-000000000000' -ApplicationID '00000000-0000-0000-0000-000000000000' -CertificateThumbprint 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' -SenderAddress 'sender@example.com' -RecipientAddresses_normal @('recipient_1@example.com','recipient_2@example.com')
 
     Runs a status report with default values by providing only necessary values for authentication and report delivery
     .EXAMPLE
-    Get-AzureADLicenseStatus -directoryID '00000000-0000-0000-0000-000000000000' -applicationID '00000000-0000-0000-0000-000000000000' -certificateThumbprint 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' -senderAddress 'sender@example.com' -normalRecipientsAddresses @('recipient_1@example.com','recipient_2@example.com') -criticalRecipientsAddresses @('recipient_3@example.com','recipient_4@example.com') -licensePercentageThreshold_normalSKUs 1 -licenseTotalThreshold_normalSKUs 100 -licensePercentageThreshold_importantSKUs 1 -licenseTotalThreshold_importantSKUs 500
+    Get-AzureADLicenseStatus -DirectoryID '00000000-0000-0000-0000-000000000000' -ApplicationID '00000000-0000-0000-0000-000000000000' -CertificateThumbprint 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' -SenderAddress 'sender@example.com' -RecipientAddresses_normal @('recipient_1@example.com','recipient_2@example.com') -RecipientAddresses_critical @('recipient_3@example.com','recipient_4@example.com') -SKUPercentageThreshold_normal 1 -SKUTotalThreshold_normal 100 -SKUPercentageThreshold_important 1 -SKUTotalThreshold_important 500
 
     Runs a status report with customized thresholds for larger organizations and additional recipients for when licenses counts reach critical levels
     .EXAMPLE
-    Get-AzureADLicenseStatus -directoryID '00000000-0000-0000-0000-000000000000' -applicationID '00000000-0000-0000-0000-000000000000' -subscriptionID '00000000-0000-0000-0000-000000000000' -keyVaultName 'MyKeyvault' -certificateName 'MyCertificate' -senderAddress 'sender@example.com' -normalRecipientsAddresses @('recipient_1@example.com','recipient_2@example.com') -criticalRecipientsAddresses @('recipient_3@example.com','recipient_4@example.com') -licensePercentageThreshold_normalSKUs 1 -licenseTotalThreshold_normalSKUs 100 -licensePercentageThreshold_importantSKUs 1 -licenseTotalThreshold_importantSKUs 500 -importantSKUs @('18181a46-0d4e-45cd-891e-60aabd171b4e','6fd2c87f-b296-42f0-b197-1e91e994b900') -interchangeableSKUs @('4b585984-651b-448a-9e53-3b10f069cf7f','18181a46-0d4e-45cd-891e-60aabd171b4e','6fd2c87f-b296-42f0-b197-1e91e994b900','c7df2760-2c81-4ef7-b578-5b5392b571df') -advancedCheckups
+    Get-AzureADLicenseStatus -DirectoryID '00000000-0000-0000-0000-000000000000' -ApplicationID '00000000-0000-0000-0000-000000000000' -SubscriptionID '00000000-0000-0000-0000-000000000000' -KeyVaultName 'MyKeyVault' -CertificateName 'MyCertificate' -SenderAddress 'sender@example.com' -RecipientAddresses_normal @('recipient_1@example.com','recipient_2@example.com') -RecipientAddresses_critical @('recipient_3@example.com','recipient_4@example.com') -SKUPercentageThreshold_normal 1 -SKUTotalThreshold_normal 100 -SKUPercentageThreshold_important 1 -SKUTotalThreshold_important 500 -ImportantSKUs @('18181a46-0d4e-45cd-891e-60aabd171b4e','6fd2c87f-b296-42f0-b197-1e91e994b900') -InterchangeableSKUs @('4b585984-651b-448a-9e53-3b10f069cf7f','18181a46-0d4e-45cd-891e-60aabd171b4e','6fd2c87f-b296-42f0-b197-1e91e994b900','c7df2760-2c81-4ef7-b578-5b5392b571df') -AdvancedCheckups
 
     Runs a status report by using an Azure certificate for automation purposes, specifying both important and interchangeable SKUs and activating advanced checkups
     #>
@@ -229,80 +229,81 @@ function Get-AzureADLicenseStatus {
     param (
         [Parameter(Mandatory=$true)]
         [ValidateNotNullOrEmpty()]
-        [guid]$directoryID,
+        [guid]$DirectoryID,
         [Parameter(Mandatory=$true)]
         [ValidateNotNullOrEmpty()]
-        [guid]$applicationID,
+        [guid]$ApplicationID,
         [Parameter(Mandatory=$true, ParameterSetName='AzureCertificate')]
         [ValidateNotNullOrEmpty()]
-        [guid]$subscriptionID,
+        [guid]$SubscriptionID,
         [Parameter(Mandatory=$true, ParameterSetName='AzureCertificate')]
         [ValidateNotNullOrEmpty()]
-        [string]$keyVaultName,
+        [string]$KeyVaultName,
         [Parameter(Mandatory=$true, ParameterSetName='AzureCertificate')]
-        [Parameter(Mandatory=$true, ParameterSetName='LocalCertificateName')]
         [ValidateNotNullOrEmpty()]
-        [string]$certificateName,
+        [string]$CertificateName,
         [Parameter(Mandatory=$true, ParameterSetName='LocalCertificate')]
         [ValidateNotNullOrEmpty()]
-        [System.Security.Cryptography.X509Certificates.X509Certificate2]$certificate,
+        [System.Security.Cryptography.X509Certificates.X509Certificate2]$Certificate,
         [Parameter(Mandatory=$true, ParameterSetName='LocalCertificateThumbprint')]
         [ValidateNotNullOrEmpty()]
-        [string]$certificateThumbprint,
+        [string]$CertificateThumbprint,
         [Parameter(Mandatory=$true)]
         [ValidateNotNullOrEmpty()]
-        [string]$senderAddress,
+        [string]$SenderAddress,
         [Parameter(Mandatory=$true)]
         [ValidateNotNullOrEmpty()]
-        [string[]]$normalRecipientsAddresses,
+        [string[]]$RecipientAddresses_normal,
         [ValidateNotNullOrEmpty()]
-        [string[]]$criticalRecipientsAddresses,
+        [string[]]$RecipientAddresses_critical,
         [ValidateRange('NonNegative')]
-        [int]$licenseIgnoreThreshold = 10,
+        [int]$SKUIgnoreThreshold = 10,
         [ValidateRange(0, 100)]
-        [int]$licensePercentageThreshold_normalSKUs = 5,
+        [int]$SKUPercentageThreshold_normal = 5,
         [ValidateRange('NonNegative')]
-        [int]$licenseTotalThreshold_normalSKUs = 10,
+        [int]$SKUTotalThreshold_normal = 10,
         [ValidateRange(0, 100)]
-        [int]$licensePercentageThreshold_importantSKUs = 5,
+        [int]$SKUPercentageThreshold_important = 5,
         [ValidateRange('NonNegative')]
-        [int]$licenseTotalThreshold_importantSKUs = 50,
-        [ValidateScript({$_ -in 1..99 -and $_ -gt $criticalPercentageThreshold_basic})]
-        [int]$warningPercentageThreshold_basic = 80,
-        [ValidateScript({$_ -in 1..99 -and $_ -lt $warningPercentageThreshold_basic})]
-        [int]$criticalPercentageThreshold_basic = 20,
-        [ValidateScript({$_ -in 1..99 -and $_ -gt $criticalPercentageThreshold_advanced})]
-        [int]$warningPercentageThreshold_advanced = 99,
-        [ValidateScript({$_ -in 1..99 -and $_ -lt $warningPercentageThreshold_advanced})]
-        [int]$criticalPercentageThreshold_advanced = 95,
+        [int]$SKUTotalThreshold_important = 50,
+        [ValidateScript({$_ -in 1..99 -and $_ -gt $CriticalPercentageThreshold_basic})]
+        [int]$WarningPercentageThreshold_basic = 80,
+        [ValidateScript({$_ -in 1..99 -and $_ -lt $WarningPercentageThreshold_basic})]
+        [int]$CriticalPercentageThreshold_basic = 20,
+        [ValidateScript({$_ -in 1..99 -and $_ -gt $CriticalPercentageThreshold_advanced})]
+        [int]$WarningPercentageThreshold_advanced = 99,
+        [ValidateScript({$_ -in 1..99 -and $_ -lt $WarningPercentageThreshold_advanced})]
+        [int]$CriticalPercentageThreshold_advanced = 95,
         [ValidateNotNullOrEmpty()]
-        [guid[]]$importantSKUs = @(),
+        [guid[]]$ImportantSKUs = @(),
         [ValidateNotNullOrEmpty()]
-        [guid[]]$interchangeableSKUs = @(),
-        [switch]$advancedCheckups
+        [guid[]]$InterchangeableSKUs = @(),
+        [switch]$AdvancedCheckups
     )
 
-    switch ($PSCmdlet.ParameterSetName) {
-        'AzureCertificate' {
-            Connect-AzAccount -Identity -Subscription $subscriptionID | Out-Null
-            $azCertSecret = Get-AzKeyVaultSecret -VaultName $keyVaultName -Name $certificateName -AsPlainText
-            $azCertSecretByte = [Convert]::FromBase64String($azCertSecret)
-            $x509Cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($azCertSecretByte)
-            Disconnect-AzAccount
-            Connect-MgGraph -Certificate $x509Cert -TenantId $directoryID -ClientId $applicationID | Out-Null
+    try {
+        switch ($PSCmdlet.ParameterSetName) {
+            'AzureCertificate' {
+                Connect-AzAccount -Identity -Subscription $SubscriptionID | Out-Null
+                $azCertSecret = Get-AzKeyVaultSecret -VaultName $KeyVaultName -Name $CertificateName -AsPlainText
+                $azCertSecretByte = [Convert]::FromBase64String($azCertSecret)
+                $x509Cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($azCertSecretByte)
+                Disconnect-AzAccount
+                Connect-MgGraph -Certificate $x509Cert -TenantId $DirectoryID -ClientId $ApplicationID -ErrorAction Stop | Out-Null
+            }
+            'LocalCertificate' {
+                Connect-MgGraph -Certificate $Certificate -TenantId $DirectoryID -ClientId $ApplicationID -ErrorAction Stop | Out-Null
+            }
+            'LocalCertificateThumbprint' {
+                Connect-MgGraph -CertificateThumbprint $CertificateThumbprint -TenantId $DirectoryID -ClientId $ApplicationID -ErrorAction Stop | Out-Null
+            }
         }
-        'LocalCertificate' {
-            Connect-MgGraph -Certificate $certificate -TenantId $directoryID -ClientId $applicationID | Out-Null
-        }
-        'LocalCertificateName' {
-            Connect-MgGraph -CertificateName $certificateName -TenantId $directoryID -ClientId $applicationID | Out-Null
-        }
-        'LocalCertificateThumbprint' {
-            Connect-MgGraph -CertificateThumbprint $certificateThumbprint -TenantId $directoryID -ClientId $applicationID | Out-Null
-        }
+        $graphAuthentication = $true
     }
-
-    if ($null -ne (Get-MgContext)) {
+    catch {
+        $graphAuthentication = $false
+    }
+    if ($graphAuthentication) {
         #region: SKUs
         # Get SKUs
         $SKUs = [System.Collections.Generic.List[hashtable]]::new()
@@ -313,16 +314,16 @@ function Get-AzureADLicenseStatus {
             $URI = $data['@odata.nextLink']
         }
         # Analyze SKUs
-        foreach ($SKU in $SKUs | Where-Object{$_.prepaidUnits.enabled -gt $licenseIgnoreThreshold}) {
+        foreach ($SKU in $SKUs | Where-Object{$_.prepaidUnits.enabled -gt $SKUIgnoreThreshold}) {
             $totalCount = $SKU.prepaidUnits.enabled
             $availableCount = $SKU.prepaidUnits.enabled - $SKU.consumedUnits
-            if ($SKU.skuId -in $importantSKUs) {
-                $percentageThreshold = $licensePercentageThreshold_importantSKUs
-                $totalThreshold = $licenseTotalThreshold_importantSKUs
+            if ($SKU.skuId -in $ImportantSKUs) {
+                $percentageThreshold = $SKUPercentageThreshold_important
+                $totalThreshold = $SKUTotalThreshold_important
             }
             else {
-                $percentageThreshold = $licensePercentageThreshold_normalSKUs
-                $totalThreshold = $licenseTotalThreshold_normalSKUs
+                $percentageThreshold = $SKUPercentageThreshold_normal
+                $totalThreshold = $SKUTotalThreshold_normal
             }
             $minimumCount = (@([System.Math]::Ceiling($totalCount * $percentageThreshold / 100), $totalThreshold) | Measure-Object -Minimum).Minimum
             if ($availableCount -lt $minimumCount) {
@@ -367,7 +368,7 @@ function Get-AzureADLicenseStatus {
                 }
                 # Identify interchangeable SKUs, based on specifications
                 if ($null -ne $userSKUs) {
-                    $comparisonInterchangeable = (Compare-Object $userSKUs $interchangeableSKUs -ExcludeDifferent -IncludeEqual).InputObject
+                    $comparisonInterchangeable = (Compare-Object $userSKUs $InterchangeableSKUs -ExcludeDifferent -IncludeEqual).InputObject
                 }
                 else {
                     $comparisonInterchangeable = @()
@@ -436,7 +437,7 @@ function Get-AzureADLicenseStatus {
         #endregion
 
         #region: Advanced
-        if ($advancedCheckups) {
+        if ($AdvancedCheckups) {
             $AADP1Users = [System.Collections.Generic.List[guid]]::new()
             $AADP2Users = [System.Collections.Generic.List[guid]]::new()
             $ATPUsers = [System.Collections.Generic.List[guid]]::new()
@@ -496,15 +497,35 @@ function Get-AzureADLicenseStatus {
                 $eligibleRoleMembers.AddRange([hashtable[]]($data.value))
                 $URI = $data['@odata.nextLink']
             }
-            $AADP2Users.AddRange([guid[]](($eligibleRoleMembers |
+            $AADP2Users.AddRange([guid[]]@(($eligibleRoleMembers |
                                     Where-Object{$_.scheduleInfo.startDateTime -le [datetime]::Today -and
                                         ($_.scheduleInfo.expiration.endDateTime -ge [datetime]::Today -or
                                         $_.scheduleInfo.expiration.type -eq 'noExpiration')}).principalId))
             # Defender for Office 365 P1/P2 based on user and shared mailboxes
             $orgDomain = (Invoke-MgGraphRequest -Method GET -Uri 'https://graph.microsoft.com/v1.0/organization?$select=verifiedDomains').value.verifiedDomains | Where-Object{$_.isInitial -eq $true}
-            Connect-ExchangeOnline -AppId $applicationID -Certificate $x509Cert -Organization $orgDomain.name -CommandName Get-Mailbox
-            $ATPUsers.AddRange([guid[]](Get-EXOMailbox -RecipientTypeDetails 'SharedMailbox', 'UserMailbox' -ResultSize Unlimited).ExternalDirectoryObjectId)
-            Disconnect-ExchangeOnline -Confirm:$false
+            try {
+                switch ($PSCmdlet.ParameterSetName) {
+                    'AzureCertificate' {
+                        Connect-ExchangeOnline -AppId $ApplicationID -Certificate $x509Cert -Organization $orgDomain.name -CommandName Get-Mailbox -ErrorAction Stop
+                    }
+                    'LocalCertificate' {
+                        Connect-ExchangeOnline -AppId $ApplicationID -Certificate $Certificate -Organization $orgDomain.name -CommandName Get-Mailbox -ErrorAction Stop
+                    }
+                    'LocalCertificateThumbprint' {
+                        Connect-ExchangeOnline -AppId $ApplicationID -CertificateThumbprint $CertificateThumbprint -Organization $orgDomain.name -CommandName Get-Mailbox -ErrorAction Stop
+                    }
+                }
+                $exchangeAuthentication = $true
+            }
+            catch {
+                $exchangeAuthentication = $false
+            }
+            if ($exchangeAuthentication) {
+                if ($null -ne ($mailboxes = Get-EXOMailbox -RecipientTypeDetails 'SharedMailbox', 'UserMailbox' -ResultSize Unlimited)) {
+                    $ATPUsers.AddRange([guid[]]@($mailboxes.ExternalDirectoryObjectId))
+                }
+                Disconnect-ExchangeOnline -Confirm:$false
+            }
             # Add results
             if ($AADP1Users.Count -gt 0) {
                 $skuid = '078d2b04-f1bd-4111-bbd4-b4b1b354cef4'
@@ -559,10 +580,10 @@ function Get-AzureADLicenseStatus {
                                         <td>$(Get-SKUName -SKUID $SKU)</td> `
                                         <td>$($results['SKU'][$SKU]['availableCount'])</td> `
                                         <td>$($results['SKU'][$SKU]['minimumCount'])</td>"
-                                        if ($results['SKU'][$SKU]['availableCount'] / $results['SKU'][$SKU]['minimumCount'] * 100 -ge $warningPercentageThreshold_basic) {
+                                        if ($results['SKU'][$SKU]['availableCount'] / $results['SKU'][$SKU]['minimumCount'] * 100 -ge $WarningPercentageThreshold_basic) {
                         Add-Output -Output "<td class=green>$differenceCount</td>"
                     }
-                    elseif ($results['SKU'][$SKU]['availableCount'] / $results['SKU'][$SKU]['minimumCount'] * 100 -le $criticalPercentageThreshold_basic) {
+                    elseif ($results['SKU'][$SKU]['availableCount'] / $results['SKU'][$SKU]['minimumCount'] * 100 -le $CriticalPercentageThreshold_basic) {
                         $critical = $true
                         Add-Output -Output "<td class=red>$differenceCount</td>"
                     }
@@ -573,9 +594,9 @@ function Get-AzureADLicenseStatus {
                 }
                 Add-Output -Output "</table></p> `
                 <p>The following criteria were used during the checkup:<ul> `
-                                    <li>Check products with >$licenseIgnoreThreshold total licenses</li> `
-                                    <li>Report normal products having both <$licenseTotalThreshold_normalSKUs licenses and <$licensePercentageThreshold_normalSKUs% of their total licenses available</li> `
-                                    <li>Report important products having both <$licenseTotalThreshold_importantSKUs licenses and <$licensePercentageThreshold_importantSKUs% of their total licenses available</li></ul></p>"
+                                    <li>Check products with >$SKUIgnoreThreshold total licenses</li> `
+                                    <li>Report normal products having both <$SKUTotalThreshold_normal licenses and <$SKUPercentageThreshold_normal% of their total licenses available</li> `
+                                    <li>Report important products having both <$SKUTotalThreshold_important licenses and <$SKUPercentageThreshold_important% of their total licenses available</li></ul></p>"
             }
             # Output basic user results
             if ($results['User'].Keys.Count -gt 0) {
@@ -617,10 +638,10 @@ function Get-AzureADLicenseStatus {
                                         <td>$(Get-SKUName -SKUID $SKU)</td> `
                                         <td>$($results['Advanced'][$SKU]['enabledCount'])</td> `
                                         <td>$($results['Advanced'][$SKU]['neededCount'])</td>"
-                                        if ($results['Advanced'][$SKU]['enabledCount'] / $results['Advanced'][$SKU]['neededCount'] * 100 -ge $warningPercentageThreshold_advanced) {
+                                        if ($results['Advanced'][$SKU]['enabledCount'] / $results['Advanced'][$SKU]['neededCount'] * 100 -ge $WarningPercentageThreshold_advanced) {
                         Add-Output -Output "<td class=green>$differenceCount</td>"
                     }
-                    elseif ($results['Advanced'][$SKU]['enabledCount'] / $results['Advanced'][$SKU]['neededCount'] * 100 -le $criticalPercentageThreshold_advanced) {
+                    elseif ($results['Advanced'][$SKU]['enabledCount'] / $results['Advanced'][$SKU]['neededCount'] * 100 -le $CriticalPercentageThreshold_advanced) {
                         $critical = $true
                         Add-Output -Output "<td class=red>$differenceCount</td>"
                     }
@@ -649,7 +670,7 @@ function Get-AzureADLicenseStatus {
                 }
             }
             $email['message'].Add('toRecipients', [System.Collections.Generic.List[hashtable]]::new())
-            foreach ($recipientAddress in $normalRecipientsAddresses) {
+            foreach ($recipientAddress in $RecipientAddresses_normal) {
                 $email['message']['toRecipients'].Add(@{
                     'emailAddress' = @{
                         'address' = $recipientAddress
@@ -660,7 +681,7 @@ function Get-AzureADLicenseStatus {
                 $email['message']['subject'] = 'Azure AD licenses need urgent attention'
                 $email['message']['importance'] = 'high'
                 $email['message'].Add('ccRecipients', [System.Collections.Generic.List[hashtable]]::new())
-                foreach ($recipientAddress in $criticalRecipientsAddresses) {
+                foreach ($recipientAddress in $RecipientAddresses_critical) {
                     $email['message']['ccRecipients'].Add(@{
                         'emailAddress' = @{
                             'address' = $recipientAddress
@@ -668,7 +689,7 @@ function Get-AzureADLicenseStatus {
                     })
                 }
             }
-            Invoke-MgGraphRequest -Method POST -Uri ('https://graph.microsoft.com/v1.0/users/{0}/sendMail' -f $senderAddress) -Body $email -ContentType 'application/json'
+            Invoke-MgGraphRequest -Method POST -Uri ('https://graph.microsoft.com/v1.0/users/{0}/sendMail' -f $SenderAddress) -Body $email -ContentType 'application/json'
         }
         #endregion
 
