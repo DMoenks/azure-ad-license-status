@@ -37,7 +37,13 @@ th, td {
 #endregion
 
 #region: Helper functions
-$outputs = [System.Text.StringBuilder]::new()
+function Initialize-Variables {
+    $script:groups = [System.Collections.Generic.List[hashtable]]::new()
+    $script:outputs = [System.Text.StringBuilder]::new()
+    $script:results = @{}
+    $script:skuTranslate = [string]::new([char[]]((Invoke-WebRequest -Uri 'https://download.microsoft.com/download/e/3/e/e3e9faf2-f28b-490a-9ada-c6089a1fc5b0/Product%20names%20and%20service%20plan%20identifiers%20for%20licensing.csv' -UseBasicParsing).Content)) | ConvertFrom-Csv
+}
+
 function Add-Output {
     param (
         [Parameter(Mandatory = $true)]
@@ -47,18 +53,17 @@ function Add-Output {
     $outputs.AppendLine($Output) | Out-Null
 }
 
-$results = @{}
 function Add-Result {
     param (
         [Parameter(Mandatory = $true, ParameterSetName = 'SKU')]
         [ValidateNotNullOrEmpty()]
         [guid]$SKUID,
         [Parameter(Mandatory = $true, ParameterSetName = 'SKU')]
-        [ValidateRange('NonNegative')]
-        [int]$AvailableCount,
+        [ValidateNotNullOrEmpty()]
+        [UInt32]$AvailableCount,
         [Parameter(Mandatory = $true, ParameterSetName = 'SKU')]
-        [ValidateRange('NonNegative')]
-        [int]$MinimumCount,
+        [ValidateNotNullOrEmpty()]
+        [UInt32]$MinimumCount,
         [Parameter(Mandatory = $true, ParameterSetName = 'User')]
         [ValidateNotNullOrEmpty()]
         [string]$UserPrincipalName,
@@ -72,11 +77,11 @@ function Add-Result {
         [ValidateNotNullOrEmpty()]
         [string]$PlanName,
         [Parameter(Mandatory = $true, ParameterSetName = 'Advanced')]
-        [ValidateRange('NonNegative')]
-        [int]$EnabledCount,
+        [ValidateNotNullOrEmpty()]
+        [UInt32]$EnabledCount,
         [Parameter(Mandatory = $true, ParameterSetName = 'Advanced')]
-        [ValidateRange('NonNegative')]
-        [int]$NeededCount
+        [ValidateNotNullOrEmpty()]
+        [UInt32]$NeededCount
     )
     if (-not $results.ContainsKey($PSCmdlet.ParameterSetName)) {
         $results.Add($PSCmdlet.ParameterSetName, @{})
@@ -109,7 +114,6 @@ function Add-Result {
     }
 }
 
-$groups = [System.Collections.Generic.List[hashtable]]::new()
 function Get-GroupMember {
     [OutputType([guid[]])]
     param (
@@ -140,7 +144,6 @@ function Get-GroupMember {
     Write-Output ([guid[]]@(($groups | Where-Object{$_.id -in $GroupIDs}).$memberProperty.id | Select-Object -Unique)) -NoEnumerate
 }
 
-$skuTranslate = [string]::new([char[]]((Invoke-WebRequest -Uri 'https://download.microsoft.com/download/e/3/e/e3e9faf2-f28b-490a-9ada-c6089a1fc5b0/Product%20names%20and%20service%20plan%20identifiers%20for%20licensing.csv' -UseBasicParsing).Content)) | ConvertFrom-Csv
 function Get-SKUName {
     [OutputType([string])]
     param (
@@ -258,24 +261,24 @@ function Get-AzureADLicenseStatus {
         [string[]]$RecipientAddresses_normal,
         [ValidateNotNullOrEmpty()]
         [string[]]$RecipientAddresses_critical,
-        [ValidateRange('NonNegative')]
-        [int]$SKUIgnoreThreshold = 10,
+        [ValidateNotNullOrEmpty()]
+        [UInt32]$SKUIgnoreThreshold = 10,
         [ValidateRange(0, 100)]
-        [int]$SKUPercentageThreshold_normal = 5,
-        [ValidateRange('NonNegative')]
-        [int]$SKUTotalThreshold_normal = 10,
+        [UInt16]$SKUPercentageThreshold_normal = 5,
+        [ValidateNotNullOrEmpty()]
+        [UInt32]$SKUTotalThreshold_normal = 10,
         [ValidateRange(0, 100)]
-        [int]$SKUPercentageThreshold_important = 5,
-        [ValidateRange('NonNegative')]
-        [int]$SKUTotalThreshold_important = 50,
+        [UInt16]$SKUPercentageThreshold_important = 5,
+        [ValidateNotNullOrEmpty()]
+        [UInt32]$SKUTotalThreshold_important = 50,
         [ValidateScript({$_ -in 1..99 -and $_ -gt $SKUCriticalThreshold_basic})]
-        [int]$SKUWarningThreshold_basic = 80,
+        [UInt16]$SKUWarningThreshold_basic = 80,
         [ValidateScript({$_ -in 1..99 -and $_ -lt $SKUWarningThreshold_basic})]
-        [int]$SKUCriticalThreshold_basic = 20,
+        [UInt16]$SKUCriticalThreshold_basic = 20,
         [ValidateScript({$_ -in 1..99 -and $_ -gt $SKUCriticalThreshold_advanced})]
-        [int]$SKUWarningThreshold_advanced = 99,
+        [UInt16]$SKUWarningThreshold_advanced = 99,
         [ValidateScript({$_ -in 1..99 -and $_ -lt $SKUWarningThreshold_advanced})]
-        [int]$SKUCriticalThreshold_advanced = 95,
+        [UInt16]$SKUCriticalThreshold_advanced = 95,
         [ValidateNotNullOrEmpty()]
         [guid[]]$ImportantSKUs = @(),
         [ValidateNotNullOrEmpty()]
@@ -302,11 +305,14 @@ function Get-AzureADLicenseStatus {
             }
         }
         $graphAuthentication = $true
+        Write-Information -MessageData 'Succeeded to authenticate with Graph'
     }
     catch {
         $graphAuthentication = $false
+        Write-Error -Message 'Failed to authenticate with Graph'
     }
     if ($graphAuthentication) {
+        Initialize-Variables
         #region: SKUs
         # Get SKUs
         $organizationSKUs = [System.Collections.Generic.List[hashtable]]::new()
@@ -316,6 +322,7 @@ function Get-AzureADLicenseStatus {
             $organizationSKUs.AddRange([hashtable[]]($data.value))
             $URI = $data['@odata.nextLink']
         }
+        Write-Information -MessageData "Found $($organizationSKUs.Count) SKUs" -Tags @('GraphResult')
         # Analyze SKUs
         foreach ($SKU in $organizationSKUs | Where-Object{$_.prepaidUnits.enabled -gt $SKUIgnoreThreshold}) {
             $totalCount = $SKU.prepaidUnits.enabled
@@ -360,30 +367,36 @@ function Get-AzureADLicenseStatus {
             $users.AddRange([hashtable[]]($data.value))
             $URI = $data['@odata.nextLink']
         }
+        Write-Information -MessageData "Found $($users.Count) users" -Tags @('GraphResult')
         # Analyze users
         foreach ($user in $users) {
             if ($user.licenseAssignmentStates.count -gt 0) {
-                $userSKUs = ($user.licenseAssignmentStates | Where-Object{$_.state -eq 'Active' -or $_.error -in @('CountViolation', 'MutuallyExclusiveViolation')}).skuId
+                if ($null -ne ($userSKUAssignments = $user.licenseAssignmentStates | Where-Object{$_.state -eq 'Active' -or $_.error -in @('CountViolation', 'MutuallyExclusiveViolation')})) {
+                    $userSKUs = $userSKUAssignments.skuId
+                }
+                else {
+                    $userSKUs = @()
+                }
                 if ($null -ne ($countViolations = $user.licenseAssignmentStates | Where-Object{$_.error -eq 'CountViolation'})) {
                     foreach ($countViolation in $countViolations.skuId | Select-Object -Unique) {
                         $results['SKU'][$countViolation]['availableCount'] -= 1
                     }
                 }
                 # Identify interchangeable SKUs, based on specifications
-                $comparisonInterchangeable = @()
+                $userSKUs_interchangeable = @()
                 if ($null -ne $userSKUs) {
-                    if ($null -ne ($comparison_dingens = Compare-Object $userSKUs $InterchangeableSKUs -ExcludeDifferent -IncludeEqual)) {
-                        $comparisonInterchangeable = $comparison_dingens.InputObject
+                    if ($null -ne ($comparison_interchangeable = Compare-Object $userSKUs $InterchangeableSKUs -ExcludeDifferent -IncludeEqual)) {
+                        $userSKUs_interchangeable = @($comparison_interchangeable.InputObject)
                     }
                 }
                 # Identify optimizable SKUs, based on organization-level calculations
-                $comparisonOptimizable = [System.Collections.Generic.List[guid]]::new()
+                $userSKUs_optimizable = [System.Collections.Generic.List[guid]]::new()
                 if ($null -ne ($comparison_replaceableOrganization = $userSKUs | Where-Object{$_ -in $superiorSKUs_organization.Keys} | ForEach-Object{$superiorSKUs_organization[$_]})) {
                     # TODO: Rework into foreach loop
-                    $comparisonOptimizable = Compare-Object -ReferenceObject $userSKUs -DifferenceObject $comparison_replaceableOrganization -ExcludeDifferent -IncludeEqual | ForEach-Object{$superiorSKU = $_.InputObject; $superiorSKUs_organization.Keys | Where-Object{$superiorSKUs_organization[$_] -contains $superiorSKU}} | Where-Object{$_ -in $userSKUs} | Select-Object -Unique
+                    $userSKUs_optimizable = Compare-Object -ReferenceObject $userSKUs -DifferenceObject $comparison_replaceableOrganization -ExcludeDifferent -IncludeEqual | ForEach-Object{$superiorSKU = $_.InputObject; $superiorSKUs_organization.Keys | Where-Object{$superiorSKUs_organization[$_] -contains $superiorSKU}} | Where-Object{$_ -in $userSKUs} | Select-Object -Unique
                 }
                 else {
-                    $comparisonOptimizable = $null
+                    $userSKUs_optimizable = $null
                 }
                 # Identify removable SKUs, based on user-level calculations
                 $skuid_enabledPlans = @{}
@@ -413,20 +426,20 @@ function Get-AzureADLicenseStatus {
                 }
                 if ($null -ne ($comparison_replaceableUser = $userSKUs | Where-Object{$_ -in $superiorSKUs_user.Keys} | ForEach-Object{$superiorSKUs_user[$_]})) {
                     # TODO: Rework into foreach loop
-                    $comparisonRemovable = Compare-Object -ReferenceObject $userSKUs -DifferenceObject $comparison_replaceableUser -ExcludeDifferent -IncludeEqual | ForEach-Object{$superiorSKU = $_.InputObject; $superiorSKUs_user.Keys | Where-Object{$superiorSKUs_user[$_] -contains $superiorSKU}} | Where-Object{$_ -in $userSKUs} | Select-Object -Unique
+                    $userSKUs_removable = Compare-Object -ReferenceObject $userSKUs -DifferenceObject $comparison_replaceableUser -ExcludeDifferent -IncludeEqual | ForEach-Object{$superiorSKU = $_.InputObject; $superiorSKUs_user.Keys | Where-Object{$superiorSKUs_user[$_] -contains $superiorSKU}} | Where-Object{$_ -in $userSKUs} | Select-Object -Unique
                 }
                 else {
-                    $comparisonRemovable = $null
+                    $userSKUs_removable = $null
                 }
                 # Add results
-                if ($comparisonInterchangeable.Count -gt 1) {
-                    Add-Result -UserPrincipalName $user.userPrincipalName -ConflictType Interchangeable -ConflictSKUs $comparisonInterchangeable
+                if ($userSKUs_interchangeable.Count -gt 1) {
+                    Add-Result -UserPrincipalName $user.userPrincipalName -ConflictType Interchangeable -ConflictSKUs $userSKUs_interchangeable
                 }
-                if ($null -ne $comparisonOptimizable) {
-                    Add-Result -UserPrincipalName $user.userPrincipalName -ConflictType Optimizable -ConflictSKUs $comparisonOptimizable
+                if ($null -ne $userSKUs_optimizable) {
+                    Add-Result -UserPrincipalName $user.userPrincipalName -ConflictType Optimizable -ConflictSKUs $userSKUs_optimizable
                 }
-                if ($null -ne $comparisonRemovable) {
-                    Add-Result -UserPrincipalName $user.userPrincipalName -ConflictType Removable -ConflictSKUs $comparisonRemovable
+                if ($null -ne $userSKUs_removable) {
+                    Add-Result -UserPrincipalName $user.userPrincipalName -ConflictType Removable -ConflictSKUs $userSKUs_removable
                 }
             }
         }
@@ -444,6 +457,7 @@ function Get-AzureADLicenseStatus {
                 $groups.AddRange([hashtable[]]($data.value))
                 $URI = $data['@odata.nextLink']
             }
+            Write-Information -MessageData "Found $($groups.Count) groups" -Tags @('GraphResult')
             # Azure AD P1 based on dynamic groups
             if ($null -ne ($dynamicGroups = $groups | Where-Object{$_.groupTypes -contains 'DynamicMembership'})) {
                 $AADP1Users.AddRange((Get-GroupMember -GroupIDs $dynamicGroups.id -TransitiveMembers))
@@ -456,6 +470,7 @@ function Get-AzureADLicenseStatus {
                 $applications.AddRange([hashtable[]]($data.value))
                 $URI = $data['@odata.nextLink']
             }
+            Write-Information -MessageData "Found $($applications.Count) service principals" -Tags @('GraphResult')
             if ($null -ne ($applicationGroups = ($applications | Where-Object{$_.accountEnabled -eq $true -and $_.appRoleAssignmentRequired -eq $true -and $_.servicePrincipalType -eq 'Application'}).appRoleAssignedTo | Where-Object{$_.principalType -eq 'Group'})) {
                 $AADP1Users.AddRange((Get-GroupMember -GroupIDs $applicationGroups.principalId -TransitiveMembers))
             }
@@ -467,12 +482,16 @@ function Get-AzureADLicenseStatus {
                 $conditionalAccessPolicies.AddRange([hashtable[]]($data.value))
                 $URI = $data['@odata.nextLink']
             }
+            Write-Information -MessageData "Found $($conditionalAccessPolicies.Count) conditional access policies" -Tags @('GraphResult')
             foreach ($conditionalAccessPolicy in $conditionalAccessPolicies | Where-Object{$_.state -eq 'enabled'}) {
                 if ($conditionalAccessPolicy.conditions.users.includeUsers -eq 'All') {
                     $includeUsers = $users.id
                 }
+                elseif ($null -ne $conditionalAccessPolicy.conditions.users.includeUsers | Where-Object{$_ -ne 'GuestsOrExternalUsers'}) {
+                    $includeUsers = @($conditionalAccessPolicy.conditions.users.includeUsers | Where-Object{$_ -ne 'GuestsOrExternalUsers'})
+                }
                 else {
-                    $includeUsers = $conditionalAccessPolicy.conditions.users.includeUsers | Where-Object{$_ -ne 'GuestsOrExternalUsers'}
+                    $includeUsers = @()
                 }
                 if ($null -ne ($conditionalAccessUsers = Compare-Object -ReferenceObject $includeUsers -DifferenceObject $conditionalAccessPolicy.conditions.users.excludeUsers | Where-Object{$_.SideIndicator -eq '<='})) {
                     $AADP1Users.AddRange([guid[]]@($conditionalAccessUsers.InputObject))
@@ -480,8 +499,11 @@ function Get-AzureADLicenseStatus {
                 if ($conditionalAccessPolicy.conditions.users.includeGroups -eq 'All') {
                     $includeGroups = $groups.id
                 }
+                elseif ($null -ne $conditionalAccessPolicy.conditions.users.includeGroups) {
+                    $includeGroups = @($conditionalAccessPolicy.conditions.users.includeGroups)
+                }
                 else {
-                    $includeGroups = $conditionalAccessPolicy.conditions.users.includeGroups
+                    $includeGroups = @()
                 }
                 if ($null -ne ($conditionalAccessGroups = Compare-Object -ReferenceObject $includeGroups -DifferenceObject $conditionalAccessPolicy.conditions.users.excludeGroups | Where-Object{$_.SideIndicator -eq '<='})) {
                     $AADP1Users.AddRange((Get-GroupMember -GroupIDs $conditionalAccessGroups.InputObject -TransitiveMembers))
@@ -495,6 +517,7 @@ function Get-AzureADLicenseStatus {
                 $eligibleRoleMembers.AddRange([hashtable[]]($data.value))
                 $URI = $data['@odata.nextLink']
             }
+            Write-Information -MessageData "Found $($eligibleRoleMembers.Count) eligible role assignments" -Tags @('GraphResult')
             if ($eligibleRoleMembers.Count -gt 0) {
                 if ($null -ne ($actuallyEligibleRoleMembers = $eligibleRoleMembers | Where-Object{$_.scheduleInfo.startDateTime -le [datetime]::Today -and ($_.scheduleInfo.expiration.endDateTime -ge [datetime]::Today -or $_.scheduleInfo.expiration.type -eq 'noExpiration')})) {
                     $AADP2Users.AddRange([guid[]]@($actuallyEligibleRoleMembers.principalId))
@@ -515,12 +538,15 @@ function Get-AzureADLicenseStatus {
                     }
                 }
                 $exchangeAuthentication = $true
+                Write-Information -MessageData 'Succeeded to authenticate with Exchange Online'
             }
             catch {
                 $exchangeAuthentication = $false
+                Write-Error -Message 'Failed to authenticate with Exchange Online'
             }
             if ($exchangeAuthentication) {
                 if ($null -ne ($mailboxes = Get-EXOMailbox -RecipientTypeDetails 'SharedMailbox', 'UserMailbox' -ResultSize Unlimited)) {
+                    Write-Information -MessageData "Found $($mailboxes.Count) mailboxes" -Tags @('GraphResult')
                     $ATPUsers.AddRange([guid[]]@($mailboxes.ExternalDirectoryObjectId))
                 }
                 Disconnect-ExchangeOnline -Confirm:$false
@@ -570,7 +596,7 @@ function Get-AzureADLicenseStatus {
             Add-Output -Output $style
             $critical = $false
             # Output basic SKU results
-            if ($results['SKU'].Keys.Count -gt 0) {
+            if ($results.ContainsKey('SKU')) {
                 Add-Output -Output "<p class=gray>Basic checkup - Products</p> `
                                     <p>Please check license counts for the following product SKUs and <a href=""$LicensingURL"">reserve</a> additional licenses:</p> `
                                     <p><table><tr><th>License type</th><th>Available count</th><th>Minimum count</th><th>Difference</th></tr>"
@@ -599,7 +625,7 @@ function Get-AzureADLicenseStatus {
                                     <li>Report important products having both <$SKUTotalThreshold_important licenses and <$SKUPercentageThreshold_important% of their total licenses available</li></ul></p>"
             }
             # Output basic user results
-            if ($results['User'].Keys.Count -gt 0) {
+            if ($results.ContainsKey('User')) {
                 Add-Output -Output '<p class=gray>Basic checkup - Users</p>
                                     <p>Please check license assignments for the following user accounts and mitigate impact:</p>
                                     <p><table><tr><th>Account</th><th>Interchangeable</th><th>Optimizable</th><th>Removable</th></tr>'
@@ -628,7 +654,7 @@ function Get-AzureADLicenseStatus {
                                     <li>Report actually inclusive licenses as <strong>removable</strong>, based on enabled SKU features</li></ul></p>'
             }
             # Output advanced SKU results
-            if ($results['Advanced'].Keys.Count -gt 0) {
+            if ($results.ContainsKey('Advanced')) {
                 Add-Output -Output "<p class=gray>Advanced checkup - Features</p> `
                                     <p>Please check license counts for the following product SKUs and <a href=""$LicensingURL"">reserve</a> additional licenses:</p> `
                                     <p><table><tr><th>License type</th><th>Enabled count</th><th>Needed count</th><th>Difference</th></tr>"
