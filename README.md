@@ -46,9 +46,12 @@ The main motivation for this script was to conquer side-effects of semi-automati
 
 #### 3.1.1 Basic
 
-- _Az.Accounts_
-- _Az.KeyVault_
-- _Microsoft.Graph_
+- For local execution
+  - _Microsoft.Graph.Authentication_
+- For Azure execution
+  - _Az.Accounts_
+  - _Az.KeyVault_
+  - _Microsoft.Graph.Authentication_
 
 #### 3.1.2 Advanced
 
@@ -58,19 +61,19 @@ The main motivation for this script was to conquer side-effects of semi-automati
 
 #### 3.2.1 Basic
 
-- Microsoft Graph permission _Organization.Read.All_
-- Microsoft Graph permission _Mail.Send_
-- Microsoft Graph permission _User.Read.All_
+- **Microsoft Graph** permission _Mail.Send_
+- **Microsoft Graph** permission _Organization.Read.All_
+- **Microsoft Graph** permission _User.Read.All_
 
 #### 3.2.2 Advanced
 
-- Microsoft Graph permission _Application.Read.All_
-- Microsoft Graph permission _GroupMember.Read.All_
-- Microsoft Graph permission _Policy.Read.All_
-- Microsoft Graph permission _RoleManagement.Read.All_
-- Office 365 Exchange Online permission _Exchange.ManageAsApp_ and Azure AD role _Exchange Recipient Administrator_
+- **Microsoft Graph** permission _Application.Read.All_
+- **Microsoft Graph** permission _GroupMember.Read.All_
+- **Microsoft Graph** permission _Policy.Read.All_
+- **Microsoft Graph** permission _RoleManagement.Read.All_
+- **Office 365 Exchange Online** permission _Exchange.ManageAsApp_ and Azure AD role _Exchange Recipient Administrator_
 
-> HINT: To simplify permission management, the following permissions can be replaced with the _Directory.Read.All_ permission. As this would provide the script with additional, probably unnecessary permissions, consider this at your own discretion.
+> HINT: To simplify permission management, the following **Microsoft Graph** permissions can be replaced with the _Directory.Read.All_ permission. As this would provide the script with additional, probably unnecessary permissions, consider this at your own discretion.
 >
 >- _Application.Read.All_
 >- _GroupMember.Read.All_
@@ -79,18 +82,25 @@ The main motivation for this script was to conquer side-effects of semi-automati
 
 ## 4 Preparations
 
-1. Create Azure automation account
-   1. Create PowerShell runbook
-   2. Add required modules
-   3. Enable system-assigned managed identity
-2. Create Azure key vault
-   1. Create self-signed certificate
-   2. Grant Azure role _Key Vault Secrets User_ for automation account to certificate
-3. Create Azure AD application
-   1. Add certificate
-   2. Grant required permissions
-4. (optional) Create Exchange Online application access policy
-   1. Restrict Azure AD application's _Mail.Send_ permission to intended sender mailbox
+1. Prepare execution
+   - For local execution
+     1. Install required modules
+     2. Install this module
+     3. Create self-signed certificate
+   - For Azure execution
+     1. Create Azure automation account
+        1. Add required modules
+        2. Add this module
+        3. Enable system-assigned managed identity
+     1. Create Azure key vault
+        1. Create self-signed certificate
+        1. Grant Azure role _Key Vault Secrets User_ for automation account to certificate
+2. Prepare authentication
+   1. Create Azure AD application
+   2. Add certificate
+   3. Add required permissions
+3. (optional) Limit send permissions
+   1. Create Exchange Online application access policy to restrict Azure AD application's _Mail.Send_ permission to intended sender mailbox
 
 ## 5 Links
 
