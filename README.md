@@ -61,19 +61,19 @@ The main motivation for this script was to conquer side-effects of semi-automati
 
 #### 3.2.1 Basic
 
-- **Microsoft Graph** permission _Mail.Send_
-- **Microsoft Graph** permission _Organization.Read.All_
-- **Microsoft Graph** permission _User.Read.All_
+- Microsoft Graph permission _Mail.Send_
+- Microsoft Graph permission _Organization.Read.All_
+- Microsoft Graph permission _User.Read.All_
 
 #### 3.2.2 Advanced
 
-- **Microsoft Graph** permission _Application.Read.All_
-- **Microsoft Graph** permission _GroupMember.Read.All_
-- **Microsoft Graph** permission _Policy.Read.All_
-- **Microsoft Graph** permission _RoleManagement.Read.All_
-- **Office 365 Exchange Online** permission _Exchange.ManageAsApp_ and Azure AD role _Exchange Recipient Administrator_
+- Microsoft Graph permission _Application.Read.All_
+- Microsoft Graph permission _GroupMember.Read.All_
+- Microsoft Graph permission _Policy.Read.All_
+- Microsoft Graph permission _RoleManagement.Read.All_
+- Office 365 Exchange Online permission _Exchange.ManageAsApp_ and Azure AD role _Global Reader_
 
-> HINT: To simplify permission management, the following **Microsoft Graph** permissions can be replaced with the _Directory.Read.All_ permission. As this would provide the script with additional, probably unnecessary permissions, consider this at your own discretion.
+> HINT: To simplify permission management, the following Microsoft Graph permissions can be replaced with the _Directory.Read.All_ permission. As this would provide the script with additional, probably unnecessary permissions, consider this at your own discretion.
 >
 >- _Application.Read.All_
 >- _GroupMember.Read.All_
@@ -92,19 +92,19 @@ The main motivation for this script was to conquer side-effects of semi-automati
         1. Add required modules
         2. Add this module
         3. Enable system-assigned managed identity
-     1. Create Azure key vault
+     2. Create Azure key vault
         1. Create self-signed certificate
-        1. Grant Azure role _Key Vault Secrets User_ for automation account to certificate
+        2. Grant Azure role _Key Vault Secrets User_ for automation account to certificate
 2. Prepare authentication
    1. Create Azure AD application
-   2. Add certificate
-   3. Add required permissions
-3. (optional) Limit send permissions
+   2. Add required permissions
+   3. Add certificate
+3. (optional) Limit permissions
    1. Create Exchange Online application access policy to restrict Azure AD application's _Mail.Send_ permission to intended sender mailbox
 
 ## 5 Links
 
-- [Azure automation runbook](https://learn.microsoft.com/azure/automation/automation-create-standalone-account)
+- [Azure automation account](https://learn.microsoft.com/azure/automation/automation-create-standalone-account)
 - [Azure key vault](https://learn.microsoft.com/azure/key-vault/general/quick-create-portal)
 - [Azure AD application](https://learn.microsoft.com/azure/active-directory/develop/quickstart-register-app)
 - [Exchange Online application access policy](https://learn.microsoft.com/graph/auth-limit-mailbox-access)

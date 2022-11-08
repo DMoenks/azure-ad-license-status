@@ -305,11 +305,11 @@ function Get-AzureADLicenseStatus {
             }
         }
         $graphAuthentication = $true
-        Write-Information -MessageData 'Succeeded to authenticate with Graph'
+        Write-Information -MessageData 'Succeeded to authenticate with Graph' -Tags 'Authentication'
     }
     catch {
         $graphAuthentication = $false
-        Write-Error -Message 'Failed to authenticate with Graph'
+        Write-Error -Message 'Failed to authenticate with Graph' -Category AuthenticationError
     }
     if ($graphAuthentication) {
         Initialize-Variables
@@ -322,7 +322,7 @@ function Get-AzureADLicenseStatus {
             $organizationSKUs.AddRange([hashtable[]]($data.value))
             $URI = $data['@odata.nextLink']
         }
-        Write-Information -MessageData "Found $($organizationSKUs.Count) SKUs" -Tags @('GraphResult')
+        Write-Information -MessageData "Found $($organizationSKUs.Count) SKUs" -Tags @('QueryResult')
         # Analyze SKUs
         foreach ($SKU in $organizationSKUs | Where-Object{$_.prepaidUnits.enabled -gt $SKUIgnoreThreshold}) {
             $totalCount = $SKU.prepaidUnits.enabled
@@ -356,6 +356,7 @@ function Get-AzureADLicenseStatus {
                 }
             }
         }
+        Write-Information -MessageData "Found $($superiorSKUs_organization.Count) SKU matches for organization" -Tags @('AnalysisResult')
         #endregion
 
         #region: Users
@@ -367,7 +368,7 @@ function Get-AzureADLicenseStatus {
             $users.AddRange([hashtable[]]($data.value))
             $URI = $data['@odata.nextLink']
         }
-        Write-Information -MessageData "Found $($users.Count) users" -Tags @('GraphResult')
+        Write-Information -MessageData "Found $($users.Count) users" -Tags @('QueryResult')
         # Analyze users
         foreach ($user in $users) {
             if ($user.licenseAssignmentStates.count -gt 0) {
@@ -434,12 +435,15 @@ function Get-AzureADLicenseStatus {
                 # Add results
                 if ($userSKUs_interchangeable.Count -gt 1) {
                     Add-Result -UserPrincipalName $user.userPrincipalName -ConflictType Interchangeable -ConflictSKUs $userSKUs_interchangeable
+                    Write-Information -MessageData "Found $($userSKUs_interchangeable.Count) interchangeable SKUs for user $($user.userPrincipalName)" -Tags @('AnalysisResult')
                 }
                 if ($null -ne $userSKUs_optimizable) {
                     Add-Result -UserPrincipalName $user.userPrincipalName -ConflictType Optimizable -ConflictSKUs $userSKUs_optimizable
+                    Write-Information -MessageData "Found $($userSKUs_optimizable.Count) optimizable SKUs for user $($user.userPrincipalName)" -Tags @('AnalysisResult')
                 }
                 if ($null -ne $userSKUs_removable) {
                     Add-Result -UserPrincipalName $user.userPrincipalName -ConflictType Removable -ConflictSKUs $userSKUs_removable
+                    Write-Information -MessageData "Found $($userSKUs_removable.Count) removable SKUs for user $($user.userPrincipalName)" -Tags @('AnalysisResult')
                 }
             }
         }
@@ -457,7 +461,7 @@ function Get-AzureADLicenseStatus {
                 $groups.AddRange([hashtable[]]($data.value))
                 $URI = $data['@odata.nextLink']
             }
-            Write-Information -MessageData "Found $($groups.Count) groups" -Tags @('GraphResult')
+            Write-Information -MessageData "Found $($groups.Count) groups" -Tags @('QueryResult')
             # Azure AD P1 based on dynamic groups
             if ($null -ne ($dynamicGroups = $groups | Where-Object{$_.groupTypes -contains 'DynamicMembership'})) {
                 $AADP1Users.AddRange((Get-GroupMember -GroupIDs $dynamicGroups.id -TransitiveMembers))
@@ -470,7 +474,7 @@ function Get-AzureADLicenseStatus {
                 $applications.AddRange([hashtable[]]($data.value))
                 $URI = $data['@odata.nextLink']
             }
-            Write-Information -MessageData "Found $($applications.Count) service principals" -Tags @('GraphResult')
+            Write-Information -MessageData "Found $($applications.Count) service principals" -Tags @('QueryResult')
             if ($null -ne ($applicationGroups = ($applications | Where-Object{$_.accountEnabled -eq $true -and $_.appRoleAssignmentRequired -eq $true -and $_.servicePrincipalType -eq 'Application'}).appRoleAssignedTo | Where-Object{$_.principalType -eq 'Group'})) {
                 $AADP1Users.AddRange((Get-GroupMember -GroupIDs $applicationGroups.principalId -TransitiveMembers))
             }
@@ -482,7 +486,7 @@ function Get-AzureADLicenseStatus {
                 $conditionalAccessPolicies.AddRange([hashtable[]]($data.value))
                 $URI = $data['@odata.nextLink']
             }
-            Write-Information -MessageData "Found $($conditionalAccessPolicies.Count) conditional access policies" -Tags @('GraphResult')
+            Write-Information -MessageData "Found $($conditionalAccessPolicies.Count) conditional access policies" -Tags @('QueryResult')
             foreach ($conditionalAccessPolicy in $conditionalAccessPolicies | Where-Object{$_.state -eq 'enabled'}) {
                 if ($conditionalAccessPolicy.conditions.users.includeUsers -eq 'All') {
                     $includeUsers = $users.id
@@ -517,7 +521,7 @@ function Get-AzureADLicenseStatus {
                 $eligibleRoleMembers.AddRange([hashtable[]]($data.value))
                 $URI = $data['@odata.nextLink']
             }
-            Write-Information -MessageData "Found $($eligibleRoleMembers.Count) eligible role assignments" -Tags @('GraphResult')
+            Write-Information -MessageData "Found $($eligibleRoleMembers.Count) eligible role assignments" -Tags @('QueryResult')
             if ($eligibleRoleMembers.Count -gt 0) {
                 if ($null -ne ($actuallyEligibleRoleMembers = $eligibleRoleMembers | Where-Object{$_.scheduleInfo.startDateTime -le [datetime]::Today -and ($_.scheduleInfo.expiration.endDateTime -ge [datetime]::Today -or $_.scheduleInfo.expiration.type -eq 'noExpiration')})) {
                     $AADP2Users.AddRange([guid[]]@($actuallyEligibleRoleMembers.principalId))
@@ -538,52 +542,60 @@ function Get-AzureADLicenseStatus {
                     }
                 }
                 $exchangeAuthentication = $true
-                Write-Information -MessageData 'Succeeded to authenticate with Exchange Online'
+                Write-Information -MessageData 'Succeeded to authenticate with Exchange Online' -Tags 'Authentication'
             }
             catch {
                 $exchangeAuthentication = $false
-                Write-Error -Message 'Failed to authenticate with Exchange Online'
+                Write-Error -Message 'Failed to authenticate with Exchange Online' -Category AuthenticationError
             }
             if ($exchangeAuthentication) {
-                if ($null -ne ($mailboxes = Get-EXOMailbox -RecipientTypeDetails 'SharedMailbox', 'UserMailbox' -ResultSize Unlimited)) {
-                    Write-Information -MessageData "Found $($mailboxes.Count) mailboxes" -Tags @('GraphResult')
+                if ($null -ne ($mailboxes = Get-Mailbox -RecipientTypeDetails 'SharedMailbox', 'UserMailbox' -ResultSize Unlimited)) {
+                    Write-Information -MessageData "Found $($mailboxes.Count) mailboxes" -Tags @('QueryResult')
                     $ATPUsers.AddRange([guid[]]@($mailboxes.ExternalDirectoryObjectId))
                 }
                 Disconnect-ExchangeOnline -Confirm:$false
             }
             # Add results
             if ($AADP1Users.Count -gt 0) {
-                if ($null -ne ($AADP1SKUs = @($organizationSKUs | Where-Object{@($_.servicePlans.servicePlanId) -ccontains '41781fb2-bc02-4b7c-bd55-b576c07bb09d'}))) {
+                if ($null -ne ($AADP1SKUs = @($organizationSKUs | Where-Object{@($_.servicePlans.servicePlanId) -contains '41781fb2-bc02-4b7c-bd55-b576c07bb09d'}))) {
                     $AADP1Licenses = ($AADP1SKUs.prepaidUnits.enabled | Measure-Object -Sum).Sum
                 }
                 else {
                     $AADP1Licenses = 0
                 }
-                if ($AADP1Licenses -lt ($neededCount = ($AADP1Users | Select-Object -Unique).Count)) {
+                $neededCount = ($AADP1Users | Select-Object -Unique).Count
+                Write-Information -MessageData "Found $neededCount needed, $AADP1Licenses enabled AADP1 licenses" -Tags @('AnalysisResult')
+                if ($AADP1Licenses -lt $neededCount) {
                     Add-Result -PlanName 'Azure Active Directory Premium P1' -EnabledCount $AADP1Licenses -NeededCount $neededCount
                 }
             }
             if ($AADP2Users.Count -gt 0) {
-                if ($null -ne ($AADP2SKUs = @($organizationSKUs | Where-Object{@($_.servicePlans.servicePlanId) -ccontains 'eec0eb4f-6444-4f95-aba0-50c24d67f998'}))) {
+                if ($null -ne ($AADP2SKUs = @($organizationSKUs | Where-Object{@($_.servicePlans.servicePlanId) -contains 'eec0eb4f-6444-4f95-aba0-50c24d67f998'}))) {
                     $AADP2Licenses = ($AADP2SKUs.prepaidUnits.enabled | Measure-Object -Sum).Sum
                 }
                 else {
                     $AADP2Licenses = 0
                 }
-                if ($AADP2Licenses -lt ($neededCount = ($AADP2Users | Select-Object -Unique).Count)) {
+                $neededCount = ($AADP2Users | Select-Object -Unique).Count
+                Write-Information -MessageData "Found $neededCount needed, $AADP1Licenses enabled AADP2 licenses" -Tags @('AnalysisResult')
+                if ($AADP2Licenses -lt $neededCount) {
                     Add-Result -PlanName 'Azure Active Directory Premium P2' -EnabledCount $AADP2Licenses -NeededCount $neededCount
                 }
             }
             if ($ATPUsers.Count -gt 0) {
-                if ($null -ne ($ATPSKUs = @($organizationSKUs | Where-Object{@($_.servicePlans.servicePlanId) -ccontains '8e0c0a52-6a6c-4d40-8370-dd62790dcd70'}))) {
+                if ($null -ne ($ATPSKUs = @($organizationSKUs | Where-Object{@($_.servicePlans.servicePlanId) -contains '8e0c0a52-6a6c-4d40-8370-dd62790dcd70'}))) {
                     $ATPLicenses = ($ATPSKUs.prepaidUnits.enabled | Measure-Object -Sum).Sum
-                    if ($ATPLicenses -lt ($neededCount = ($ATPUsers | Select-Object -Unique).Count)) {
+                    $neededCount = ($ATPUsers | Select-Object -Unique).Count
+                    Write-Information -MessageData "Found $neededCount needed, $AADP1Licenses enabled DfOP2 licenses" -Tags @('AnalysisResult')
+                    if ($ATPLicenses -lt $neededCount) {
                         Add-Result -PlanName 'Microsoft Defender for Office 365 P2' -EnabledCount $ATPLicenses -NeededCount $neededCount
                     }
                 }
-                elseif ($null -ne ($ATPSKUs = @($organizationSKUs | Where-Object{@($_.servicePlans.servicePlanId) -ccontains 'f20fedf3-f3c3-43c3-8267-2bfdd51c0939'}))) {
+                elseif ($null -ne ($ATPSKUs = @($organizationSKUs | Where-Object{@($_.servicePlans.servicePlanId) -contains 'f20fedf3-f3c3-43c3-8267-2bfdd51c0939'}))) {
                     $ATPLicenses = ($ATPSKUs.prepaidUnits.enabled | Measure-Object -Sum).Sum
-                    if ($ATPLicenses -lt ($neededCount = ($ATPUsers | Select-Object -Unique).Count)) {
+                    $neededCount = ($ATPUsers | Select-Object -Unique).Count
+                    Write-Information -MessageData "Found $neededCount needed, $AADP1Licenses enabled DfOP2 licenses" -Tags @('AnalysisResult')
+                    if ($ATPLicenses -lt $neededCount) {
                         Add-Result -PlanName 'Microsoft Defender for Office 365 P1' -EnabledCount $ATPLicenses -NeededCount $neededCount
                     }
                 }
