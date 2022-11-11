@@ -50,6 +50,7 @@ function Add-Output {
         [ValidateNotNullOrEmpty()]
         [string]$Output
     )
+
     $outputs.AppendLine($Output) | Out-Null
 }
 
@@ -83,6 +84,7 @@ function Add-Result {
         [ValidateNotNullOrEmpty()]
         [UInt32]$NeededCount
     )
+
     if (-not $results.ContainsKey($PSCmdlet.ParameterSetName)) {
         $results.Add($PSCmdlet.ParameterSetName, @{})
     }
@@ -122,6 +124,7 @@ function Get-GroupMember {
         [guid[]]$GroupIDs,
         [switch]$TransitiveMembers
     )
+   
     if ($TransitiveMembers.IsPresent) {
         $memberProperty = 'transitiveMembers'
     }
@@ -151,6 +154,7 @@ function Get-SKUName {
         [ValidateNotNullOrEmpty()]
         [guid]$SKUID
     )
+
     if ($null -ne ($skuName = ($skuTranslate | Where-Object{$_.GUID -eq $SKUID}).Product_Display_Name | Select-Object -Unique)) {
         $skuName = [cultureinfo]::new('en-US').TextInfo.ToTitleCase($skuName.ToLower())
     }
@@ -158,6 +162,17 @@ function Get-SKUName {
         $skuName = $SKUID
     }
     Write-Output $skuName
+}
+
+function Get-LicensedUsers {
+    [OutputType([guid[]])]
+    param (
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [guid[]]$PlanIDs
+    )
+
+    Write-Output ([guid[]]@($users | Where-Object{$_.ContainsKey('enabledPlans')} | Where-Object{$null -ne (Compare-Object $_.enabledPlans $PlanIDs -ExcludeDifferent -IncludeEqual)})) -NoEnumerate
 }
 #endregion
 
@@ -409,6 +424,7 @@ function Get-AzureADLicenseStatus {
                         $skuid_enabledPlans[$skuid].AddRange([guid[]]@((($organizationSKUs | Where-Object{$_.skuid -eq $skuid}).servicePlans | Where-Object{$_.servicePlanId -notin $assignment.disabledplans -and $_.appliesTo -eq 'User'}).servicePlanId))
                     }
                 }
+                $user.Add('enabledPlans', $skuid_enabledPlans)
                 $superiorSKUs_user = @{}
                 foreach ($referenceSKU in $skuid_enabledPlans.Keys) {
                     foreach ($differenceSKU in $skuid_enabledPlans.Keys | Where-Object{$_ -ne $referenceSKU}) {
@@ -462,6 +478,8 @@ function Get-AzureADLicenseStatus {
                 $URI = $data['@odata.nextLink']
             }
             Write-Information -MessageData "Found $($groups.Count) groups" -Tags @('QueryResult')
+            # Azure AD P1 based on external identities, if not linked to a subscription
+            # https://learn.microsoft.com/en-us/azure/active-directory/external-identities/external-identities-pricing
             # Azure AD P1 based on dynamic groups
             if ($null -ne ($dynamicGroups = $groups | Where-Object{$_.groupTypes -contains 'DynamicMembership'})) {
                 $AADP1Users.AddRange((Get-GroupMember -GroupIDs $dynamicGroups.id -TransitiveMembers))
@@ -527,18 +545,26 @@ function Get-AzureADLicenseStatus {
                     $AADP2Users.AddRange([guid[]]@($actuallyEligibleRoleMembers.principalId))
                 }
             }
-            # Defender for Office 365 P1/P2 based on user and shared mailboxes
+            # Defender for Office 365 P1/P2 based on https://learn.microsoft.com/office365/servicedescriptions/office-365-advanced-threat-protection-service-description#licensing-terms
             $orgDomain = (Invoke-MgGraphRequest -Method GET -Uri 'https://graph.microsoft.com/v1.0/organization?$select=verifiedDomains').value.verifiedDomains | Where-Object{$_.isInitial -eq $true}
             try {
+                $neededCmdlets = @('Get-Mailbox',
+                                    'Get-SafeLinksRule',
+                                    'Get-SafeLinksPolicy',
+                                    'Get-SafeAttachmentRule',
+                                    'Get-SafeAttachmentPolicy',
+                                    'Get-AntiPhishRule',
+                                    'Get-AntiPhishPolicy',
+                                    'Get-AtpPolicyForO365')
                 switch ($PSCmdlet.ParameterSetName) {
                     'AzureCertificate' {
-                        Connect-ExchangeOnline -AppId $ApplicationID -Certificate $azureCertificate -Organization $orgDomain.name -CommandName 'Get-Mailbox' -ShowBanner:$false -ErrorAction Stop
+                        Connect-ExchangeOnline -AppId $ApplicationID -Certificate $azureCertificate -Organization $orgDomain.name -CommandName $neededCmdlets -ShowBanner:$false -ErrorAction Stop
                     }
                     'LocalCertificate' {
-                        Connect-ExchangeOnline -AppId $ApplicationID -Certificate $Certificate -Organization $orgDomain.name -CommandName 'Get-Mailbox' -ShowBanner:$false -ErrorAction Stop
+                        Connect-ExchangeOnline -AppId $ApplicationID -Certificate $Certificate -Organization $orgDomain.name -CommandName $neededCmdlets -ShowBanner:$false -ErrorAction Stop
                     }
                     'LocalCertificateThumbprint' {
-                        Connect-ExchangeOnline -AppId $ApplicationID -CertificateThumbprint $CertificateThumbprint -Organization $orgDomain.name -CommandName 'Get-Mailbox' -ShowBanner:$false -ErrorAction Stop
+                        Connect-ExchangeOnline -AppId $ApplicationID -CertificateThumbprint $CertificateThumbprint -Organization $orgDomain.name -CommandName $neededCmdlets -ShowBanner:$false -ErrorAction Stop
                     }
                 }
                 $exchangeAuthentication = $true
@@ -549,9 +575,40 @@ function Get-AzureADLicenseStatus {
                 Write-Error -Message 'Failed to authenticate with Exchange Online' -Category AuthenticationError
             }
             if ($exchangeAuthentication) {
-                if ($null -ne ($mailboxes = Get-Mailbox -RecipientTypeDetails 'SharedMailbox', 'UserMailbox' -ResultSize Unlimited)) {
-                    Write-Information -MessageData "Found $($mailboxes.Count) mailboxes" -Tags @('QueryResult')
-                    $ATPUsers.AddRange([guid[]]@($mailboxes.ExternalDirectoryObjectId))
+                if ($null -ne ($organizationSKUs | Where-Object{@($_.servicePlans.servicePlanId) -contains '8e0c0a52-6a6c-4d40-8370-dd62790dcd70'})) {
+                    Write-Information -MessageData "Identified a Defender for Office P2 tenant" -Tags @('QueryResult')
+                    # Mailboxes
+                    if ($null -ne ($mailboxes = Get-Mailbox -RecipientTypeDetails 'SharedMailbox', 'UserMailbox' -ResultSize Unlimited)) {
+                        Write-Information -MessageData "Found $($mailboxes.Count) mailboxes" -Tags @('QueryResult')
+                        $ATPUsers.AddRange([guid[]]@($mailboxes.ExternalDirectoryObjectId))
+                    }
+                    # Safe Attachments for SharePoint/Teams
+                    if ((Get-AtpPolicyForO365).EnableATPForSPOTeamsODB) {
+                        Write-Information -MessageData "Identified ATP for ODB/SPO/Teams" -Tags @('QueryResult')
+                        $ATPUsers.AddRange((Get-LicensedUsers -PlanIDs @('5dbe027f-2339-4123-9542-606e4d348a72','57ff2da0-773e-42df-b2af-ffb7a2317929')))
+                    }
+                    # Safe Links
+                    $defaultSafeLinksPolicy = Get-SafeLinksPolicy | Where-Object{$_.IsBuiltInProtection -eq $true}
+                    if ($defaultSafeLinksPolicy.EnableSafeLinksForOffice) {
+                        Write-Information -MessageData "Identified Safe Links in default policy" -Tags @('QueryResult')
+                        # Add all users licensed for Office: 43de0ff5-c92c-492b-9116-175376d08c38
+                        $ATPUsers.AddRange((Get-LicensedUsers -PlanIDs @('43de0ff5-c92c-492b-9116-175376d08c38')))
+                    }
+                    <#
+                    else {
+                        foreach ($customSafeLinksPolicy in Get-SafeLinksPolicy | Where-Object{$_.IsBuiltInProtection -eq $false}) {
+                            if ($customSafeLinksPolicy.EnableSafeLinksForOffice) {
+                                # Add all users licensed for Office and in scope of rule
+                                if (($customSafeLinksRule = Get-SafeLinksRule | Where-Object{$_.SafeLinksPolicy -eq $customSafeLinksPolicy.Identity}).State -eq 'Enabled'){
+                                    $ATPUsers.AddRange([guid[]]@())
+                                }
+                            }
+                        }
+                    }
+                    #>
+                }
+                elseif ($null -ne ($organizationSKUs | Where-Object{@($_.servicePlans.servicePlanId) -contains 'f20fedf3-f3c3-43c3-8267-2bfdd51c0939'})) {
+                    Write-Information -MessageData "Identified a Defender for Office P1 tenant" -Tags @('QueryResult')
                 }
                 Disconnect-ExchangeOnline -Confirm:$false
             }
@@ -636,6 +693,37 @@ function Get-AzureADLicenseStatus {
                                     <li>Report normal products having both <$SKUTotalThreshold_normal licenses and <$SKUPercentageThreshold_normal% of their total licenses available</li> `
                                     <li>Report important products having both <$SKUTotalThreshold_important licenses and <$SKUPercentageThreshold_important% of their total licenses available</li></ul></p>"
             }
+            # Output advanced SKU results
+            if ($results.ContainsKey('Advanced')) {
+                Add-Output -Output "<p class=gray>Advanced checkup - Products</p> `
+                                    <p>Please check license counts for the following product SKUs and <a href=""$LicensingURL"">reserve</a> additional licenses:</p> `
+                                    <p><table><tr><th>License type</th><th>Enabled count</th><th>Needed count</th><th>Difference</th></tr>"
+                foreach ($plan in $results['Advanced'].Keys) {
+                    $differenceCount = $results['Advanced'][$plan]['enabledCount'] - $results['Advanced'][$plan]['neededCount']
+                    Add-Output -Output "<tr> `
+                                        <td>$plan</td> `
+                                        <td>$($results['Advanced'][$plan]['enabledCount'])</td> `
+                                        <td>$($results['Advanced'][$plan]['neededCount'])</td>"
+                    if ($results['Advanced'][$plan]['enabledCount'] / $results['Advanced'][$plan]['neededCount'] * 100 -ge $SKUWarningThreshold_advanced) {
+                        Add-Output -Output "<td class=green>$differenceCount</td>"
+                    }
+                    elseif ($results['Advanced'][$plan]['enabledCount'] / $results['Advanced'][$plan]['neededCount'] * 100 -le $SKUCriticalThreshold_advanced) {
+                        $critical = $true
+                        Add-Output -Output "<td class=red>$differenceCount</td>"
+                    }
+                    else {
+                        Add-Output -Output "<td class=yellow>$differenceCount</td>"
+                    }
+                    Add-Output -Output '</tr>'
+                }
+                Add-Output -Output '</table></p>
+                                    <p>The following criteria were used during the checkup:<ul>
+                                    <li>Check <i>Azure AD P1</i> based on group-based application assignments</li>
+                                    <li>Check <i>Azure AD P1</i> based on dynamic group memberships</li>
+                                    <li>Check <i>Azure AD P1</i> based on MFA-enabled users</li>
+                                    <li>Check <i>Azure AD P2</i> based on PIM-managed users</li>
+                                    <li>Check <i>Defender for Office 365 P1/P2</i> based on user and shared mailboxes</li></ul></p>'
+            }
             # Output basic user results
             if ($results.ContainsKey('User')) {
                 Add-Output -Output '<p class=gray>Basic checkup - Users</p>
@@ -664,37 +752,6 @@ function Get-AzureADLicenseStatus {
                                     <li>Report theoretically exclusive licenses as <strong>interchangeable</strong>, based on specified SKUs</li>
                                     <li>Report practically inclusive licenses as <strong>optimizable</strong>, based on available SKU features</li>
                                     <li>Report actually inclusive licenses as <strong>removable</strong>, based on enabled SKU features</li></ul></p>'
-            }
-            # Output advanced SKU results
-            if ($results.ContainsKey('Advanced')) {
-                Add-Output -Output "<p class=gray>Advanced checkup - Features</p> `
-                                    <p>Please check license counts for the following product SKUs and <a href=""$LicensingURL"">reserve</a> additional licenses:</p> `
-                                    <p><table><tr><th>License type</th><th>Enabled count</th><th>Needed count</th><th>Difference</th></tr>"
-                foreach ($plan in $results['Advanced'].Keys) {
-                    $differenceCount = $results['Advanced'][$plan]['enabledCount'] - $results['Advanced'][$plan]['neededCount']
-                    Add-Output -Output "<tr> `
-                                        <td>$plan</td> `
-                                        <td>$($results['Advanced'][$plan]['enabledCount'])</td> `
-                                        <td>$($results['Advanced'][$plan]['neededCount'])</td>"
-                    if ($results['Advanced'][$plan]['enabledCount'] / $results['Advanced'][$plan]['neededCount'] * 100 -ge $SKUWarningThreshold_advanced) {
-                        Add-Output -Output "<td class=green>$differenceCount</td>"
-                    }
-                    elseif ($results['Advanced'][$plan]['enabledCount'] / $results['Advanced'][$plan]['neededCount'] * 100 -le $SKUCriticalThreshold_advanced) {
-                        $critical = $true
-                        Add-Output -Output "<td class=red>$differenceCount</td>"
-                    }
-                    else {
-                        Add-Output -Output "<td class=yellow>$differenceCount</td>"
-                    }
-                    Add-Output -Output '</tr>'
-                }
-                Add-Output -Output '</table></p>
-                                    <p>The following criteria were used during the checkup:<ul>
-                                    <li>Check <i>Azure AD P1</i> based on group-based application assignments</li>
-                                    <li>Check <i>Azure AD P1</i> based on dynamic group memberships</li>
-                                    <li>Check <i>Azure AD P1</i> based on MFA-enabled users</li>
-                                    <li>Check <i>Azure AD P2</i> based on PIM-managed users</li>
-                                    <li>Check <i>Defender for Office 365 P1/P2</i> based on user and shared mailboxes</li></ul></p>'
             }
             # Configure and send email
             $email = @{
