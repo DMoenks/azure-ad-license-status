@@ -576,39 +576,42 @@ function Get-AzureADLicenseStatus {
             }
             if ($exchangeAuthentication) {
                 if ($null -ne ($organizationSKUs | Where-Object{@($_.servicePlans.servicePlanId) -contains '8e0c0a52-6a6c-4d40-8370-dd62790dcd70'})) {
-                    Write-Information -MessageData "Identified a Defender for Office P2 tenant" -Tags @('QueryResult')
+                    $ATPvariant = 'DfOP2'
+                    Write-Information -MessageData 'Identified a Defender for Office P2 tenant' -Tags @('QueryResult')
                     # Mailboxes
                     if ($null -ne ($mailboxes = Get-Mailbox -RecipientTypeDetails 'SharedMailbox', 'UserMailbox' -ResultSize Unlimited)) {
-                        Write-Information -MessageData "Found $($mailboxes.Count) mailboxes" -Tags @('QueryResult')
                         $ATPUsers.AddRange([guid[]]@($mailboxes.ExternalDirectoryObjectId))
+                        Write-Information -MessageData "Found $($mailboxes.Count) mailboxes" -Tags @('QueryResult')
                     }
                     # Safe Attachments for SharePoint/Teams
                     if ((Get-AtpPolicyForO365).EnableATPForSPOTeamsODB) {
-                        Write-Information -MessageData "Identified ATP for ODB/SPO/Teams" -Tags @('QueryResult')
                         $ATPUsers.AddRange((Get-LicensedUsers -PlanIDs @('5dbe027f-2339-4123-9542-606e4d348a72','57ff2da0-773e-42df-b2af-ffb7a2317929')))
+                        Write-Information -MessageData 'Identified Safe Attachments for ODB/SPO/Teams' -Tags @('QueryResult')
                     }
                     # Safe Links
                     $defaultSafeLinksPolicy = Get-SafeLinksPolicy | Where-Object{$_.IsBuiltInProtection -eq $true}
                     if ($defaultSafeLinksPolicy.EnableSafeLinksForOffice) {
-                        Write-Information -MessageData "Identified Safe Links in default policy" -Tags @('QueryResult')
-                        # Add all users licensed for Office: 43de0ff5-c92c-492b-9116-175376d08c38
                         $ATPUsers.AddRange((Get-LicensedUsers -PlanIDs @('43de0ff5-c92c-492b-9116-175376d08c38')))
+                        Write-Information -MessageData 'Identified Safe Links in default policy' -Tags @('QueryResult')
                     }
-                    <#
                     else {
                         foreach ($customSafeLinksPolicy in Get-SafeLinksPolicy | Where-Object{$_.IsBuiltInProtection -eq $false}) {
                             if ($customSafeLinksPolicy.EnableSafeLinksForOffice) {
-                                # Add all users licensed for Office and in scope of rule
                                 if (($customSafeLinksRule = Get-SafeLinksRule | Where-Object{$_.SafeLinksPolicy -eq $customSafeLinksPolicy.Identity}).State -eq 'Enabled'){
                                     $ATPUsers.AddRange([guid[]]@())
+                                    Write-Information -MessageData "Identified Safe Links in custom policy '$($customSafeLinksPolicy.Identity)'" -Tags @('QueryResult')
                                 }
                             }
                         }
                     }
-                    #>
                 }
                 elseif ($null -ne ($organizationSKUs | Where-Object{@($_.servicePlans.servicePlanId) -contains 'f20fedf3-f3c3-43c3-8267-2bfdd51c0939'})) {
-                    Write-Information -MessageData "Identified a Defender for Office P1 tenant" -Tags @('QueryResult')
+                    $ATPvariant = 'DfOP1'
+                    Write-Information -MessageData 'Identified a Defender for Office P1 tenant' -Tags @('QueryResult')
+                }
+                else {
+                    $ATPvariant = 'EOP'
+                    Write-Information -MessageData 'Identified an Exchange Online Protection tenant' -Tags @('QueryResult')
                 }
                 Disconnect-ExchangeOnline -Confirm:$false
             }
@@ -640,20 +643,23 @@ function Get-AzureADLicenseStatus {
                 }
             }
             if ($ATPUsers.Count -gt 0) {
-                if ($null -ne ($ATPSKUs = @($organizationSKUs | Where-Object{@($_.servicePlans.servicePlanId) -contains '8e0c0a52-6a6c-4d40-8370-dd62790dcd70'}))) {
-                    $ATPLicenses = ($ATPSKUs.prepaidUnits.enabled | Measure-Object -Sum).Sum
-                    $neededCount = ($ATPUsers | Select-Object -Unique).Count
-                    Write-Information -MessageData "Found $neededCount needed, $AADP1Licenses enabled DfOP2 licenses" -Tags @('AnalysisResult')
-                    if ($ATPLicenses -lt $neededCount) {
-                        Add-Result -PlanName 'Microsoft Defender for Office 365 P2' -EnabledCount $ATPLicenses -NeededCount $neededCount
+                $neededCount = ($ATPUsers | Select-Object -Unique).Count
+                switch ($ATPvariant) {
+                    'DfOP1' {
+                        $ATPSKUs = @($organizationSKUs | Where-Object{@($_.servicePlans.servicePlanId) -contains 'f20fedf3-f3c3-43c3-8267-2bfdd51c0939'})
+                        $ATPLicenses = ($ATPSKUs.prepaidUnits.enabled | Measure-Object -Sum).Sum
+                        Write-Information -MessageData "Found $neededCount needed, $AADP1Licenses enabled DfOP2 licenses" -Tags @('AnalysisResult')
+                        if ($ATPLicenses -lt $neededCount) {
+                            Add-Result -PlanName 'Microsoft Defender for Office 365 P1' -EnabledCount $ATPLicenses -NeededCount $neededCount
+                        }
                     }
-                }
-                elseif ($null -ne ($ATPSKUs = @($organizationSKUs | Where-Object{@($_.servicePlans.servicePlanId) -contains 'f20fedf3-f3c3-43c3-8267-2bfdd51c0939'}))) {
-                    $ATPLicenses = ($ATPSKUs.prepaidUnits.enabled | Measure-Object -Sum).Sum
-                    $neededCount = ($ATPUsers | Select-Object -Unique).Count
-                    Write-Information -MessageData "Found $neededCount needed, $AADP1Licenses enabled DfOP2 licenses" -Tags @('AnalysisResult')
-                    if ($ATPLicenses -lt $neededCount) {
-                        Add-Result -PlanName 'Microsoft Defender for Office 365 P1' -EnabledCount $ATPLicenses -NeededCount $neededCount
+                    'DfOP2' {
+                        $ATPSKUs = @($organizationSKUs | Where-Object{@($_.servicePlans.servicePlanId) -contains '8e0c0a52-6a6c-4d40-8370-dd62790dcd70'})
+                        $ATPLicenses = ($ATPSKUs.prepaidUnits.enabled | Measure-Object -Sum).Sum
+                        Write-Information -MessageData "Found $neededCount needed, $AADP1Licenses enabled DfOP2 licenses" -Tags @('AnalysisResult')
+                        if ($ATPLicenses -lt $neededCount) {
+                            Add-Result -PlanName 'Microsoft Defender for Office 365 P2' -EnabledCount $ATPLicenses -NeededCount $neededCount
+                        }
                     }
                 }
             }
