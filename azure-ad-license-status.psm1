@@ -38,10 +38,45 @@ th, td {
 
 #region: Helper functions
 function Initialize-Variables {
+    # Process
+    $script:nestingLevel = 0
+    # General
     $script:groups = [System.Collections.Generic.List[hashtable]]::new()
     $script:outputs = [System.Text.StringBuilder]::new()
     $script:results = @{}
     $script:skuTranslate = [string]::new([char[]]((Invoke-WebRequest -Uri 'https://download.microsoft.com/download/e/3/e/e3e9faf2-f28b-490a-9ada-c6089a1fc5b0/Product%20names%20and%20service%20plan%20identifiers%20for%20licensing.csv' -UseBasicParsing).Content)) | ConvertFrom-Csv
+    # Exchange Online
+    $script:EXOCmdlets = @('Get-Recipient',
+                            'Get-DistributionGroupMember',
+                            'Get-UnifiedGroupLinks',
+                            'Get-ATPBuiltInProtectionRule',
+                            'Get-ATPProtectionPolicyRule',
+                            'Get-AntiPhishRule',
+                            'Get-AntiPhishPolicy',
+                            'Get-SafeAttachmentRule',
+                            'Get-SafeAttachmentPolicy',
+                            'Get-SafeLinksRule',
+                            'Get-SafeLinksPolicy')
+    $script:EXOProperties = @('ExchangeObjectId',
+                            'ExternalDirectoryObjectId',
+                            'PrimarySmtpAddress',
+                            'RecipientTypeDetails')
+    $script:EXOTypes_group = @('GroupMailbox',
+                            'MailUniversalDistributionGroup',
+                            'MailUniversalSecurityGroup')
+    $script:EXOTypes_user = @('MailUser',
+                            'SharedMailbox',
+                            'UserMailbox')
+}
+
+function Write-VerboseMessage {
+    param (
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$Message
+    )
+
+    Write-Verbose -Message $Message.Insert(0, ((0..$nestingLevel | ForEach-Object{'-'}) -join ''))
 }
 
 function Add-Output {
@@ -50,8 +85,11 @@ function Add-Output {
         [ValidateNotNullOrEmpty()]
         [string]$Output
     )
+    $nestingLevel++
+    Write-VerboseMessage 'Add-Output'
 
     $outputs.AppendLine($Output) | Out-Null
+    $nestingLevel--
 }
 
 function Add-Result {
@@ -84,6 +122,8 @@ function Add-Result {
         [ValidateNotNullOrEmpty()]
         [UInt32]$NeededCount
     )
+    $nestingLevel++
+    Write-VerboseMessage 'Add-Result'
 
     if (-not $results.ContainsKey($PSCmdlet.ParameterSetName)) {
         $results.Add($PSCmdlet.ParameterSetName, @{})
@@ -114,37 +154,188 @@ function Add-Result {
             }
         }
     }
+    $nestingLevel--
 }
 
-function Get-GroupMember {
+function Get-AADGroupMembers {
     [OutputType([guid[]])]
     param (
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
-        [guid[]]$GroupIDs,
-        [switch]$TransitiveMembers
+        [guid[]]$GroupIDs
     )
-   
-    if ($TransitiveMembers.IsPresent) {
-        $memberProperty = 'transitiveMembers'
-    }
-    else {
-        $memberProperty = 'members'
-    }
+    $nestingLevel++
+    Write-VerboseMessage 'Get-AADGroupMembers'
+
+    $groupMembers = [System.Collections.Generic.List[hashtable]]::new()
     foreach ($groupID in $GroupIDs) {
-        $group = $groups | Where-Object{$_.id -eq $groupID}
-        if (-not $group.ContainsKey($memberProperty)) {
-            $groupMembers = [System.Collections.Generic.List[hashtable]]::new()
-            $URI = 'https://graph.microsoft.com/v1.0/groups/{0}/{1}?$select=id' -f $groupID, $memberProperty
-            while ($null -ne $URI) {
-                $data = Invoke-MgGraphRequest -Method GET -Uri $URI
-                $groupMembers.AddRange([hashtable[]]($data.value))
-                $URI = $data['@odata.nextLink']
-            }
-            $group.Add($memberProperty, $groupMembers)
+        $URI = 'https://graph.microsoft.com/v1.0/groups/{0}/transitiveMembers?$select=id' -f $groupID
+        while ($null -ne $URI) {
+            $data = Invoke-MgGraphRequest -Method GET -Uri $URI
+            $groupMembers.AddRange([hashtable[]]($data.value))
+            $URI = $data['@odata.nextLink']
         }
     }
-    Write-Output ([guid[]]@(($groups | Where-Object{$_.id -in $GroupIDs}).$memberProperty.id | Select-Object -Unique)) -NoEnumerate
+    $groupMembers_unique = @($groupMembers.id | Select-Object -Unique)
+    Write-VerboseMessage "Found $($groupMembers_unique.Count) members"
+    $nestingLevel--
+    Write-Output ([guid[]]$groupMembers_unique) -NoEnumerate
+}
+
+function Get-EXOGroupMembers {
+    [OutputType([pscustomobject[]])]
+    param (
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [guid[]]$GroupIDs
+    )
+    $nestingLevel++
+    Write-VerboseMessage 'Get-EXOGroupMembers'
+
+    $groupMembers = [System.Collections.Generic.List[pscustomobject]]::new()
+    foreach ($groupID in $GroupIDs) {
+        if ($null -ne ($group = Get-Recipient $groupID.Guid -RecipientTypeDetails $EXOTypes_group | Select-Object $EXOProperties)) {
+            switch ($group.RecipientTypeDetails) {
+                'GroupMailbox' {
+                    $members = @(Get-UnifiedGroupLinks $group.ExchangeObjectId.Guid -LinkType Members -ResultSize Unlimited | Select-Object $EXOProperties)
+                }
+                Default {
+                    $members = @(Get-DistributionGroupMember $group.ExchangeObjectId.Guid -ResultSize Unlimited | Select-Object $EXOProperties)
+                }
+            }
+            foreach ($member in $members) {
+                switch ($member.RecipientTypeDetails) {
+                    {$_ -in $EXOTypes_user} {
+                        $groupMembers.Add($member)
+                    }
+                    {$_ -in $EXOTypes_group} {
+                        $groupMembers.AddRange((Get-EXOGroupMembers -GroupIDs $member.ExchangeObjectId))
+                    }
+                }
+            }
+        }
+    }
+    $groupMembers_unique = @($groupMembers | Select-Object -Unique)
+    Write-VerboseMessage "Found $($groupMembers_unique.Count) members"
+    $nestingLevel--
+    Write-Output ([pscustomobject[]]$groupMembers_unique) -NoEnumerate
+}
+
+function Resolve-ATPRecipients {
+    [OutputType([pscustomobject[]])]
+    param (
+        [Parameter(Mandatory = $true)]
+        [AllowNull()]
+        [string[]]$Users,
+        [Parameter(Mandatory = $true)]
+        [AllowNull()]
+        [string[]]$Groups,
+        [Parameter(Mandatory = $true)]
+        [AllowNull()]
+        [string[]]$Domains
+    )
+    $nestingLevel++
+    Write-VerboseMessage 'Resolve-ATPRecipients'
+
+    $categoryCount = 0
+    $affectedAsUser = [System.Collections.Generic.List[pscustomobject]]::new()
+    $affectedAsGroup = [System.Collections.Generic.List[pscustomobject]]::new()
+    $affectedAsDomain = [System.Collections.Generic.List[pscustomobject]]::new()
+    if ($null -ne $Users) {
+        $categoryCount++
+        if ($null -ne ($recipients = Get-Recipient -RecipientTypeDetails $EXOTypes_user -ResultSize Unlimited | Select-Object $EXOProperties | Where-Object{$_.PrimarySmtpAddress -in $Users})) {
+            $affectedAsUser.AddRange([pscustomobject[]]@($recipients))
+        }
+    }
+    Write-VerboseMessage "Found $($affectedAsUser.Count) recipients by users"
+    if ($null -ne $Groups) {
+        $categoryCount++
+        if ($null -ne ($recipients = Get-Recipient -RecipientTypeDetails $EXOTypes_group -ResultSize Unlimited | Select-Object $EXOProperties | Where-Object{$_.PrimarySmtpAddress -in $Groups})) {
+            $affectedAsGroup.AddRange((Get-EXOGroupMembers -GroupIDs $recipients.ExchangeObjectId))
+        }
+    }
+    Write-VerboseMessage "Found $($affectedAsGroup.Count) recipients by groups"
+    if ($null -ne $Domains) {
+        $categoryCount++
+        if ($null -ne ($recipients = Get-Recipient -RecipientTypeDetails $EXOTypes_user -ResultSize Unlimited | Select-Object $EXOProperties | Where-Object{$_.PrimarySmtpAddress.Split('@')[1] -in $Domains})) {
+            $affectedAsDomain.AddRange([pscustomobject[]]@($recipients))
+        }
+        if ($null -ne ($recipients = Get-Recipient -RecipientTypeDetails $EXOTypes_group -ResultSize Unlimited | Select-Object $EXOProperties | Where-Object{$_.PrimarySmtpAddress.Split('@')[1] -in $Domains})) {
+            $affectedAsDomain.AddRange((Get-EXOGroupMembers -GroupIDs $recipients.ExchangeObjectId))
+        }
+    }
+    Write-VerboseMessage "Found $($affectedAsDomain.Count) recipients by domains"
+    if ($null -ne ($resolvedUsers = @($affectedAsUser | Select-Object -Unique) + @($affectedAsGroup | Select-Object -Unique) + @($affectedAsDomain | Select-Object -Unique) | Group-Object -Property ExchangeObjectId | Where-Object{$_.Count -eq $categoryCount})) {
+        $resolvedUsers_unique = @($resolvedUsers.Group | Select-Object -Unique)
+        Write-VerboseMessage "Found $($resolvedUsers_unique.Count) recipients by combination"
+        $nestingLevel--
+        Write-Output ([pscustomobject[]]$resolvedUsers_unique) -NoEnumerate
+    }
+    else {
+        Write-VerboseMessage "Found 0 recipients by combination"
+        $nestingLevel--
+        Write-Output @([pscustomobject[]]::new(0)) -NoEnumerate
+    }
+}
+
+function Get-ATPRecipients {
+    [OutputType([pscustomobject[]])]
+    param (
+        [Parameter(Mandatory = $true)]
+        [AllowNull()]
+        [string[]]$IncludedUsers,
+        [Parameter(Mandatory = $true)]
+        [AllowNull()]
+        [string[]]$IncludedGroups,
+        [Parameter(Mandatory = $true)]
+        [AllowNull()]
+        [string[]]$IncludedDomains,
+        [Parameter(Mandatory = $true)]
+        [AllowNull()]
+        [string[]]$ExcludedUsers,
+        [Parameter(Mandatory = $true)]
+        [AllowNull()]
+        [string[]]$ExcludedGroups,
+        [Parameter(Mandatory = $true)]
+        [AllowNull()]
+        [string[]]$ExcludedDomains
+    )
+    $nestingLevel++
+    Write-VerboseMessage 'Get-ATPRecipients'
+
+    Write-VerboseMessage 'Checking included recipients'
+    if ($null -eq $IncludedUsers -and
+    $null -eq $IncludedGroups -and
+    $null -eq $IncludedDomains) {
+        $userRecipients = @(Get-Recipient -RecipientTypeDetails $EXOTypes_user -ResultSize Unlimited | Select-Object $EXOProperties)
+        $groupRecipients = Get-EXOGroupMembers -GroupIDs (Get-Recipient -RecipientTypeDetails $EXOTypes_group -ResultSize Unlimited).ExchangeObjectId
+        $includedRecipients = $userRecipients + $groupRecipients | Select-Object -Unique
+    }
+    else {
+        $includedRecipients = Resolve-ATPRecipients -Users $IncludedUsers -Groups $IncludedGroups -Domains $IncludedDomains
+    }
+    Write-VerboseMessage "Found $($includedRecipients.Count) included recipients"
+    Write-VerboseMessage 'Checking excluded recipients'
+    if ($null -eq $ExcludedUsers -and
+    $null -eq $ExcludedGroups -and
+    $null -eq $ExcludedDomains) {
+        $excludedRecipients = @()
+    }
+    else {
+        $excludedRecipients = Resolve-ATPRecipients -Users $ExcludedUsers -Groups $ExcludedGroups -Domains $ExcludedDomains
+    }
+    Write-VerboseMessage "Found $($excludedRecipients.Count) excluded recipients"
+    Write-VerboseMessage 'Checking affected recipients'
+    $affectedRecipients = [System.Collections.Generic.List[pscustomobject]]::new()
+    if ($null -ne ($affectedRecipientComparison = Compare-Object -ReferenceObject $includedRecipients -DifferenceObject $excludedRecipients)) {
+        if ($null -ne ($affectedRecipientResults = $affectedRecipientComparison | Where-Object{$_.SideIndicator -eq '<='})) {
+            $affectedRecipients.AddRange([pscustomobject[]]@($affectedRecipientResults.InputObject))
+        }
+    }
+    $affectedRecipients_unique = @($affectedRecipients | Select-Object -Unique)
+    Write-VerboseMessage "Found $($affectedRecipients_unique.Count) affected recipients"
+    $nestingLevel--
+    Write-Output ([pscustomobject[]]$affectedRecipients_unique) -NoEnumerate
 }
 
 function Get-SKUName {
@@ -154,6 +345,8 @@ function Get-SKUName {
         [ValidateNotNullOrEmpty()]
         [guid]$SKUID
     )
+    $nestingLevel++
+    Write-VerboseMessage 'Get-SKUName'
 
     if ($null -ne ($skuName = ($skuTranslate | Where-Object{$_.GUID -eq $SKUID}).Product_Display_Name | Select-Object -Unique)) {
         $skuName = [cultureinfo]::new('en-US').TextInfo.ToTitleCase($skuName.ToLower())
@@ -161,18 +354,8 @@ function Get-SKUName {
     else {
         $skuName = $SKUID
     }
+    $nestingLevel--
     Write-Output $skuName
-}
-
-function Get-LicensedUsers {
-    [OutputType([guid[]])]
-    param (
-        [Parameter(Mandatory = $true)]
-        [ValidateNotNullOrEmpty()]
-        [guid[]]$PlanIDs
-    )
-
-    Write-Output ([guid[]]@($users | Where-Object{$_.ContainsKey('enabledPlans')} | Where-Object{$null -ne (Compare-Object $_.enabledPlans $PlanIDs -ExcludeDifferent -IncludeEqual)})) -NoEnumerate
 }
 #endregion
 
@@ -183,7 +366,7 @@ function Get-AzureADLicenseStatus {
     .DESCRIPTION
     This script is meant to conquer side-effects of semi-automatic license assignments for Microsoft services in Azure AD, i.e. the combination of group-based licensing with manual group membership management, by regularly reporting both on the amount of available licenses per SKU and any conflicting license assignments per user account. This allows for somewhat easier license management without either implementing a full-fledged software asset management solution or hiring a licensing service provider.
 
-    SKU IDs and names are in accordance with https://docs.microsoft.com/en-us/azure/active-directory/enterprise-users/licensing-service-plan-reference
+    SKU IDs and names are in accordance with https://learn.microsoft.com/en-us/azure/active-directory/enterprise-users/licensing-service-plan-reference
     .PARAMETER DirectoryID
     Specifies the directory to connect to
     .PARAMETER ApplicationID
@@ -278,11 +461,11 @@ function Get-AzureADLicenseStatus {
         [string[]]$RecipientAddresses_critical,
         [ValidateNotNullOrEmpty()]
         [UInt32]$SKUIgnoreThreshold = 10,
-        [ValidateRange(0, 100)]
+        [ValidateRange(0,100)]
         [UInt16]$SKUPercentageThreshold_normal = 5,
         [ValidateNotNullOrEmpty()]
         [UInt32]$SKUTotalThreshold_normal = 10,
-        [ValidateRange(0, 100)]
+        [ValidateRange(0,100)]
         [UInt16]$SKUPercentageThreshold_important = 5,
         [ValidateNotNullOrEmpty()]
         [UInt32]$SKUTotalThreshold_important = 50,
@@ -303,6 +486,7 @@ function Get-AzureADLicenseStatus {
         [switch]$AdvancedCheckups
     )
 
+    Initialize-Variables
     try {
         switch ($PSCmdlet.ParameterSetName) {
             'AzureCertificate' {
@@ -320,14 +504,13 @@ function Get-AzureADLicenseStatus {
             }
         }
         $graphAuthentication = $true
-        Write-Information -MessageData 'Succeeded to authenticate with Graph' -Tags 'Authentication'
+        Write-VerboseMessage 'Succeeded to authenticate with Graph'
     }
     catch {
         $graphAuthentication = $false
         Write-Error -Message 'Failed to authenticate with Graph' -Category AuthenticationError
     }
     if ($graphAuthentication) {
-        Initialize-Variables
         #region: SKUs
         # Get SKUs
         $organizationSKUs = [System.Collections.Generic.List[hashtable]]::new()
@@ -337,7 +520,7 @@ function Get-AzureADLicenseStatus {
             $organizationSKUs.AddRange([hashtable[]]($data.value))
             $URI = $data['@odata.nextLink']
         }
-        Write-Information -MessageData "Found $($organizationSKUs.Count) SKUs" -Tags @('QueryResult')
+        Write-VerboseMessage "Found $($organizationSKUs.Count) SKUs"
         # Analyze SKUs
         foreach ($SKU in $organizationSKUs | Where-Object{$_.prepaidUnits.enabled -gt $SKUIgnoreThreshold}) {
             $totalCount = $SKU.prepaidUnits.enabled
@@ -360,7 +543,7 @@ function Get-AzureADLicenseStatus {
             foreach ($differenceSKU in $organizationSKUs | Where-Object{$_.skuId -ne $referenceSKU.skuId}) {
                 if ($null -ne ($referenceServicePlans = $referenceSKU.servicePlans | Where-Object{$_.appliesTo -eq 'User'}) -and
                 $null -ne ($differenceServicePlans = $differenceSKU.servicePlans | Where-Object{$_.appliesTo -eq 'User'})) {
-                    if ($null -ne ($comparisonSKU = Compare-Object $referenceServicePlans.servicePlanId $differenceServicePlans.servicePlanId -IncludeEqual) -and
+                    if ($null -ne ($comparisonSKU = Compare-Object -ReferenceObject $referenceServicePlans.servicePlanId -DifferenceObject $differenceServicePlans.servicePlanId -IncludeEqual) -and
                     $comparisonSKU.SideIndicator -contains '==' -and
                     $comparisonSKU.SideIndicator -notcontains '=>') {
                         if (-not $superiorSKUs_organization.ContainsKey($differenceSKU.skuId)) {
@@ -371,7 +554,7 @@ function Get-AzureADLicenseStatus {
                 }
             }
         }
-        Write-Information -MessageData "Found $($superiorSKUs_organization.Count) SKU matches for organization" -Tags @('AnalysisResult')
+        Write-VerboseMessage "Found $($superiorSKUs_organization.Count) SKU matches for organization"
         #endregion
 
         #region: Users
@@ -383,11 +566,11 @@ function Get-AzureADLicenseStatus {
             $users.AddRange([hashtable[]]($data.value))
             $URI = $data['@odata.nextLink']
         }
-        Write-Information -MessageData "Found $($users.Count) users" -Tags @('QueryResult')
+        Write-VerboseMessage "Found $($users.Count) users"
         # Analyze users
         foreach ($user in $users) {
             if ($user.licenseAssignmentStates.count -gt 0) {
-                if ($null -ne ($userSKUAssignments = $user.licenseAssignmentStates | Where-Object{$_.state -eq 'Active' -or $_.error -in @('CountViolation', 'MutuallyExclusiveViolation')})) {
+                if ($null -ne ($userSKUAssignments = $user.licenseAssignmentStates | Where-Object{$_.state -eq 'Active' -or $_.error -in @('CountViolation','MutuallyExclusiveViolation')})) {
                     $userSKUs = $userSKUAssignments.skuId
                 }
                 else {
@@ -401,7 +584,7 @@ function Get-AzureADLicenseStatus {
                 # Identify interchangeable SKUs, based on specifications
                 $userSKUs_interchangeable = @()
                 if ($null -ne $userSKUs) {
-                    if ($null -ne ($comparison_interchangeable = Compare-Object $userSKUs $InterchangeableSKUs -ExcludeDifferent -IncludeEqual)) {
+                    if ($null -ne ($comparison_interchangeable = Compare-Object -ReferenceObject $userSKUs -DifferenceObject $InterchangeableSKUs -ExcludeDifferent -IncludeEqual)) {
                         $userSKUs_interchangeable = @($comparison_interchangeable.InputObject)
                     }
                 }
@@ -424,13 +607,12 @@ function Get-AzureADLicenseStatus {
                         $skuid_enabledPlans[$skuid].AddRange([guid[]]@((($organizationSKUs | Where-Object{$_.skuid -eq $skuid}).servicePlans | Where-Object{$_.servicePlanId -notin $assignment.disabledplans -and $_.appliesTo -eq 'User'}).servicePlanId))
                     }
                 }
-                $user.Add('enabledPlans', $skuid_enabledPlans)
                 $superiorSKUs_user = @{}
                 foreach ($referenceSKU in $skuid_enabledPlans.Keys) {
                     foreach ($differenceSKU in $skuid_enabledPlans.Keys | Where-Object{$_ -ne $referenceSKU}) {
                         if ($null -ne ($referenceServicePlans = $skuid_enabledPlans[$referenceSKU]) -and
                         $null -ne ($differenceServicePlans = $skuid_enabledPlans[$differenceSKU])) {
-                            if ($null -ne ($comparisonSKU = Compare-Object $referenceServicePlans $differenceServicePlans -IncludeEqual) -and
+                            if ($null -ne ($comparisonSKU = Compare-Object -ReferenceObject $referenceServicePlans -DifferenceObject $differenceServicePlans -IncludeEqual) -and
                             $comparisonSKU.SideIndicator -contains '==' -and
                             $comparisonSKU.SideIndicator -notcontains '=>') {
                                 if (-not $superiorSKUs_user.ContainsKey($differenceSKU)) {
@@ -451,15 +633,15 @@ function Get-AzureADLicenseStatus {
                 # Add results
                 if ($userSKUs_interchangeable.Count -gt 1) {
                     Add-Result -UserPrincipalName $user.userPrincipalName -ConflictType Interchangeable -ConflictSKUs $userSKUs_interchangeable
-                    Write-Information -MessageData "Found $($userSKUs_interchangeable.Count) interchangeable SKUs for user $($user.userPrincipalName)" -Tags @('AnalysisResult')
+                    Write-VerboseMessage "Found $($userSKUs_interchangeable.Count) interchangeable SKUs for user $($user.userPrincipalName)"
                 }
                 if ($null -ne $userSKUs_optimizable) {
                     Add-Result -UserPrincipalName $user.userPrincipalName -ConflictType Optimizable -ConflictSKUs $userSKUs_optimizable
-                    Write-Information -MessageData "Found $($userSKUs_optimizable.Count) optimizable SKUs for user $($user.userPrincipalName)" -Tags @('AnalysisResult')
+                    Write-VerboseMessage "Found $($userSKUs_optimizable.Count) optimizable SKUs for user $($user.userPrincipalName)"
                 }
                 if ($null -ne $userSKUs_removable) {
                     Add-Result -UserPrincipalName $user.userPrincipalName -ConflictType Removable -ConflictSKUs $userSKUs_removable
-                    Write-Information -MessageData "Found $($userSKUs_removable.Count) removable SKUs for user $($user.userPrincipalName)" -Tags @('AnalysisResult')
+                    Write-VerboseMessage "Found $($userSKUs_removable.Count) removable SKUs for user $($user.userPrincipalName)"
                 }
             }
         }
@@ -477,12 +659,12 @@ function Get-AzureADLicenseStatus {
                 $groups.AddRange([hashtable[]]($data.value))
                 $URI = $data['@odata.nextLink']
             }
-            Write-Information -MessageData "Found $($groups.Count) groups" -Tags @('QueryResult')
+            Write-VerboseMessage "Found $($groups.Count) groups"
             # Azure AD P1 based on external identities, if not linked to a subscription
             # https://learn.microsoft.com/en-us/azure/active-directory/external-identities/external-identities-pricing
             # Azure AD P1 based on dynamic groups
             if ($null -ne ($dynamicGroups = $groups | Where-Object{$_.groupTypes -contains 'DynamicMembership'})) {
-                $AADP1Users.AddRange((Get-GroupMember -GroupIDs $dynamicGroups.id -TransitiveMembers))
+                $AADP1Users.AddRange((Get-AADGroupMembers -GroupIDs $dynamicGroups.id))
             }
             # Azure AD P1 based on group-based application assignments
             $applications = [System.Collections.Generic.List[hashtable]]::new()
@@ -492,9 +674,9 @@ function Get-AzureADLicenseStatus {
                 $applications.AddRange([hashtable[]]($data.value))
                 $URI = $data['@odata.nextLink']
             }
-            Write-Information -MessageData "Found $($applications.Count) service principals" -Tags @('QueryResult')
+            Write-VerboseMessage "Found $($applications.Count) service principals"
             if ($null -ne ($applicationGroups = ($applications | Where-Object{$_.accountEnabled -eq $true -and $_.appRoleAssignmentRequired -eq $true -and $_.servicePrincipalType -eq 'Application'}).appRoleAssignedTo | Where-Object{$_.principalType -eq 'Group'})) {
-                $AADP1Users.AddRange((Get-GroupMember -GroupIDs $applicationGroups.principalId -TransitiveMembers))
+                $AADP1Users.AddRange((Get-AADGroupMembers -GroupIDs $applicationGroups.principalId))
             }
             # Azure AD P1 based on users in scope of Conditional Access
             $conditionalAccessPolicies = [System.Collections.Generic.List[hashtable]]::new()
@@ -504,7 +686,7 @@ function Get-AzureADLicenseStatus {
                 $conditionalAccessPolicies.AddRange([hashtable[]]($data.value))
                 $URI = $data['@odata.nextLink']
             }
-            Write-Information -MessageData "Found $($conditionalAccessPolicies.Count) conditional access policies" -Tags @('QueryResult')
+            Write-VerboseMessage "Found $($conditionalAccessPolicies.Count) conditional access policies"
             foreach ($conditionalAccessPolicy in $conditionalAccessPolicies | Where-Object{$_.state -eq 'enabled'}) {
                 if ($conditionalAccessPolicy.conditions.users.includeUsers -eq 'All') {
                     $includeUsers = $users.id
@@ -528,7 +710,7 @@ function Get-AzureADLicenseStatus {
                     $includeGroups = @()
                 }
                 if ($null -ne ($conditionalAccessGroups = Compare-Object -ReferenceObject $includeGroups -DifferenceObject $conditionalAccessPolicy.conditions.users.excludeGroups | Where-Object{$_.SideIndicator -eq '<='})) {
-                    $AADP1Users.AddRange((Get-GroupMember -GroupIDs $conditionalAccessGroups.InputObject -TransitiveMembers))
+                    $AADP1Users.AddRange((Get-AADGroupMembers -GroupIDs $conditionalAccessGroups.InputObject))
                 }
             }
             # Azure AD P2 based on users in scope of Privileged Identity Management
@@ -539,79 +721,126 @@ function Get-AzureADLicenseStatus {
                 $eligibleRoleMembers.AddRange([hashtable[]]($data.value))
                 $URI = $data['@odata.nextLink']
             }
-            Write-Information -MessageData "Found $($eligibleRoleMembers.Count) eligible role assignments" -Tags @('QueryResult')
+            Write-VerboseMessage "Found $($eligibleRoleMembers.Count) eligible role assignments"
             if ($eligibleRoleMembers.Count -gt 0) {
                 if ($null -ne ($actuallyEligibleRoleMembers = $eligibleRoleMembers | Where-Object{$_.scheduleInfo.startDateTime -le [datetime]::Today -and ($_.scheduleInfo.expiration.endDateTime -ge [datetime]::Today -or $_.scheduleInfo.expiration.type -eq 'noExpiration')})) {
                     $AADP2Users.AddRange([guid[]]@($actuallyEligibleRoleMembers.principalId))
                 }
             }
-            # Defender for Office 365 P1/P2 based on https://learn.microsoft.com/office365/servicedescriptions/office-365-advanced-threat-protection-service-description#licensing-terms
+            # Defender for Office 365 P1/P2 based on https://learn.microsoft.com/en-us/office365/servicedescriptions/office-365-advanced-threat-protection-service-description#licensing-terms
             $orgDomain = (Invoke-MgGraphRequest -Method GET -Uri 'https://graph.microsoft.com/v1.0/organization?$select=verifiedDomains').value.verifiedDomains | Where-Object{$_.isInitial -eq $true}
             try {
-                $neededCmdlets = @('Get-Mailbox',
-                                    'Get-SafeLinksRule',
-                                    'Get-SafeLinksPolicy',
-                                    'Get-SafeAttachmentRule',
-                                    'Get-SafeAttachmentPolicy',
-                                    'Get-AntiPhishRule',
-                                    'Get-AntiPhishPolicy',
-                                    'Get-AtpPolicyForO365')
                 switch ($PSCmdlet.ParameterSetName) {
                     'AzureCertificate' {
-                        Connect-ExchangeOnline -AppId $ApplicationID -Certificate $azureCertificate -Organization $orgDomain.name -CommandName $neededCmdlets -ShowBanner:$false -ErrorAction Stop
+                        Connect-ExchangeOnline -AppId $ApplicationID -Certificate $azureCertificate -Organization $orgDomain.name -CommandName $EXOCmdlets -ShowBanner:$false -ErrorAction Stop
                     }
                     'LocalCertificate' {
-                        Connect-ExchangeOnline -AppId $ApplicationID -Certificate $Certificate -Organization $orgDomain.name -CommandName $neededCmdlets -ShowBanner:$false -ErrorAction Stop
+                        Connect-ExchangeOnline -AppId $ApplicationID -Certificate $Certificate -Organization $orgDomain.name -CommandName $EXOCmdlets -ShowBanner:$false -ErrorAction Stop
                     }
                     'LocalCertificateThumbprint' {
-                        Connect-ExchangeOnline -AppId $ApplicationID -CertificateThumbprint $CertificateThumbprint -Organization $orgDomain.name -CommandName $neededCmdlets -ShowBanner:$false -ErrorAction Stop
+                        Connect-ExchangeOnline -AppId $ApplicationID -CertificateThumbprint $CertificateThumbprint -Organization $orgDomain.name -CommandName $EXOCmdlets -ShowBanner:$false -ErrorAction Stop
                     }
                 }
                 $exchangeAuthentication = $true
-                Write-Information -MessageData 'Succeeded to authenticate with Exchange Online' -Tags 'Authentication'
+                Write-VerboseMessage 'Succeeded to authenticate with Exchange Online'
             }
             catch {
                 $exchangeAuthentication = $false
                 Write-Error -Message 'Failed to authenticate with Exchange Online' -Category AuthenticationError
             }
             if ($exchangeAuthentication) {
-                if ($null -ne ($organizationSKUs | Where-Object{@($_.servicePlans.servicePlanId) -contains '8e0c0a52-6a6c-4d40-8370-dd62790dcd70'})) {
-                    $ATPvariant = 'DfOP2'
-                    Write-Information -MessageData 'Identified a Defender for Office P2 tenant' -Tags @('QueryResult')
-                    # Mailboxes
-                    if ($null -ne ($mailboxes = Get-Mailbox -RecipientTypeDetails 'SharedMailbox', 'UserMailbox' -ResultSize Unlimited)) {
-                        $ATPUsers.AddRange([guid[]]@($mailboxes.ExternalDirectoryObjectId))
-                        Write-Information -MessageData "Found $($mailboxes.Count) mailboxes" -Tags @('QueryResult')
-                    }
-                    # Safe Attachments for SharePoint/Teams
-                    if ((Get-AtpPolicyForO365).EnableATPForSPOTeamsODB) {
-                        $ATPUsers.AddRange((Get-LicensedUsers -PlanIDs @('5dbe027f-2339-4123-9542-606e4d348a72','57ff2da0-773e-42df-b2af-ffb7a2317929')))
-                        Write-Information -MessageData 'Identified Safe Attachments for ODB/SPO/Teams' -Tags @('QueryResult')
-                    }
-                    # Safe Links
-                    $defaultSafeLinksPolicy = Get-SafeLinksPolicy | Where-Object{$_.IsBuiltInProtection -eq $true}
-                    if ($defaultSafeLinksPolicy.EnableSafeLinksForOffice) {
-                        $ATPUsers.AddRange((Get-LicensedUsers -PlanIDs @('43de0ff5-c92c-492b-9116-175376d08c38')))
-                        Write-Information -MessageData 'Identified Safe Links in default policy' -Tags @('QueryResult')
+                if ($null -ne (Compare-Object -ReferenceObject $organizationSKUs.servicePlans.servicePlanId -DifferenceObject @('f20fedf3-f3c3-43c3-8267-2bfdd51c0939','8e0c0a52-6a6c-4d40-8370-dd62790dcd70') -ExcludeDifferent -IncludeEqual)) {
+                    # Protected mailboxes
+                    if ($null -ne ($organizationSKUs | Where-Object{@($_.servicePlans.servicePlanId) -contains '8e0c0a52-6a6c-4d40-8370-dd62790dcd70'})) {
+                        $ATPvariant = 'DfOP2'
+                        Write-VerboseMessage 'Identified a Defender for Office P2 tenant'
+                        if ($null -ne ($recipients = Get-Recipient -RecipientTypeDetails $EXOTypes_user -ResultSize Unlimited)) {
+                            $ATPUsers.AddRange([guid[]]@($recipients.ExternalDirectoryObjectId))
+                            Write-VerboseMessage "Found $($recipients.Count) affected/protected recipients"
+                        }
                     }
                     else {
-                        foreach ($customSafeLinksPolicy in Get-SafeLinksPolicy | Where-Object{$_.IsBuiltInProtection -eq $false}) {
-                            if ($customSafeLinksPolicy.EnableSafeLinksForOffice) {
-                                if (($customSafeLinksRule = Get-SafeLinksRule | Where-Object{$_.SafeLinksPolicy -eq $customSafeLinksPolicy.Identity}).State -eq 'Enabled'){
-                                    $ATPUsers.AddRange([guid[]]@())
-                                    Write-Information -MessageData "Identified Safe Links in custom policy '$($customSafeLinksPolicy.Identity)'" -Tags @('QueryResult')
+                        $ATPvariant = 'DfOP1'
+                        Write-VerboseMessage 'Identified a Defender for Office P1 tenant'
+                        # Order of precedence according to https://learn.microsoft.com/en-us/microsoft-365/security/office-365-security/preset-security-policies?view=o365-worldwide#order-of-precedence-for-preset-security-policies-and-other-policies
+                        $matchedRecipients = [System.Collections.Generic.List[guid]]::new()
+                        # Handle strict protection rule
+                        if ($null -ne ($strictProtectionRule = Get-ATPProtectionPolicyRule -Identity 'Strict Preset Security Policy' -State Enabled -ErrorAction SilentlyContinue)) {
+                            Write-VerboseMessage 'ATP strict rule'
+                            if ($null -ne ($recipients = Get-ATPRecipients -IncludedUsers $strictProtectionRule.SentTo -IncludedGroups $strictProtectionRule.SentToMemberOf -IncludedDomains $strictProtectionRule.RecipientDomainIs -ExcludedUsers $strictProtectionRule.ExceptIfSentTo -ExcludedGroups $strictProtectionRule.ExceptIfSentToMemberOf -ExcludedDomains $strictProtectionRule.ExceptIfRecipientDomainIs | Where-Object{$_.ExternalDirectoryObjectId -notin $matchedRecipients})) {
+                                $matchedRecipients.AddRange([guid[]]@($recipients.ExternalDirectoryObjectId))
+                                $ATPUsers.AddRange([guid[]]@($recipients.ExternalDirectoryObjectId))
+                                Write-VerboseMessage "Found $($recipients.Count) affected/protected recipients"
+                            }
+                        }
+                        # Handle standard protection rule
+                        if ($null -ne ($standardProtectionRule = Get-ATPProtectionPolicyRule -Identity 'Standard Preset Security Policy' -State Enabled -ErrorAction SilentlyContinue)) {
+                            Write-VerboseMessage 'ATP standard rule'
+                            if ($null -ne ($recipients = Get-ATPRecipients -IncludedUsers $standardProtectionRule.SentTo -IncludedGroups $standardProtectionRule.SentToMemberOf -IncludedDomains $standardProtectionRule.RecipientDomainIs -ExcludedUsers $standardProtectionRule.ExceptIfSentTo -ExcludedGroups $standardProtectionRule.ExceptIfSentToMemberOf -ExcludedDomains $standardProtectionRule.ExceptIfRecipientDomainIs | Where-Object{$_.ExternalDirectoryObjectId -notin $matchedRecipients})) {
+                                $matchedRecipients.AddRange([guid[]]@($recipients.ExternalDirectoryObjectId))
+                                $ATPUsers.AddRange([guid[]]@($recipients.ExternalDirectoryObjectId))
+                                Write-VerboseMessage "Found $($recipients.Count) affected/protected recipients"
+                            }
+                        }
+                        # Handle custom protection rules
+                        foreach ($customAntiPhishPolicy in Get-AntiPhishPolicy | Where-Object{$_.Identity -ne 'Office 365 AntiPhish Default' -and $_.RecommendedPolicyType -notin @('Standard','Strict')}) {
+                            if (($customAntiPhishRule = Get-AntiPhishRule | Where-Object{$_.AntiPhishPolicy -eq $customAntiPhishPolicy.Identity}).State -eq 'Enabled'){
+                                Write-VerboseMessage "ATP custom anti-phishing policy '$($customAntiPhishPolicy.Name)'"
+                                if ($null -ne ($recipients = Get-ATPRecipients -IncludedUsers $customAntiPhishRule.SentTo -IncludedGroups $customAntiPhishRule.SentToMemberOf -IncludedDomains $customAntiPhishRule.RecipientDomainIs -ExcludedUsers $customAntiPhishRule.ExceptIfSentTo -ExcludedGroups $customAntiPhishRule.ExceptIfSentToMemberOf -ExcludedDomains $customAntiPhishRule.ExceptIfRecipientDomainIs | Where-Object{$_.ExternalDirectoryObjectId -notin $matchedRecipients})) {
+                                    $matchedRecipients.AddRange([guid[]]@($recipients.ExternalDirectoryObjectId))
+                                    if ($customAntiPhishPolicy.Enabled) {
+                                        $ATPUsers.AddRange([guid[]]@($recipients.ExternalDirectoryObjectId))
+                                        Write-VerboseMessage "Found $($recipients.Count) affected, $($recipients.Count) protected recipients"
+                                    }
+                                    else {
+                                        Write-VerboseMessage "Found $($recipients.Count) affected, 0 protected recipients"
+                                    }
                                 }
                             }
                         }
+                        foreach ($customSafeAttachmentPolicy in Get-SafeAttachmentPolicy | Where-Object{$_.IsBuiltInProtection -eq $false -and $_.RecommendedPolicyType -notin @('Standard','Strict')}) {
+                            if (($customSafeAttachmentRule = Get-SafeAttachmentRule | Where-Object{$_.SafeAttachmentPolicy -eq $customSafeAttachmentPolicy.Identity}).State -eq 'Enabled'){
+                                Write-VerboseMessage "ATP custom Safe Attachments policy '$($customSafeAttachmentPolicy.Name)'"
+                                if ($null -ne ($recipients = Get-ATPRecipients -IncludedUsers $customSafeAttachmentRule.SentTo -IncludedGroups $customSafeAttachmentRule.SentToMemberOf -IncludedDomains $customSafeAttachmentRule.RecipientDomainIs -ExcludedUsers $customSafeAttachmentRule.ExceptIfSentTo -ExcludedGroups $customSafeAttachmentRule.ExceptIfSentToMemberOf -ExcludedDomains $customSafeAttachmentRule.ExceptIfRecipientDomainIs | Where-Object{$_.ExternalDirectoryObjectId -notin $matchedRecipients})) {
+                                    $matchedRecipients.AddRange([guid[]]@($recipients.ExternalDirectoryObjectId))
+                                    if ($customSafeAttachmentPolicy.Enable) {
+                                        $ATPUsers.AddRange([guid[]]@($recipients.ExternalDirectoryObjectId))
+                                        Write-VerboseMessage "Found $($recipients.Count) affected, $($recipients.Count) protected recipients"
+                                    }
+                                    else {
+                                        Write-VerboseMessage "Found $($recipients.Count) affected, 0 protected recipients"
+                                    }
+                                }
+                            }
+                        }
+                        foreach ($customSafeLinksPolicy in Get-SafeLinksPolicy | Where-Object{$_.IsBuiltInProtection -eq $false -and $_.RecommendedPolicyType -notin @('Standard','Strict')}) {
+                            if (($customSafeLinksRule = Get-SafeLinksRule | Where-Object{$_.SafeLinksPolicy -eq $customSafeLinksPolicy.Identity}).State -eq 'Enabled'){
+                                Write-VerboseMessage "ATP custom Safe Links policy '$($customSafeLinksPolicy.Name)'"
+                                if ($null -ne ($recipients = Get-ATPRecipients -IncludedUsers $customSafeLinksRule.SentTo -IncludedGroups $customSafeLinksRule.SentToMemberOf -IncludedDomains $customSafeLinksRule.RecipientDomainIs -ExcludedUsers $customSafeLinksRule.ExceptIfSentTo -ExcludedGroups $customSafeLinksRule.ExceptIfSentToMemberOf -ExcludedDomains $customSafeLinksRule.ExceptIfRecipientDomainIs | Where-Object{$_.ExternalDirectoryObjectId -notin $matchedRecipients})) {
+                                    $matchedRecipients.AddRange([guid[]]@($recipients.ExternalDirectoryObjectId))
+                                    if ($customSafeLinksPolicy.EnableSafeLinksForEmail -or $customSafeLinksPolicy.EnableSafeLinksForOffice -or $customSafeLinksPolicy.EnableSafeLinksForTeams) {
+                                        $ATPUsers.AddRange([guid[]]@($recipients.ExternalDirectoryObjectId))
+                                        Write-VerboseMessage "Found $($recipients.Count) affected, $($recipients.Count) protected recipients"
+                                    }
+                                    else {
+                                        Write-VerboseMessage "Found $($recipients.Count) affected, 0 protected recipients"
+                                    }
+                                }
+                            }
+                        }
+                        # Handle built-in protection rule
+                        Write-VerboseMessage 'ATP built-in rule'
+                        $builtinProtectionRule = Get-ATPBuiltInProtectionRule
+                        if ($null -ne ($recipients = Get-ATPRecipients -IncludedUsers $builtinProtectionRule.SentTo -IncludedGroups $builtinProtectionRule.SentToMemberOf -IncludedDomains $builtinProtectionRule.RecipientDomainIs -ExcludedUsers $builtinProtectionRule.ExceptIfSentTo -ExcludedGroups $builtinProtectionRule.ExceptIfSentToMemberOf -ExcludedDomains $builtinProtectionRule.ExceptIfRecipientDomainIs | Where-Object{$_.ExternalDirectoryObjectId -notin $matchedRecipients})) {
+                            $matchedRecipients.AddRange([guid[]]@($recipients.ExternalDirectoryObjectId))
+                            $ATPUsers.AddRange([guid[]]@($recipients.ExternalDirectoryObjectId))
+                            Write-VerboseMessage "Found $($recipients.Count) affected/protected recipients"
+                        }
                     }
-                }
-                elseif ($null -ne ($organizationSKUs | Where-Object{@($_.servicePlans.servicePlanId) -contains 'f20fedf3-f3c3-43c3-8267-2bfdd51c0939'})) {
-                    $ATPvariant = 'DfOP1'
-                    Write-Information -MessageData 'Identified a Defender for Office P1 tenant' -Tags @('QueryResult')
                 }
                 else {
                     $ATPvariant = 'EOP'
-                    Write-Information -MessageData 'Identified an Exchange Online Protection tenant' -Tags @('QueryResult')
+                    Write-VerboseMessage 'Identified an Exchange Online Protection tenant'
                 }
                 Disconnect-ExchangeOnline -Confirm:$false
             }
@@ -624,7 +853,7 @@ function Get-AzureADLicenseStatus {
                     $AADP1Licenses = 0
                 }
                 $neededCount = ($AADP1Users | Select-Object -Unique).Count
-                Write-Information -MessageData "Found $neededCount needed, $AADP1Licenses enabled AADP1 licenses" -Tags @('AnalysisResult')
+                Write-VerboseMessage "Found $neededCount needed, $AADP1Licenses enabled AADP1 licenses"
                 if ($AADP1Licenses -lt $neededCount) {
                     Add-Result -PlanName 'Azure Active Directory Premium P1' -EnabledCount $AADP1Licenses -NeededCount $neededCount
                 }
@@ -637,7 +866,7 @@ function Get-AzureADLicenseStatus {
                     $AADP2Licenses = 0
                 }
                 $neededCount = ($AADP2Users | Select-Object -Unique).Count
-                Write-Information -MessageData "Found $neededCount needed, $AADP1Licenses enabled AADP2 licenses" -Tags @('AnalysisResult')
+                Write-VerboseMessage "Found $neededCount needed, $AADP1Licenses enabled AADP2 licenses"
                 if ($AADP2Licenses -lt $neededCount) {
                     Add-Result -PlanName 'Azure Active Directory Premium P2' -EnabledCount $AADP2Licenses -NeededCount $neededCount
                 }
@@ -648,7 +877,7 @@ function Get-AzureADLicenseStatus {
                     'DfOP1' {
                         $ATPSKUs = @($organizationSKUs | Where-Object{@($_.servicePlans.servicePlanId) -contains 'f20fedf3-f3c3-43c3-8267-2bfdd51c0939'})
                         $ATPLicenses = ($ATPSKUs.prepaidUnits.enabled | Measure-Object -Sum).Sum
-                        Write-Information -MessageData "Found $neededCount needed, $AADP1Licenses enabled DfOP2 licenses" -Tags @('AnalysisResult')
+                        Write-VerboseMessage "Found $neededCount needed, $ATPLicenses enabled DfOP2 licenses"
                         if ($ATPLicenses -lt $neededCount) {
                             Add-Result -PlanName 'Microsoft Defender for Office 365 P1' -EnabledCount $ATPLicenses -NeededCount $neededCount
                         }
@@ -656,7 +885,7 @@ function Get-AzureADLicenseStatus {
                     'DfOP2' {
                         $ATPSKUs = @($organizationSKUs | Where-Object{@($_.servicePlans.servicePlanId) -contains '8e0c0a52-6a6c-4d40-8370-dd62790dcd70'})
                         $ATPLicenses = ($ATPSKUs.prepaidUnits.enabled | Measure-Object -Sum).Sum
-                        Write-Information -MessageData "Found $neededCount needed, $AADP1Licenses enabled DfOP2 licenses" -Tags @('AnalysisResult')
+                        Write-VerboseMessage "Found $neededCount needed, $ATPLicenses enabled DfOP2 licenses"
                         if ($ATPLicenses -lt $neededCount) {
                             Add-Result -PlanName 'Microsoft Defender for Office 365 P2' -EnabledCount $ATPLicenses -NeededCount $neededCount
                         }
