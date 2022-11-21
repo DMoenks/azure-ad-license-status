@@ -589,9 +589,7 @@ function Get-AzureADLicenseStatus {
                     }
                 }
                 # Identify optimizable SKUs, based on organization-level calculations
-                $userSKUs_optimizable = [System.Collections.Generic.List[guid]]::new()
                 if ($null -ne ($comparison_replaceableOrganization = $userSKUs | Where-Object{$_ -in $superiorSKUs_organization.Keys} | ForEach-Object{$superiorSKUs_organization[$_]})) {
-                    # TODO: Rework into foreach loop
                     $userSKUs_optimizable = Compare-Object -ReferenceObject $userSKUs -DifferenceObject $comparison_replaceableOrganization -ExcludeDifferent -IncludeEqual | ForEach-Object{$superiorSKU = $_.InputObject; $superiorSKUs_organization.Keys | Where-Object{$superiorSKUs_organization[$_] -contains $superiorSKU}} | Where-Object{$_ -in $userSKUs} | Select-Object -Unique
                 }
                 else {
@@ -624,7 +622,6 @@ function Get-AzureADLicenseStatus {
                     }
                 }
                 if ($null -ne ($comparison_replaceableUser = $userSKUs | Where-Object{$_ -in $superiorSKUs_user.Keys} | ForEach-Object{$superiorSKUs_user[$_]})) {
-                    # TODO: Rework into foreach loop
                     $userSKUs_removable = Compare-Object -ReferenceObject $userSKUs -DifferenceObject $comparison_replaceableUser -ExcludeDifferent -IncludeEqual | ForEach-Object{$superiorSKU = $_.InputObject; $superiorSKUs_user.Keys | Where-Object{$superiorSKUs_user[$_] -contains $superiorSKU}} | Where-Object{$_ -in $userSKUs} | Select-Object -Unique
                 }
                 else {
@@ -637,11 +634,11 @@ function Get-AzureADLicenseStatus {
                 }
                 if ($null -ne $userSKUs_optimizable) {
                     Add-Result -UserPrincipalName $user.userPrincipalName -ConflictType Optimizable -ConflictSKUs $userSKUs_optimizable
-                    Write-VerboseMessage "Found $($userSKUs_optimizable.Count) optimizable SKUs for user $($user.userPrincipalName)"
+                    Write-VerboseMessage "Found $(@($userSKUs_optimizable).Count) optimizable SKUs for user $($user.userPrincipalName)"
                 }
                 if ($null -ne $userSKUs_removable) {
                     Add-Result -UserPrincipalName $user.userPrincipalName -ConflictType Removable -ConflictSKUs $userSKUs_removable
-                    Write-VerboseMessage "Found $($userSKUs_removable.Count) removable SKUs for user $($user.userPrincipalName)"
+                    Write-VerboseMessage "Found $(@($userSKUs_removable).Count) removable SKUs for user $($user.userPrincipalName)"
                 }
             }
         }
