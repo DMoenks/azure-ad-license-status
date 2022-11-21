@@ -24,7 +24,7 @@ The main motivation for this script was to conquer side-effects of semi-automati
 - Azure Active Directory Premium P1 based on dynamic group memberships
 - Azure Active Directory Premium P1 based on users enabled for Conditional Access
 - Azure Active Directory Premium P2 based on users enabled for Privileged Identity Management
-- Defender for Office 365 P1/P2 based on user and shared mailboxes
+- Defender for Office 365 P1/P2 based on Exchange Online recipients
 
 ### 2.2 User level
 
@@ -67,16 +67,13 @@ The main motivation for this script was to conquer side-effects of semi-automati
 
 #### 3.2.2 Advanced
 
-- Microsoft Graph permission _Application.Read.All_
-- Microsoft Graph permission _GroupMember.Read.All_
 - Microsoft Graph permission _Policy.Read.All_
 - Microsoft Graph permission _RoleManagement.Read.All_
-- Office 365 Exchange Online permission _Exchange.ManageAsApp_ and Azure AD role _Global Reader_
+- Office 365 Exchange Online permission _Exchange.ManageAsApp_
+- Azure AD role _Global Reader_
 
-> HINT: To simplify permission management, the following Microsoft Graph permissions can be replaced with the _Directory.Read.All_ permission. As this would provide the script with additional, probably unnecessary permissions, consider this at your own discretion.
+> HINT: When granting the _Global Reader_ role to the application, the following Microsoft Graph permissions can be revoked, as they are already included in the role's permissions.
 >
->- _Application.Read.All_
->- _GroupMember.Read.All_
 >- _Organization.Read.All_
 >- _User.Read.All_
 
