@@ -39,7 +39,7 @@ th, td {
 #region: Helper functions
 function Initialize-Variables {
     # Process
-    $script:nestingLevel = 0
+    $script:nestingLevel = 1
     # General
     $script:groups = [System.Collections.Generic.List[hashtable]]::new()
     $script:outputs = [System.Text.StringBuilder]::new()
@@ -76,7 +76,7 @@ function Write-VerboseMessage {
         [string]$Message
     )
 
-    Write-Verbose -Message $Message.Insert(0, ((0..$nestingLevel | ForEach-Object{'-'}) -join ''))
+    Write-Verbose -Message "$([string]::new('-', $nestingLevel)) $Message"
 }
 
 function Add-Output {
@@ -107,7 +107,7 @@ function Add-Result {
         [ValidateNotNullOrEmpty()]
         [string]$UserPrincipalName,
         [Parameter(Mandatory = $true, ParameterSetName = 'User')]
-        [ValidateSet('Interchangeable','Optimizable','Removable')]
+        [ValidateSet('Interchangeable', 'Optimizable', 'Removable')]
         [string]$ConflictType,
         [Parameter(Mandatory = $true, ParameterSetName = 'User')]
         [ValidateNotNullOrEmpty()]
@@ -194,13 +194,13 @@ function Get-EXOGroupMembers {
 
     $groupMembers = [System.Collections.Generic.List[pscustomobject]]::new()
     foreach ($groupID in $GroupIDs) {
-        if ($null -ne ($group = Get-Recipient $groupID.Guid -RecipientTypeDetails $EXOTypes_group | Select-Object $EXOProperties)) {
+        if ($null -ne ($group = Get-Recipient $groupID.Guid -RecipientTypeDetails $EXOTypes_group | Select-Object -Property $EXOProperties)) {
             switch ($group.RecipientTypeDetails) {
                 'GroupMailbox' {
-                    $members = @(Get-UnifiedGroupLinks $group.ExchangeObjectId.Guid -LinkType Members -ResultSize Unlimited | Select-Object $EXOProperties)
+                    $members = @(Get-UnifiedGroupLinks $group.ExchangeObjectId.Guid -LinkType Members -ResultSize Unlimited | Select-Object -Property $EXOProperties)
                 }
                 Default {
-                    $members = @(Get-DistributionGroupMember $group.ExchangeObjectId.Guid -ResultSize Unlimited | Select-Object $EXOProperties)
+                    $members = @(Get-DistributionGroupMember $group.ExchangeObjectId.Guid -ResultSize Unlimited | Select-Object -Property $EXOProperties)
                 }
             }
             foreach ($member in $members) {
@@ -243,24 +243,24 @@ function Resolve-ATPRecipients {
     $affectedAsDomain = [System.Collections.Generic.List[pscustomobject]]::new()
     if ($null -ne $Users) {
         $categoryCount++
-        if ($null -ne ($recipients = Get-Recipient -RecipientTypeDetails $EXOTypes_user -ResultSize Unlimited | Select-Object $EXOProperties | Where-Object{$_.PrimarySmtpAddress -in $Users})) {
+        if ($null -ne ($recipients = Get-Recipient -RecipientTypeDetails $EXOTypes_user -ResultSize Unlimited | Select-Object -Property $EXOProperties | Where-Object{$_.PrimarySmtpAddress -in $Users})) {
             $affectedAsUser.AddRange([pscustomobject[]]@($recipients))
         }
     }
     Write-VerboseMessage "Found $($affectedAsUser.Count) recipients by users"
     if ($null -ne $Groups) {
         $categoryCount++
-        if ($null -ne ($recipients = Get-Recipient -RecipientTypeDetails $EXOTypes_group -ResultSize Unlimited | Select-Object $EXOProperties | Where-Object{$_.PrimarySmtpAddress -in $Groups})) {
+        if ($null -ne ($recipients = Get-Recipient -RecipientTypeDetails $EXOTypes_group -ResultSize Unlimited | Select-Object -Property $EXOProperties | Where-Object{$_.PrimarySmtpAddress -in $Groups})) {
             $affectedAsGroup.AddRange((Get-EXOGroupMembers -GroupIDs $recipients.ExchangeObjectId))
         }
     }
     Write-VerboseMessage "Found $($affectedAsGroup.Count) recipients by groups"
     if ($null -ne $Domains) {
         $categoryCount++
-        if ($null -ne ($recipients = Get-Recipient -RecipientTypeDetails $EXOTypes_user -ResultSize Unlimited | Select-Object $EXOProperties | Where-Object{$_.PrimarySmtpAddress.Split('@')[1] -in $Domains})) {
+        if ($null -ne ($recipients = Get-Recipient -RecipientTypeDetails $EXOTypes_user -ResultSize Unlimited | Select-Object -Property $EXOProperties | Where-Object{$_.PrimarySmtpAddress.Split('@')[1] -in $Domains})) {
             $affectedAsDomain.AddRange([pscustomobject[]]@($recipients))
         }
-        if ($null -ne ($recipients = Get-Recipient -RecipientTypeDetails $EXOTypes_group -ResultSize Unlimited | Select-Object $EXOProperties | Where-Object{$_.PrimarySmtpAddress.Split('@')[1] -in $Domains})) {
+        if ($null -ne ($recipients = Get-Recipient -RecipientTypeDetails $EXOTypes_group -ResultSize Unlimited | Select-Object -Property $EXOProperties | Where-Object{$_.PrimarySmtpAddress.Split('@')[1] -in $Domains})) {
             $affectedAsDomain.AddRange((Get-EXOGroupMembers -GroupIDs $recipients.ExchangeObjectId))
         }
     }
@@ -307,7 +307,7 @@ function Get-ATPRecipients {
     if ($null -eq $IncludedUsers -and
     $null -eq $IncludedGroups -and
     $null -eq $IncludedDomains) {
-        $userRecipients = @(Get-Recipient -RecipientTypeDetails $EXOTypes_user -ResultSize Unlimited | Select-Object $EXOProperties)
+        $userRecipients = @(Get-Recipient -RecipientTypeDetails $EXOTypes_user -ResultSize Unlimited | Select-Object -Property $EXOProperties)
         $groupRecipients = Get-EXOGroupMembers -GroupIDs (Get-Recipient -RecipientTypeDetails $EXOTypes_group -ResultSize Unlimited).ExchangeObjectId
         $includedRecipients = $userRecipients + $groupRecipients | Select-Object -Unique
     }
@@ -415,15 +415,15 @@ function Get-AzureADLicenseStatus {
     Specifies if advanced license checkups should be run
     ATTENTION: Advanced checkups require additional access permissions and might increase the checkup duration
     .EXAMPLE
-    Get-AzureADLicenseStatus -DirectoryID '00000000-0000-0000-0000-000000000000' -ApplicationID '00000000-0000-0000-0000-000000000000' -CertificateThumbprint 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' -SenderAddress 'sender@example.com' -RecipientAddresses_normal @('recipient_1@example.com','recipient_2@example.com')
+    Get-AzureADLicenseStatus -DirectoryID '00000000-0000-0000-0000-000000000000' -ApplicationID '00000000-0000-0000-0000-000000000000' -CertificateThumbprint 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' -SenderAddress 'sender@example.com' -RecipientAddresses_normal @('recipient_1@example.com', 'recipient_2@example.com')
 
     Prepares a status report with default values by using only necessary parameters for authentication and report delivery
     .EXAMPLE
-    Get-AzureADLicenseStatus -DirectoryID '00000000-0000-0000-0000-000000000000' -ApplicationID '00000000-0000-0000-0000-000000000000' -CertificateThumbprint 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' -SenderAddress 'sender@example.com' -RecipientAddresses_normal @('recipient_1@example.com','recipient_2@example.com') -RecipientAddresses_critical @('recipient_3@example.com','recipient_4@example.com') -SKUPercentageThreshold_normal 1 -SKUTotalThreshold_normal 100 -SKUPercentageThreshold_important 1 -SKUTotalThreshold_important 500
+    Get-AzureADLicenseStatus -DirectoryID '00000000-0000-0000-0000-000000000000' -ApplicationID '00000000-0000-0000-0000-000000000000' -CertificateThumbprint 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' -SenderAddress 'sender@example.com' -RecipientAddresses_normal @('recipient_1@example.com', 'recipient_2@example.com') -RecipientAddresses_critical @('recipient_3@example.com', 'recipient_4@example.com') -SKUPercentageThreshold_normal 1 -SKUTotalThreshold_normal 100 -SKUPercentageThreshold_important 1 -SKUTotalThreshold_important 500
 
     Prepares a status report with customized thresholds for larger organizations and additional recipients for when license counts reach critical levels
     .EXAMPLE
-    Get-AzureADLicenseStatus -DirectoryID '00000000-0000-0000-0000-000000000000' -ApplicationID '00000000-0000-0000-0000-000000000000' -SubscriptionID '00000000-0000-0000-0000-000000000000' -KeyVaultName 'MyKeyVault' -CertificateName 'MyCertificate' -SenderAddress 'sender@example.com' -RecipientAddresses_normal @('recipient_1@example.com','recipient_2@example.com') -RecipientAddresses_critical @('recipient_3@example.com','recipient_4@example.com') -SKUPercentageThreshold_normal 1 -SKUTotalThreshold_normal 100 -SKUPercentageThreshold_important 1 -SKUTotalThreshold_important 500 -ImportantSKUs @('18181a46-0d4e-45cd-891e-60aabd171b4e','6fd2c87f-b296-42f0-b197-1e91e994b900') -InterchangeableSKUs @('4b585984-651b-448a-9e53-3b10f069cf7f','18181a46-0d4e-45cd-891e-60aabd171b4e','6fd2c87f-b296-42f0-b197-1e91e994b900','c7df2760-2c81-4ef7-b578-5b5392b571df') -AdvancedCheckups
+    Get-AzureADLicenseStatus -DirectoryID '00000000-0000-0000-0000-000000000000' -ApplicationID '00000000-0000-0000-0000-000000000000' -SubscriptionID '00000000-0000-0000-0000-000000000000' -KeyVaultName 'MyKeyVault' -CertificateName 'MyCertificate' -SenderAddress 'sender@example.com' -RecipientAddresses_normal @('recipient_1@example.com', 'recipient_2@example.com') -RecipientAddresses_critical @('recipient_3@example.com', 'recipient_4@example.com') -SKUPercentageThreshold_normal 1 -SKUTotalThreshold_normal 100 -SKUPercentageThreshold_important 1 -SKUTotalThreshold_important 500 -ImportantSKUs @('18181a46-0d4e-45cd-891e-60aabd171b4e', '6fd2c87f-b296-42f0-b197-1e91e994b900') -InterchangeableSKUs @('4b585984-651b-448a-9e53-3b10f069cf7f', '18181a46-0d4e-45cd-891e-60aabd171b4e', '6fd2c87f-b296-42f0-b197-1e91e994b900', 'c7df2760-2c81-4ef7-b578-5b5392b571df') -AdvancedCheckups
 
     Prepares a status report by using an Azure certificate for automation purposes, specifying both important and interchangeable SKUs and activating advanced checkups
     #>
@@ -461,11 +461,11 @@ function Get-AzureADLicenseStatus {
         [string[]]$RecipientAddresses_critical,
         [ValidateNotNullOrEmpty()]
         [UInt32]$SKUIgnoreThreshold = 10,
-        [ValidateRange(0,100)]
+        [ValidateRange(0, 100)]
         [UInt16]$SKUPercentageThreshold_normal = 5,
         [ValidateNotNullOrEmpty()]
         [UInt32]$SKUTotalThreshold_normal = 10,
-        [ValidateRange(0,100)]
+        [ValidateRange(0, 100)]
         [UInt16]$SKUPercentageThreshold_important = 5,
         [ValidateNotNullOrEmpty()]
         [UInt32]$SKUTotalThreshold_important = 50,
@@ -570,7 +570,7 @@ function Get-AzureADLicenseStatus {
         # Analyze users
         foreach ($user in $users) {
             if ($user.licenseAssignmentStates.count -gt 0) {
-                if ($null -ne ($userSKUAssignments = $user.licenseAssignmentStates | Where-Object{$_.state -eq 'Active' -or $_.error -in @('CountViolation','MutuallyExclusiveViolation')})) {
+                if ($null -ne ($userSKUAssignments = $user.licenseAssignmentStates | Where-Object{$_.state -eq 'Active' -or $_.error -in @('CountViolation', 'MutuallyExclusiveViolation')})) {
                     $userSKUs = $userSKUAssignments.skuId
                 }
                 else {
@@ -746,7 +746,7 @@ function Get-AzureADLicenseStatus {
                 Write-Error -Message 'Failed to authenticate with Exchange Online' -Category AuthenticationError
             }
             if ($exchangeAuthentication) {
-                if ($null -ne (Compare-Object -ReferenceObject $organizationSKUs.servicePlans.servicePlanId -DifferenceObject @('f20fedf3-f3c3-43c3-8267-2bfdd51c0939','8e0c0a52-6a6c-4d40-8370-dd62790dcd70') -ExcludeDifferent -IncludeEqual)) {
+                if ($null -ne (Compare-Object -ReferenceObject $organizationSKUs.servicePlans.servicePlanId -DifferenceObject @('f20fedf3-f3c3-43c3-8267-2bfdd51c0939', '8e0c0a52-6a6c-4d40-8370-dd62790dcd70') -ExcludeDifferent -IncludeEqual)) {
                     # Protected mailboxes
                     if ($null -ne ($organizationSKUs | Where-Object{@($_.servicePlans.servicePlanId) -contains '8e0c0a52-6a6c-4d40-8370-dd62790dcd70'})) {
                         $ATPvariant = 'DfOP2'
@@ -780,7 +780,7 @@ function Get-AzureADLicenseStatus {
                             }
                         }
                         # Handle custom protection rules
-                        foreach ($customAntiPhishPolicy in Get-AntiPhishPolicy | Where-Object{$_.Identity -ne 'Office 365 AntiPhish Default' -and $_.RecommendedPolicyType -notin @('Standard','Strict')}) {
+                        foreach ($customAntiPhishPolicy in Get-AntiPhishPolicy | Where-Object{$_.Identity -ne 'Office 365 AntiPhish Default' -and $_.RecommendedPolicyType -notin @('Standard', 'Strict')}) {
                             if (($customAntiPhishRule = Get-AntiPhishRule | Where-Object{$_.AntiPhishPolicy -eq $customAntiPhishPolicy.Identity}).State -eq 'Enabled'){
                                 Write-VerboseMessage "ATP custom anti-phishing policy '$($customAntiPhishPolicy.Name)'"
                                 if ($null -ne ($recipients = Get-ATPRecipients -IncludedUsers $customAntiPhishRule.SentTo -IncludedGroups $customAntiPhishRule.SentToMemberOf -IncludedDomains $customAntiPhishRule.RecipientDomainIs -ExcludedUsers $customAntiPhishRule.ExceptIfSentTo -ExcludedGroups $customAntiPhishRule.ExceptIfSentToMemberOf -ExcludedDomains $customAntiPhishRule.ExceptIfRecipientDomainIs | Where-Object{$_.ExternalDirectoryObjectId -notin $matchedRecipients})) {
@@ -795,7 +795,7 @@ function Get-AzureADLicenseStatus {
                                 }
                             }
                         }
-                        foreach ($customSafeAttachmentPolicy in Get-SafeAttachmentPolicy | Where-Object{$_.IsBuiltInProtection -eq $false -and $_.RecommendedPolicyType -notin @('Standard','Strict')}) {
+                        foreach ($customSafeAttachmentPolicy in Get-SafeAttachmentPolicy | Where-Object{$_.IsBuiltInProtection -eq $false -and $_.RecommendedPolicyType -notin @('Standard', 'Strict')}) {
                             if (($customSafeAttachmentRule = Get-SafeAttachmentRule | Where-Object{$_.SafeAttachmentPolicy -eq $customSafeAttachmentPolicy.Identity}).State -eq 'Enabled'){
                                 Write-VerboseMessage "ATP custom Safe Attachments policy '$($customSafeAttachmentPolicy.Name)'"
                                 if ($null -ne ($recipients = Get-ATPRecipients -IncludedUsers $customSafeAttachmentRule.SentTo -IncludedGroups $customSafeAttachmentRule.SentToMemberOf -IncludedDomains $customSafeAttachmentRule.RecipientDomainIs -ExcludedUsers $customSafeAttachmentRule.ExceptIfSentTo -ExcludedGroups $customSafeAttachmentRule.ExceptIfSentToMemberOf -ExcludedDomains $customSafeAttachmentRule.ExceptIfRecipientDomainIs | Where-Object{$_.ExternalDirectoryObjectId -notin $matchedRecipients})) {
@@ -810,7 +810,7 @@ function Get-AzureADLicenseStatus {
                                 }
                             }
                         }
-                        foreach ($customSafeLinksPolicy in Get-SafeLinksPolicy | Where-Object{$_.IsBuiltInProtection -eq $false -and $_.RecommendedPolicyType -notin @('Standard','Strict')}) {
+                        foreach ($customSafeLinksPolicy in Get-SafeLinksPolicy | Where-Object{$_.IsBuiltInProtection -eq $false -and $_.RecommendedPolicyType -notin @('Standard', 'Strict')}) {
                             if (($customSafeLinksRule = Get-SafeLinksRule | Where-Object{$_.SafeLinksPolicy -eq $customSafeLinksPolicy.Identity}).State -eq 'Enabled'){
                                 Write-VerboseMessage "ATP custom Safe Links policy '$($customSafeLinksPolicy.Name)'"
                                 if ($null -ne ($recipients = Get-ATPRecipients -IncludedUsers $customSafeLinksRule.SentTo -IncludedGroups $customSafeLinksRule.SentToMemberOf -IncludedDomains $customSafeLinksRule.RecipientDomainIs -ExcludedUsers $customSafeLinksRule.ExceptIfSentTo -ExcludedGroups $customSafeLinksRule.ExceptIfSentToMemberOf -ExcludedDomains $customSafeLinksRule.ExceptIfRecipientDomainIs | Where-Object{$_.ExternalDirectoryObjectId -notin $matchedRecipients})) {
