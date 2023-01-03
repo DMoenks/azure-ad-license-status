@@ -597,12 +597,12 @@ function Get-AzureADLicenseStatus {
                 }
                 # Identify removable SKUs, based on user-level calculations
                 $skuid_enabledPlans = @{}
-                foreach ($skuid in $user.licenseAssignmentStates.skuid | Select-Object -Unique) {
+                foreach ($skuid in $user.licenseAssignmentStates.skuid | Where-Object{$organizationSKUs.skuId -contains $_} | Select-Object -Unique) {
                     if (-not $skuid_enabledPlans.ContainsKey($skuid)) {
                         $skuid_enabledPlans.Add($skuid, [System.Collections.Generic.List[guid]]::new())
                     }
                     foreach ($assignment in $user.licenseAssignmentStates | Where-Object{$_.skuid -eq $skuid}) {
-                        $skuid_enabledPlans[$skuid].AddRange([guid[]]@((($organizationSKUs | Where-Object{$_.skuid -eq $skuid}).servicePlans | Where-Object{$_.servicePlanId -notin $assignment.disabledplans -and $_.appliesTo -eq 'User'}).servicePlanId))
+                        $skuid_enabledPlans[$skuid].AddRange([guid[]]@((($organizationSKUs | Where-Object{$_.skuid -eq $skuid}).servicePlans | Where-Object{$_.servicePlanId -notin $assignment.disabledPlans -and $_.appliesTo -eq 'User'}).servicePlanId))
                     }
                 }
                 $superiorSKUs_user = @{}
@@ -897,9 +897,9 @@ function Get-AzureADLicenseStatus {
             Add-Output -Output $style
             $critical = $false
             # Output basic SKU results
+            Add-Output -Output '<p class=gray>Basic checkup - Products</p>'
             if ($results.ContainsKey('SKU')) {
-                Add-Output -Output "<p class=gray>Basic checkup - Products</p> `
-                                    <p>Please check license counts for the following product SKUs and <a href=""$LicensingURL"">reserve</a> additional licenses:</p> `
+                Add-Output -Output "<p>Please check license counts for the following product SKUs and <a href=""$LicensingURL"">reserve</a> additional licenses:</p> `
                                     <p><table><tr><th>License type</th><th>Available count</th><th>Minimum count</th><th>Difference</th></tr>"
                 foreach ($SKU in $results['SKU'].Keys) {
                     $differenceCount = $results['SKU'][$SKU]['availableCount'] - $results['SKU'][$SKU]['minimumCount']
@@ -925,10 +925,13 @@ function Get-AzureADLicenseStatus {
                                     <li>Report normal products having both <$SKUTotalThreshold_normal licenses and <$SKUPercentageThreshold_normal% of their total licenses available</li> `
                                     <li>Report important products having both <$SKUTotalThreshold_important licenses and <$SKUPercentageThreshold_important% of their total licenses available</li></ul></p>"
             }
+            else {
+                Add-Output -Output 'Nothing to report'
+            }
             # Output advanced SKU results
+            Add-Output -Output '<p class=gray>Advanced checkup - Products</p>'
             if ($results.ContainsKey('Advanced')) {
-                Add-Output -Output "<p class=gray>Advanced checkup - Products</p> `
-                                    <p>Please check license counts for the following product SKUs and <a href=""$LicensingURL"">reserve</a> additional licenses:</p> `
+                Add-Output -Output "<p>Please check license counts for the following product SKUs and <a href=""$LicensingURL"">reserve</a> additional licenses:</p> `
                                     <p><table><tr><th>License type</th><th>Enabled count</th><th>Needed count</th><th>Difference</th></tr>"
                 foreach ($plan in $results['Advanced'].Keys) {
                     $differenceCount = $results['Advanced'][$plan]['enabledCount'] - $results['Advanced'][$plan]['neededCount']
@@ -956,10 +959,13 @@ function Get-AzureADLicenseStatus {
                                     <li>Check <i>Azure AD P2</i> based on PIM-managed users</li>
                                     <li>Check <i>Defender for Office 365 P1/P2</i> based on user and shared mailboxes</li></ul></p>'
             }
+            else {
+                Add-Output -Output 'Nothing to report'
+            }
             # Output basic user results
+            Add-Output -Output '<p class=gray>Basic checkup - Users</p>'
             if ($results.ContainsKey('User')) {
-                Add-Output -Output '<p class=gray>Basic checkup - Users</p>
-                                    <p>Please check license assignments for the following user accounts and mitigate impact:</p>
+                Add-Output -Output '<p>Please check license assignments for the following user accounts and mitigate impact:</p>
                                     <p><table><tr><th>Account</th><th>Interchangeable</th><th>Optimizable</th><th>Removable</th></tr>'
                 foreach ($user in $results['User'].Keys | Sort-Object) {
                     Add-Output -Output "<tr> `
@@ -984,6 +990,9 @@ function Get-AzureADLicenseStatus {
                                     <li>Report theoretically exclusive licenses as <strong>interchangeable</strong>, based on specified SKUs</li>
                                     <li>Report practically inclusive licenses as <strong>optimizable</strong>, based on available SKU features</li>
                                     <li>Report actually inclusive licenses as <strong>removable</strong>, based on enabled SKU features</li></ul></p>'
+            }
+            else {
+                Add-Output -Output 'Nothing to report'
             }
             # Configure and send email
             $email = @{
