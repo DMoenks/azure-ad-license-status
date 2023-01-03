@@ -18,13 +18,19 @@ The main motivation for this script was to conquer side-effects of semi-automati
 
 #### 2.1.2 Advanced
 
-:heavy_check_mark: Check for license need based on Azure AD and Office feature information:
+Check for license need based on Azure AD and Office feature information:
 
-- Azure Active Directory Premium P1 based on group-based application assignments
-- Azure Active Directory Premium P1 based on dynamic group memberships
-- Azure Active Directory Premium P1 based on users enabled for Conditional Access
-- Azure Active Directory Premium P2 based on users enabled for Privileged Identity Management
-- Defender for Office 365 P1/P2 based on Exchange Online recipients
+:x: Azure Active Directory Premium P1 based on applications using application proxy
+
+:heavy_check_mark: Azure Active Directory Premium P1 based on applications using group-based assignment
+
+:heavy_check_mark: Azure Active Directory Premium P1 based on groups using dynamic membership
+
+:heavy_check_mark: Azure Active Directory Premium P1 based on users enabled for Conditional Access
+
+:heavy_check_mark: Azure Active Directory Premium P2 based on users enabled for Privileged Identity Management
+
+:heavy_check_mark: Defender for Office 365 P1/P2 based on protected Exchange Online recipients
 
 ### 2.2 User level
 
