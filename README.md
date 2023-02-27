@@ -1,5 +1,8 @@
 # azure-ad-license-status
 
+[![DevSkim](https://github.com/DMoenks/azure-ad-license-status/actions/workflows/devskim.yml/badge.svg)](https://github.com/DMoenks/azure-ad-license-status/actions/workflows/devskim.yml)
+[![PSScriptAnalyzer](https://github.com/DMoenks/azure-ad-license-status/actions/workflows/powershell.yml/badge.svg)](https://github.com/DMoenks/azure-ad-license-status/actions/workflows/powershell.yml)
+
 ## 1 Use case description
 
 The main motivation for this script was to conquer side-effects of semi-automatic license assignments for Microsoft services in Azure AD, i.e. the combination of group-based licensing with manual group membership management, by regularly reporting both on the amount of available licenses per SKU and any conflicting license assignments per user account. This allows for somewhat easier license management without either implementing a full-fledged software asset management solution or hiring a licensing service provider.

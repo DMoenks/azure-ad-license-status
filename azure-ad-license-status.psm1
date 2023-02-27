@@ -64,8 +64,7 @@ function Initialize-Variables {
     $script:EXOTypes_group = @('GroupMailbox',
                             'MailUniversalDistributionGroup',
                             'MailUniversalSecurityGroup')
-    $script:EXOTypes_user = @('MailUser',
-                            'SharedMailbox',
+    $script:EXOTypes_user = @('SharedMailbox',
                             'UserMailbox')
 }
 
