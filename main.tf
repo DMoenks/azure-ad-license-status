@@ -1,4 +1,4 @@
-# Connection variables
+#region: Connection variables
 variable "tenant_id" {
   type = string
   validation {
@@ -7,41 +7,63 @@ variable "tenant_id" {
   }
 }
 
-variable "client_id" {
+variable "azuread_client_id" {
   type = string
   validation {
-    condition     = length(regexall("^[[:alnum:]]{8}(?:-[[:alnum:]]{4}){3}-[[:alnum:]]{12}$", var.client_id)) > 0
+    condition     = length(regexall("^[[:alnum:]]{8}(?:-[[:alnum:]]{4}){3}-[[:alnum:]]{12}$", var.azuread_client_id)) > 0
     error_message = "'client_id' needs to be a GUID"
   }
 }
 
-variable "client_secret" {
+variable "azuread_client_secret" {
   type      = string
   sensitive = true
 }
 
-# Deployment variables
-variable "subscription_id" {
+variable "azurerm_client_id" {
   type = string
   validation {
-    condition     = length(regexall("^[[:alnum:]]{8}(?:-[[:alnum:]]{4}){3}-[[:alnum:]]{12}$", var.subscription_id)) > 0
+    condition     = length(regexall("^[[:alnum:]]{8}(?:-[[:alnum:]]{4}){3}-[[:alnum:]]{12}$", var.azurerm_client_id)) > 0
+    error_message = "'client_id' needs to be a GUID"
+  }
+}
+
+variable "azurerm_client_secret" {
+  type      = string
+  sensitive = true
+}
+#endregion
+
+#region: Deployment variables
+variable "automation_account_subscription_id" {
+  type = string
+  validation {
+    condition     = length(regexall("^[[:alnum:]]{8}(?:-[[:alnum:]]{4}){3}-[[:alnum:]]{12}$", var.automation_account_subscription_id)) > 0
     error_message = "'subscription_id' needs to be a GUID"
   }
 }
 
-variable "resource_group" {
+variable "automation_account_resource_group_name" {
   type = string
 }
 
-variable "automation_account" {
+variable "automation_account_name" {
   type = string
 }
 
-variable "key_vault" {
+variable "key_vault_subscription_id" {
+  type = string
+  validation {
+    condition     = length(regexall("^[[:alnum:]]{8}(?:-[[:alnum:]]{4}){3}-[[:alnum:]]{12}$", var.key_vault_subscription_id)) > 0
+    error_message = "'subscription_id' needs to be a GUID"
+  }
+}
+
+variable "key_vault_resource_group_name" {
   type = string
 }
 
-variable "region" {
+variable "key_vault_name" {
   type = string
 }
 
@@ -49,13 +71,9 @@ variable "solution_name" {
   type    = string
   default = "azure-ad-license-status"
 }
+#endregion
 
-variable "advanced" {
-  type    = bool
-  default = false
-}
-
-# Provider configuration
+#region: Provider configuration
 terraform {
   required_providers {
     azuread = {
@@ -69,37 +87,48 @@ terraform {
   }
 }
 
+provider "azuread" {
+  tenant_id     = var.tenant_id
+  client_id     = var.azuread_client_id
+  client_secret = var.azuread_client_secret
+}
+
 provider "azurerm" {
   features {}
-
+  alias           = "automation_account"
   tenant_id       = var.tenant_id
-  client_id       = var.client_id
-  client_secret   = var.client_secret
-  subscription_id = var.subscription_id
+  client_id       = var.azurerm_client_id
+  client_secret   = var.azurerm_client_secret
+  subscription_id = var.automation_account_subscription_id
 }
 
-# Resource configuration
-## azurerm
-resource "azurerm_resource_group" "resource_group" {
-  name     = var.resource_group
-  location = var.region
+provider "azurerm" {
+  features {}
+  alias           = "key_vault"
+  tenant_id       = var.tenant_id
+  client_id       = var.azurerm_client_id
+  client_secret   = var.azurerm_client_secret
+  subscription_id = var.key_vault_subscription_id
+}
+#endregion
+
+#region: 'azurerm' configuration
+data "azurerm_resource_group" "automation_account_resource_group" {
+  provider = azurerm.automation_account
+  name     = var.automation_account_resource_group_name
 }
 
-resource "azurerm_automation_account" "automation_account" {
-  name                = var.automation_account
-  location            = azurerm_resource_group.resource_group.location
-  resource_group_name = azurerm_resource_group.resource_group
-  sku_name            = "Basic"
-  identity {
-    type = "SystemAssigned"
-  }
+data "azurerm_automation_account" "automation_account" {
+  provider            = azurerm.automation_account
+  resource_group_name = var.automation_account_resource_group_name
+  name                = var.automation_account_name
 }
 
 resource "azurerm_automation_runbook" "automation_runbook" {
   name                    = "Get-AzureADLicenseStatus"
-  location                = azurerm_resource_group.resource_group.location
-  resource_group_name     = azurerm_resource_group.resource_group
-  automation_account_name = azurerm_automation_account.automation_account
+  location                = data.azurerm_resource_group.automation_account_resource_group.location
+  resource_group_name     = data.azurerm_automation_account.automation_account.resource_group_name
+  automation_account_name = data.azurerm_automation_account.automation_account.name
   runbook_type            = "PowerShell"
   log_progress            = true
   log_verbose             = true
@@ -108,18 +137,20 @@ resource "azurerm_automation_runbook" "automation_runbook" {
   }
 }
 
-resource "azurerm_key_vault" "key_vault" {
-  name                      = var.key_vault
-  location                  = azurerm_resource_group.resource_group.location
-  resource_group_name       = azurerm_resource_group.resource_group
-  sku_name                  = "standard"
-  tenant_id                 = var.tenant_id
-  enable_rbac_authorization = true
+data "azurerm_resource_group" "key_vault_resource_group" {
+  provider = azurerm.key_vault
+  name     = var.key_vault_resource_group_name
+}
+
+data "azurerm_key_vault" "key_vault" {
+  provider            = azurerm.key_vault
+  resource_group_name = data.azurerm_resource_group.key_vault_resource_group.name
+  name                = var.key_vault_name
 }
 
 resource "azurerm_key_vault_certificate" "key_vault_certificate" {
   name         = var.solution_name
-  key_vault_id = azurerm_key_vault.key_vault.id
+  key_vault_id = data.azurerm_key_vault.key_vault.id
   certificate_policy {
     issuer_parameters {
       name = "Self"
@@ -156,8 +187,9 @@ resource "azurerm_key_vault_certificate" "key_vault_certificate" {
     }
   }
 }
+#endregion
 
-## azuread
+#region: 'azuread' configuration
 resource "azuread_application" "application" {
   display_name = var.solution_name
   required_resource_access {
@@ -209,3 +241,4 @@ resource "azuread_directory_role_assignment" "directory_role_assignment" {
   role_id             = "f2ef992c-3afb-46b9-b7cf-a126ee74c451"
   principal_object_id = azuread_application.application.object_id
 }
+#endregion
