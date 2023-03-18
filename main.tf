@@ -1,6 +1,7 @@
 #region: Connection variables
 variable "tenant_id" {
-  type = string
+  description = "Specifies the target tenant"
+  type        = string
   validation {
     condition     = length(regexall("^[[:alnum:]]{8}(?:-[[:alnum:]]{4}){3}-[[:alnum:]]{12}$", var.tenant_id)) > 0
     error_message = "'tenant_id' needs to be a GUID"
@@ -8,7 +9,8 @@ variable "tenant_id" {
 }
 
 variable "azuread_client_id" {
-  type = string
+  description = "Specifies the application ID for the 'azuread' provider"
+  type        = string
   validation {
     condition     = length(regexall("^[[:alnum:]]{8}(?:-[[:alnum:]]{4}){3}-[[:alnum:]]{12}$", var.azuread_client_id)) > 0
     error_message = "'client_id' needs to be a GUID"
@@ -16,12 +18,14 @@ variable "azuread_client_id" {
 }
 
 variable "azuread_client_secret" {
-  type      = string
-  sensitive = true
+  description = "Specifies the application secret for the 'azuread' provider"
+  type        = string
+  sensitive   = true
 }
 
 variable "azurerm_client_id" {
-  type = string
+  description = "Specifies the application ID for the 'azurerm' provider"
+  type        = string
   validation {
     condition     = length(regexall("^[[:alnum:]]{8}(?:-[[:alnum:]]{4}){3}-[[:alnum:]]{12}$", var.azurerm_client_id)) > 0
     error_message = "'client_id' needs to be a GUID"
@@ -29,14 +33,16 @@ variable "azurerm_client_id" {
 }
 
 variable "azurerm_client_secret" {
-  type      = string
-  sensitive = true
+  description = "Specifies the application secret for the 'azurerm' provider"
+  type        = string
+  sensitive   = true
 }
 #endregion
 
 #region: Deployment variables
 variable "automation_account_subscription_id" {
-  type = string
+  description = "Specifies the subscription for the target automation account"
+  type        = string
   validation {
     condition     = length(regexall("^[[:alnum:]]{8}(?:-[[:alnum:]]{4}){3}-[[:alnum:]]{12}$", var.automation_account_subscription_id)) > 0
     error_message = "'subscription_id' needs to be a GUID"
@@ -44,15 +50,18 @@ variable "automation_account_subscription_id" {
 }
 
 variable "automation_account_resource_group_name" {
-  type = string
+  description = "Specifies the resource group for the target automation account"
+  type        = string
 }
 
 variable "automation_account_name" {
-  type = string
+  description = "Specifies the target automation account"
+  type        = string
 }
 
 variable "key_vault_subscription_id" {
-  type = string
+  description = "Specifies the subscription for the target key vault"
+  type        = string
   validation {
     condition     = length(regexall("^[[:alnum:]]{8}(?:-[[:alnum:]]{4}){3}-[[:alnum:]]{12}$", var.key_vault_subscription_id)) > 0
     error_message = "'subscription_id' needs to be a GUID"
@@ -60,16 +69,19 @@ variable "key_vault_subscription_id" {
 }
 
 variable "key_vault_resource_group_name" {
-  type = string
+  description = "Specifies the resource group for the target key vault"
+  type        = string
 }
 
 variable "key_vault_name" {
-  type = string
+  description = "Specifies the target key vault"
+  type        = string
 }
 
 variable "solution_name" {
-  type    = string
-  default = "azure-ad-license-status"
+  description = "Specifies the name used for the Azure AD application and Key Vault certificate to be created"
+  type        = string
+  default     = "azure-ad-license-status"
 }
 #endregion
 
@@ -94,21 +106,21 @@ provider "azuread" {
 }
 
 provider "azurerm" {
-  features {}
   alias           = "automation_account"
   tenant_id       = var.tenant_id
   client_id       = var.azurerm_client_id
   client_secret   = var.azurerm_client_secret
   subscription_id = var.automation_account_subscription_id
+  features {}
 }
 
 provider "azurerm" {
-  features {}
   alias           = "key_vault"
   tenant_id       = var.tenant_id
   client_id       = var.azurerm_client_id
   client_secret   = var.azurerm_client_secret
   subscription_id = var.key_vault_subscription_id
+  features {}
 }
 #endregion
 
@@ -124,7 +136,8 @@ data "azurerm_automation_account" "automation_account" {
   name                = var.automation_account_name
 }
 
-resource "azurerm_automation_runbook" "automation_runbook" {
+resource "azurerm_automation_runbook" "automation_runbook_script" {
+  provider                = azurerm.automation_account
   name                    = "Get-AzureADLicenseStatus"
   location                = data.azurerm_resource_group.automation_account_resource_group.location
   resource_group_name     = data.azurerm_automation_account.automation_account.resource_group_name
@@ -135,6 +148,18 @@ resource "azurerm_automation_runbook" "automation_runbook" {
   publish_content_link {
     uri = "https://raw.githubusercontent.com/DMoenks/azure-ad-license-status/main/azure-ad-license-status.psm1"
   }
+}
+
+resource "azurerm_automation_runbook" "automation_runbook_script_runner" {
+  provider                = azurerm.automation_account
+  name                    = "Run-AzureADLicenseStatus"
+  location                = data.azurerm_resource_group.automation_account_resource_group.location
+  resource_group_name     = data.azurerm_automation_account.automation_account.resource_group_name
+  automation_account_name = data.azurerm_automation_account.automation_account.name
+  runbook_type            = "PowerShell"
+  log_progress            = true
+  log_verbose             = true
+  content                 = "Get-AzureADLicenseStatus -DirectoryID '${var.tenant_id}' -ApplicationID '${azuread_application.application.id}' -SubscriptionID '${var.key_vault_subscription_id}' -KeyVaultName '${var.key_vault_name}' -CertificateName '${azurerm_key_vault_certificate.key_vault_certificate.name}' -SenderAddress 'sender@example.com' -RecipientAddresses_normal @('recipient@example.com') -AdvancedCheckups"
 }
 
 data "azurerm_resource_group" "key_vault_resource_group" {
@@ -149,6 +174,7 @@ data "azurerm_key_vault" "key_vault" {
 }
 
 resource "azurerm_key_vault_certificate" "key_vault_certificate" {
+  provider     = azurerm.key_vault
   name         = var.solution_name
   key_vault_id = data.azurerm_key_vault.key_vault.id
   certificate_policy {
