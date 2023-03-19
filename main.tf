@@ -203,16 +203,21 @@ data "azurerm_resource_group" "key_vault_resource_group" {
   name     = var.key_vault_resource_group_name
 }
 
-data "azurerm_key_vault" "key_vault" {
-  provider            = azurerm.key_vault
-  resource_group_name = data.azurerm_resource_group.key_vault_resource_group.name
-  name                = var.key_vault_name
+resource "azurerm_key_vault" "key_vault" {
+  provider                  = azurerm.key_vault
+  resource_group_name       = data.azurerm_resource_group.key_vault_resource_group.name
+  name                      = var.solution_name
+  location                  = data.azurerm_resource_group.key_vault_resource_group.location
+  sku_name                  = "standard"
+  tenant_id                 = var.tenant_id
+  enable_rbac_authorization = true
+  access_policy             = []
 }
 
 resource "azurerm_key_vault_certificate" "key_vault_certificate" {
   provider     = azurerm.key_vault
   name         = var.solution_name
-  key_vault_id = data.azurerm_key_vault.key_vault.id
+  key_vault_id = azurerm_key_vault.key_vault.id
   certificate_policy {
     issuer_parameters {
       name = "Self"
@@ -248,6 +253,14 @@ resource "azurerm_key_vault_certificate" "key_vault_certificate" {
       validity_in_months = 12
     }
   }
+}
+
+resource "azurerm_role_assignment" "role_assignment" {
+  provider = azurerm.key_vault
+  scope = azurerm_key_vault.key_vault.id
+  role_definition_id = "4633458b-17de-408a-b874-0445c86b69e6"
+  principal_id = data.azurerm_automation_account.automation_account.id
+  skip_service_principal_aad_check = true
 }
 #endregion
 
