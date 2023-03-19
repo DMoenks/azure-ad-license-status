@@ -13,7 +13,7 @@ variable "azuread_client_id" {
   type        = string
   validation {
     condition     = length(regexall("^[[:alnum:]]{8}(?:-[[:alnum:]]{4}){3}-[[:alnum:]]{12}$", var.azuread_client_id)) > 0
-    error_message = "'client_id' needs to be a GUID"
+    error_message = "'azuread_client_id' needs to be a GUID"
   }
 }
 
@@ -28,7 +28,7 @@ variable "azurerm_client_id" {
   type        = string
   validation {
     condition     = length(regexall("^[[:alnum:]]{8}(?:-[[:alnum:]]{4}){3}-[[:alnum:]]{12}$", var.azurerm_client_id)) > 0
-    error_message = "'client_id' needs to be a GUID"
+    error_message = "'azurerm_client_id' needs to be a GUID"
   }
 }
 
@@ -45,7 +45,7 @@ variable "automation_account_subscription_id" {
   type        = string
   validation {
     condition     = length(regexall("^[[:alnum:]]{8}(?:-[[:alnum:]]{4}){3}-[[:alnum:]]{12}$", var.automation_account_subscription_id)) > 0
-    error_message = "'subscription_id' needs to be a GUID"
+    error_message = "'automation_account_subscription_id' needs to be a GUID"
   }
 }
 
@@ -64,7 +64,7 @@ variable "key_vault_subscription_id" {
   type        = string
   validation {
     condition     = length(regexall("^[[:alnum:]]{8}(?:-[[:alnum:]]{4}){3}-[[:alnum:]]{12}$", var.key_vault_subscription_id)) > 0
-    error_message = "'subscription_id' needs to be a GUID"
+    error_message = "'key_vault_subscription_id' needs to be a GUID"
   }
 }
 
@@ -79,7 +79,7 @@ variable "key_vault_name" {
 }
 
 variable "solution_name" {
-  description = "Specifies the name used for the Azure AD application and Key Vault certificate to be created"
+  description = "Specifies the name used for the application and certificate to be created"
   type        = string
   default     = "azure-ad-license-status"
 }
@@ -134,6 +134,42 @@ data "azurerm_automation_account" "automation_account" {
   provider            = azurerm.automation_account
   resource_group_name = var.automation_account_resource_group_name
   name                = var.automation_account_name
+}
+
+resource "azurerm_automation_module" "automation_module_az_accounts" {
+  name                    = "Az.Accounts"
+  resource_group_name     = data.azurerm_resource_group.automation_account_resource_group.name
+  automation_account_name = data.azurerm_automation_account.automation_account.name
+  module_link {
+    uri = "https://www.powershellgallery.com/api/v2/package/Az.Accounts/2.12.1"
+  }
+}
+
+resource "azurerm_automation_module" "automation_module_az_keyvault" {
+  name                    = "Az.KeyVault"
+  resource_group_name     = data.azurerm_resource_group.automation_account_resource_group.name
+  automation_account_name = data.azurerm_automation_account.automation_account.name
+  module_link {
+    uri = "https://www.powershellgallery.com/api/v2/package/Az.KeyVault/4.9.2"
+  }
+}
+
+resource "azurerm_automation_module" "automation_module_exchangeonlinemanagement" {
+  name                    = "ExchangeOnlineManagement"
+  resource_group_name     = data.azurerm_resource_group.automation_account_resource_group.name
+  automation_account_name = data.azurerm_automation_account.automation_account.name
+  module_link {
+    uri = "https://www.powershellgallery.com/api/v2/package/ExchangeOnlineManagement/3.1.0"
+  }
+}
+
+resource "azurerm_automation_module" "automation_module_microsoft_graph_authentication" {
+  name                    = "Microsoft.Graph.Authentication"
+  resource_group_name     = data.azurerm_resource_group.automation_account_resource_group.name
+  automation_account_name = data.azurerm_automation_account.automation_account.name
+  module_link {
+    uri = "https://www.powershellgallery.com/api/v2/package/Microsoft.Graph.Authentication/1.23.0"
+  }
 }
 
 resource "azurerm_automation_runbook" "automation_runbook_script" {
