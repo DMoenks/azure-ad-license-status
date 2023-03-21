@@ -108,18 +108,18 @@ provider "azuread" {
 provider "azurerm" {
   alias           = "automation_account"
   tenant_id       = var.tenant_id
+  subscription_id = var.automation_account_subscription_id
   client_id       = var.azurerm_client_id
   client_secret   = var.azurerm_client_secret
-  subscription_id = var.automation_account_subscription_id
   features {}
 }
 
 provider "azurerm" {
   alias           = "key_vault"
   tenant_id       = var.tenant_id
+  subscription_id = var.key_vault_subscription_id
   client_id       = var.azurerm_client_id
   client_secret   = var.azurerm_client_secret
-  subscription_id = var.key_vault_subscription_id
   features {}
 }
 #endregion
