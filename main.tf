@@ -41,7 +41,7 @@ variable "azurerm_client_secret" {
 
 #region: Deployment variables
 variable "automation_account_subscription_id" {
-  description = "Specifies the subscription for the target automation account"
+  description = "Specifies the target subscription for the automation account"
   type        = string
   validation {
     condition     = length(regexall("^[[:alnum:]]{8}(?:-[[:alnum:]]{4}){3}-[[:alnum:]]{12}$", var.automation_account_subscription_id)) > 0
@@ -50,17 +50,12 @@ variable "automation_account_subscription_id" {
 }
 
 variable "automation_account_resource_group_name" {
-  description = "Specifies the resource group for the target automation account"
-  type        = string
-}
-
-variable "automation_account_name" {
-  description = "Specifies the target automation account"
+  description = "Specifies the target resource group for the automation account"
   type        = string
 }
 
 variable "key_vault_subscription_id" {
-  description = "Specifies the subscription for the target key vault"
+  description = "Specifies the target subscription for the key vault"
   type        = string
   validation {
     condition     = length(regexall("^[[:alnum:]]{8}(?:-[[:alnum:]]{4}){3}-[[:alnum:]]{12}$", var.key_vault_subscription_id)) > 0
@@ -69,17 +64,12 @@ variable "key_vault_subscription_id" {
 }
 
 variable "key_vault_resource_group_name" {
-  description = "Specifies the resource group for the target key vault"
-  type        = string
-}
-
-variable "key_vault_name" {
-  description = "Specifies the target key vault"
+  description = "Specifies the target resource group for the key vault"
   type        = string
 }
 
 variable "solution_name" {
-  description = "Specifies the name used for the application and certificate to be created"
+  description = "Specifies the name used for the Azure AD application, the automation account and both the keyvault and the certificate"
   type        = string
   default     = "azure-ad-license-status"
 }
@@ -128,34 +118,34 @@ provider "azurerm" {
 resource "azuread_application" "application" {
   display_name = var.solution_name
   required_resource_access {
-    # Microsoft Graph
+    # Provider: Microsoft Graph
     resource_app_id = "00000003-0000-0000-c000-000000000000"
     resource_access {
-      # AuditLog.Read.All
+      # Permission: AuditLog.Read.All
       id   = "246dd0d5-5bd0-4def-940b-0421030a5b68"
       type = "Role"
     }
     resource_access {
-      # Mail.Send
+      # Permission: Mail.Send
       id   = "b0afded3-3588-46d8-8b3d-9842eff778da"
       type = "Role"
     }
     resource_access {
-      # Policy.Read.All
+      # Permission: Policy.Read.All
       id   = "b633e1c5-b582-4048-a93e-9f11b44c7e96"
       type = "Role"
     }
     resource_access {
-      # RoleManagement.Read.All
+      # Permission: RoleManagement.Read.All
       id   = "c7fbd983-d9aa-4fa7-84b8-17382c103bc4"
       type = "Role"
     }
   }
   required_resource_access {
-    # Office 365 Exchange Online
+    # Provider: Office 365 Exchange Online
     resource_app_id = "00000002-0000-0ff1-ce00-000000000000"
     resource_access {
-      # Exchange.ManageAsApp
+      # Permission: Exchange.ManageAsApp
       id   = "dc50a0fb-09a3-484d-be87-e023b12c6440"
       type = "Role"
     }
@@ -172,9 +162,9 @@ resource "azuread_application_certificate" "application_certificate" {
 }
 
 resource "azuread_directory_role_assignment" "directory_role_assignment" {
-  # Global Reader
-  role_id             = "f2ef992c-3afb-46b9-b7cf-a126ee74c451"
+  # Role: Global Reader
   principal_object_id = azuread_application.application.object_id
+  role_id             = "f2ef992c-3afb-46b9-b7cf-a126ee74c451"
 }
 #endregion
 
@@ -184,16 +174,21 @@ data "azurerm_resource_group" "automation_account_resource_group" {
   name     = var.automation_account_resource_group_name
 }
 
-data "azurerm_automation_account" "automation_account" {
+resource "azurerm_automation_account" "automation_account" {
   provider            = azurerm.automation_account
-  resource_group_name = var.automation_account_resource_group_name
-  name                = var.automation_account_name
+  resource_group_name = data.azurerm_resource_group.automation_account_resource_group.name
+  name                = var.solution_name
+  location            = data.azurerm_resource_group.automation_account_resource_group.location
+  sku_name            = "Basic"
+  identity {
+    type = "SystemAssigned"
+  }
 }
 
 resource "azurerm_automation_module" "automation_module_az_accounts" {
   provider                = azurerm.automation_account
   resource_group_name     = data.azurerm_resource_group.automation_account_resource_group.name
-  automation_account_name = data.azurerm_automation_account.automation_account.name
+  automation_account_name = azurerm_automation_account.automation_account.name
   name                    = "Az.Accounts"
   module_link {
     uri = "https://www.powershellgallery.com/api/v2/package/Az.Accounts/2.12.1"
@@ -203,7 +198,7 @@ resource "azurerm_automation_module" "automation_module_az_accounts" {
 resource "azurerm_automation_module" "automation_module_az_keyvault" {
   provider                = azurerm.automation_account
   resource_group_name     = data.azurerm_resource_group.automation_account_resource_group.name
-  automation_account_name = data.azurerm_automation_account.automation_account.name
+  automation_account_name = azurerm_automation_account.automation_account.name
   name                    = "Az.KeyVault"
   module_link {
     uri = "https://www.powershellgallery.com/api/v2/package/Az.KeyVault/4.9.2"
@@ -213,7 +208,7 @@ resource "azurerm_automation_module" "automation_module_az_keyvault" {
 resource "azurerm_automation_module" "automation_module_exchangeonlinemanagement" {
   provider                = azurerm.automation_account
   resource_group_name     = data.azurerm_resource_group.automation_account_resource_group.name
-  automation_account_name = data.azurerm_automation_account.automation_account.name
+  automation_account_name = azurerm_automation_account.automation_account.name
   name                    = "ExchangeOnlineManagement"
   module_link {
     uri = "https://www.powershellgallery.com/api/v2/package/ExchangeOnlineManagement/3.1.0"
@@ -223,7 +218,7 @@ resource "azurerm_automation_module" "automation_module_exchangeonlinemanagement
 resource "azurerm_automation_module" "automation_module_microsoft_graph_authentication" {
   provider                = azurerm.automation_account
   resource_group_name     = data.azurerm_resource_group.automation_account_resource_group.name
-  automation_account_name = data.azurerm_automation_account.automation_account.name
+  automation_account_name = azurerm_automation_account.automation_account.name
   name                    = "Microsoft.Graph.Authentication"
   module_link {
     uri = "https://www.powershellgallery.com/api/v2/package/Microsoft.Graph.Authentication/1.23.0"
@@ -232,8 +227,8 @@ resource "azurerm_automation_module" "automation_module_microsoft_graph_authenti
 
 resource "azurerm_automation_runbook" "automation_runbook_script" {
   provider                = azurerm.automation_account
-  resource_group_name     = data.azurerm_automation_account.automation_account.resource_group_name
-  automation_account_name = data.azurerm_automation_account.automation_account.name
+  resource_group_name     = data.azurerm_resource_group.automation_account_resource_group.name
+  automation_account_name = azurerm_automation_account.automation_account.name
   name                    = "Get-AzureADLicenseStatus"
   location                = data.azurerm_resource_group.automation_account_resource_group.location
   runbook_type            = "PowerShell"
@@ -246,14 +241,14 @@ resource "azurerm_automation_runbook" "automation_runbook_script" {
 
 resource "azurerm_automation_runbook" "automation_runbook_script_runner" {
   provider                = azurerm.automation_account
-  resource_group_name     = data.azurerm_automation_account.automation_account.resource_group_name
-  automation_account_name = data.azurerm_automation_account.automation_account.name
+  resource_group_name     = data.azurerm_resource_group.automation_account_resource_group.name
+  automation_account_name = azurerm_automation_account.automation_account.name
   name                    = "Run-AzureADLicenseStatus"
   location                = data.azurerm_resource_group.automation_account_resource_group.location
   runbook_type            = "PowerShell"
   log_progress            = true
   log_verbose             = true
-  content                 = "Get-AzureADLicenseStatus -DirectoryID '${var.tenant_id}' -ApplicationID '${azuread_application.application.id}' -SubscriptionID '${var.key_vault_subscription_id}' -KeyVaultName '${var.key_vault_name}' -CertificateName '${azurerm_key_vault_certificate.key_vault_certificate.name}' -SenderAddress 'sender@example.com' -RecipientAddresses_normal @('recipient@example.com') -AdvancedCheckups"
+  content                 = "Get-AzureADLicenseStatus -DirectoryID '${var.tenant_id}' -ApplicationID '${azuread_application.application.id}' -SubscriptionID '${var.key_vault_subscription_id}' -KeyVaultName '${var.solution_name}' -CertificateName '${azurerm_key_vault_certificate.key_vault_certificate.name}' -SenderAddress 'sender@example.com' -RecipientAddresses_normal @('recipient@example.com') -AdvancedCheckups"
 }
 
 data "azurerm_resource_group" "key_vault_resource_group" {
@@ -301,10 +296,11 @@ resource "azurerm_key_vault_certificate" "key_vault_certificate" {
 }
 
 resource "azurerm_role_assignment" "role_assignment" {
-  provider                         = azurerm.key_vault
-  scope                            = azurerm_key_vault.key_vault.id
+  # Role: Key Vault Secrets User
+  provider = azurerm.key_vault
+  scope    = azurerm_key_vault.key_vault.id
+  principal_id                     = azurerm_automation_account.automation_account.id
   role_definition_id               = "4633458b-17de-408a-b874-0445c86b69e6"
-  principal_id                     = data.azurerm_automation_account.automation_account.id
   skip_service_principal_aad_check = true
 }
 #endregion
