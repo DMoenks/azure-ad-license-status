@@ -297,8 +297,8 @@ resource "azurerm_key_vault_certificate" "key_vault_certificate" {
 
 resource "azurerm_role_assignment" "role_assignment" {
   # Role: Key Vault Secrets User
-  provider = azurerm.key_vault
-  scope    = azurerm_key_vault.key_vault.id
+  provider                         = azurerm.key_vault
+  scope                            = azurerm_key_vault.key_vault.id
   principal_id                     = azurerm_automation_account.automation_account.id
   role_definition_id               = "4633458b-17de-408a-b874-0445c86b69e6"
   skip_service_principal_aad_check = true

@@ -656,8 +656,6 @@ function Get-AzureADLicenseStatus {
                 $URI = $data['@odata.nextLink']
             }
             Write-VerboseMessage "Found $($groups.Count) groups"
-            # Azure AD P1 based on external identities, if not linked to a subscription
-            # https://learn.microsoft.com/en-us/azure/active-directory/external-identities/external-identities-pricing
             # Azure AD P1 based on dynamic groups
             if ($null -ne ($dynamicGroups = $groups | Where-Object{$_.groupTypes -contains 'DynamicMembership'})) {
                 $AADP1Users.AddRange((Get-AADGroupMembers -GroupIDs $dynamicGroups.id))
