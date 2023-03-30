@@ -3,7 +3,7 @@
     RootModule = 'azure-ad-license-status.psm1'
     
     # Version number of this module.
-    ModuleVersion = '1.2.4'
+    ModuleVersion = '1.2.5'
     
     # Supported PSEditions
     # CompatiblePSEditions = @()
