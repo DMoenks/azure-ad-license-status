@@ -78,6 +78,7 @@ Check for license need based on Azure AD and Office feature information:
 
 #### 3.2.2 Advanced
 
+- Microsoft Graph permission _AuditLog.Read.All_
 - Microsoft Graph permission _Policy.Read.All_
 - Microsoft Graph permission _RoleManagement.Read.All_
 - Office 365 Exchange Online permission _Exchange.ManageAsApp_
