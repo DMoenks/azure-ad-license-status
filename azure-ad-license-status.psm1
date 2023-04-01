@@ -672,39 +672,37 @@ function Get-AzureADLicenseStatus {
             if ($null -ne ($applicationGroups = ($applications | Where-Object{$_.accountEnabled -eq $true -and $_.appRoleAssignmentRequired -eq $true -and $_.servicePrincipalType -eq 'Application'}).appRoleAssignedTo | Where-Object{$_.principalType -eq 'Group'})) {
                 $AADP1Users.AddRange((Get-AADGroupMembers -GroupIDs $applicationGroups.principalId))
             }
-            # Azure AD P1 based on users in scope of Conditional Access
+            # Azure AD P1/P2 based on users handled by Conditional Access
             $conditionalAccessPolicies = [System.Collections.Generic.List[hashtable]]::new()
-            $URI = 'https://graph.microsoft.com/v1.0/identity/conditionalAccess/policies?$select=conditions,state'
+            $URI = 'https://graph.microsoft.com/v1.0/identity/conditionalAccess/policies?$select=id,conditions,state'
             while ($null -ne $URI) {
                 $data = Invoke-MgGraphRequest -Method GET -Uri $URI
                 $conditionalAccessPolicies.AddRange([hashtable[]]($data.value))
                 $URI = $data['@odata.nextLink']
             }
-            Write-VerboseMessage "Found $($conditionalAccessPolicies.Count) conditional access policies"
-            foreach ($conditionalAccessPolicy in $conditionalAccessPolicies | Where-Object{$_.state -eq 'enabled'}) {
-                if ($conditionalAccessPolicy.conditions.users.includeUsers -eq 'All') {
-                    $includeUsers = $users.id
+            $conditionalAccessSignIns = [System.Collections.Generic.List[hashtable]]::new()
+            $URI = 'https://graph.microsoft.com/v1.0/auditLogs/signIns?$filter=conditionalAccessStatus eq ''success'' or conditionalAccessStatus eq ''failure'''
+            while ($null -ne $URI) {
+                $data = Invoke-MgGraphRequest -Method GET -Uri $URI
+                $conditionalAccessSignIns.AddRange([hashtable[]]($data.value))
+                $URI = $data['@odata.nextLink']
+            }
+            if ($conditionalAccessPolicies.Count -gt 0 -and $conditionalAccessSignIns.Count -gt 0) {
+                if ($null -ne ($CAAADP1Policies = $conditionalAccessPolicies | Where-Object{$_.state -eq 'enabled' -and $_.conditions.userRiskLevels.Count -eq 0 -and $_.conditions.signInRiskLevels.Count -eq 0})) {
+                    Write-VerboseMessage "Found $(@($CAAADP1Policies).Count) basic conditional access policies"
+                    if ($null -ne ($CAAADP1SignIns = $conditionalAccessSignIns | Where-Object{($_.appliedConditionalAccessPolicies | Where-Object{$_.result -in @('success','failure')}).id -in $CAAADP1Policies.id})) {
+                        $CAAADP1Users = $CAAADP1SignIns.userId | Select-Object -Unique
+                        Write-VerboseMessage "Found $(@($CAAADP1Users).Count) users with basic conditional access sign-ins"
+                        $AADP1Users.AddRange([guid[]]@($CAAADP1Users))
+                    }
                 }
-                elseif ($null -ne $conditionalAccessPolicy.conditions.users.includeUsers | Where-Object{$_ -ne 'GuestsOrExternalUsers'}) {
-                    $includeUsers = @($conditionalAccessPolicy.conditions.users.includeUsers | Where-Object{$_ -ne 'GuestsOrExternalUsers'})
-                }
-                else {
-                    $includeUsers = @()
-                }
-                if ($null -ne ($conditionalAccessUsers = Compare-Object -ReferenceObject $includeUsers -DifferenceObject $conditionalAccessPolicy.conditions.users.excludeUsers | Where-Object{$_.SideIndicator -eq '<='})) {
-                    $AADP1Users.AddRange([guid[]]@($conditionalAccessUsers.InputObject))
-                }
-                if ($conditionalAccessPolicy.conditions.users.includeGroups -eq 'All') {
-                    $includeGroups = $groups.id
-                }
-                elseif ($null -ne $conditionalAccessPolicy.conditions.users.includeGroups) {
-                    $includeGroups = @($conditionalAccessPolicy.conditions.users.includeGroups)
-                }
-                else {
-                    $includeGroups = @()
-                }
-                if ($null -ne ($conditionalAccessGroups = Compare-Object -ReferenceObject $includeGroups -DifferenceObject $conditionalAccessPolicy.conditions.users.excludeGroups | Where-Object{$_.SideIndicator -eq '<='})) {
-                    $AADP1Users.AddRange((Get-AADGroupMembers -GroupIDs $conditionalAccessGroups.InputObject))
+                if ($null -ne ($CAAADP2Policies = $conditionalAccessPolicies | Where-Object{$_.state -eq 'enabled' -and ($_.conditions.userRiskLevels.Count -gt 0 -or $_.conditions.signInRiskLevels.Count -gt 0)})) {
+                    Write-VerboseMessage "Found $(@($CAAADP2Policies).Count) risk-based conditional access policies"
+                    if ($null -ne ($CAAADP2SignIns = $conditionalAccessSignIns | Where-Object{($_.appliedConditionalAccessPolicies | Where-Object{$_.result -in @('success','failure')}).id -in $CAAADP2Policies.id})) {
+                        $CAAADP2Users = $CAAADP2SignIns.userId | Select-Object -Unique
+                        Write-VerboseMessage "Found $(@($CAAADP2Users).Count) users with risk-based conditional access sign-ins"
+                        $AADP2Users.AddRange([guid[]]@($CAAADP2Users))
+                    }
                 }
             }
             # Azure AD P2 based on users in scope of Privileged Identity Management
