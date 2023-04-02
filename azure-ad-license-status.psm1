@@ -672,7 +672,7 @@ function Get-AzureADLicenseStatus {
             if ($null -ne ($applicationGroups = ($applications | Where-Object{$_.accountEnabled -eq $true -and $_.appRoleAssignmentRequired -eq $true -and $_.servicePrincipalType -eq 'Application'}).appRoleAssignedTo | Where-Object{$_.principalType -eq 'Group'})) {
                 $AADP1Users.AddRange((Get-AADGroupMembers -GroupIDs $applicationGroups.principalId))
             }
-            # Azure AD P1/P2 based on users handled by Conditional Access
+            # Azure AD P1/P2 based on users covered by Conditional Access
             $conditionalAccessPolicies = [System.Collections.Generic.List[hashtable]]::new()
             $URI = 'https://graph.microsoft.com/v1.0/identity/conditionalAccess/policies?$select=id,conditions,state'
             while ($null -ne $URI) {
@@ -719,7 +719,7 @@ function Get-AzureADLicenseStatus {
                     $AADP2Users.AddRange([guid[]]@($actuallyEligibleRoleMembers.principalId))
                 }
             }
-            # Defender for Office 365 P1/P2 based on https://learn.microsoft.com/en-us/office365/servicedescriptions/office-365-advanced-threat-protection-service-description#licensing-terms
+            # Defender for Office 365 P1/P2 based on https://learn.microsoft.com/office365/servicedescriptions/office-365-advanced-threat-protection-service-description#licensing-terms
             $orgDomain = (Invoke-MgGraphRequest -Method GET -Uri 'https://graph.microsoft.com/v1.0/organization?$select=verifiedDomains').value.verifiedDomains | Where-Object{$_.isInitial -eq $true}
             try {
                 switch ($PSCmdlet.ParameterSetName) {

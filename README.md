@@ -31,9 +31,9 @@ Check for license need based on Azure AD and Office feature information:
 
 :heavy_check_mark: Azure Active Directory Premium P1 based on groups using dynamic membership
 
-:heavy_check_mark: Azure Active Directory Premium P1 based on users enabled for Conditional Access
+:heavy_check_mark: Azure Active Directory Premium P1/P2 based on users covered by Conditional Access
 
-:heavy_check_mark: Azure Active Directory Premium P2 based on users enabled for Privileged Identity Management
+:heavy_check_mark: Azure Active Directory Premium P2 based on users eligible for Privileged Identity Management
 
 :heavy_check_mark: Defender for Office 365 P1/P2 based on protected Exchange Online recipients
 
