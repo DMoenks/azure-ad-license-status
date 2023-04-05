@@ -681,7 +681,7 @@ function Get-AzureADLicenseStatus {
                 $URI = $data['@odata.nextLink']
             }
             $conditionalAccessSignIns = [System.Collections.Generic.List[hashtable]]::new()
-            $URI = 'https://graph.microsoft.com/v1.0/auditLogs/signIns?$filter=conditionalAccessStatus eq ''success'' or conditionalAccessStatus eq ''failure'''
+            $URI = 'https://graph.microsoft.com/v1.0/auditLogs/signIns?$filter=conditionalAccessStatus eq ''success'' or conditionalAccessStatus eq ''failure''&$top=999'
             while ($null -ne $URI) {
                 $data = Invoke-MgGraphRequest -Method GET -Uri $URI
                 $conditionalAccessSignIns.AddRange([hashtable[]]($data.value))
