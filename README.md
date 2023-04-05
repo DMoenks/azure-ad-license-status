@@ -9,6 +9,8 @@ The main motivation for this script was to conquer side-effects of semi-automati
 
 > DISCLAIMER: The script can merely aid in complying with license terms and agreements. It cannot and never will lower or replace the liability to actually comply with any default or individually negotiated license terms and agreements applying to your organization.
 
+> HINT: Most of the requirements and preparations mentioned below can be deployed by using the provided Terraform module, the exception being an Exchange Online application access policy.
+
 ## 2 Feature overview
 
 ### 2.1 Organization level
