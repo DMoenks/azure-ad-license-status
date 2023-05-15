@@ -41,7 +41,6 @@ function Initialize-Variables {
     # Process
     $script:nestingLevel = 1
     # General
-    $script:groups = [System.Collections.Generic.List[hashtable]]::new()
     $script:outputs = [System.Text.StringBuilder]::new()
     $script:results = @{}
     $script:skuTranslate = [string]::new([char[]]((Invoke-WebRequest -Uri 'https://download.microsoft.com/download/e/3/e/e3e9faf2-f28b-490a-9ada-c6089a1fc5b0/Product%20names%20and%20service%20plan%20identifiers%20for%20licensing.csv' -UseBasicParsing).Content)) | ConvertFrom-Csv
@@ -648,19 +647,20 @@ function Get-AzureADLicenseStatus {
             $AADP1Users = [System.Collections.Generic.List[guid]]::new()
             $AADP2Users = [System.Collections.Generic.List[guid]]::new()
             $ATPUsers = [System.Collections.Generic.List[guid]]::new()
-            # Retrieve basic group information
-            $URI = 'https://graph.microsoft.com/v1.0/groups?$select=id,groupTypes&$top=999'
+            # Azure AD P1 based on dynamic groups
+            $dynamicGroups = [System.Collections.Generic.List[hashtable]]::new()
+            $URI = 'https://graph.microsoft.com/v1.0/groups?$filter=groupTypes/any(x:x eq ''DynamicMembership'')&$select=id,membershipRule&$top=999'
             while ($null -ne $URI) {
                 $data = Invoke-MgGraphRequest -Method GET -Uri $URI
-                $groups.AddRange([hashtable[]]($data.value))
+                $dynamicGroups.AddRange([hashtable[]]($data.value))
                 $URI = $data['@odata.nextLink']
             }
-            Write-VerboseMessage "Found $($groups.Count) groups"
-            # Azure AD P1 based on dynamic groups
-            if ($null -ne ($dynamicGroups = $groups | Where-Object{$_.groupTypes -contains 'DynamicMembership'})) {
-                $AADP1Users.AddRange((Get-AADGroupMembers -GroupIDs $dynamicGroups.id))
+            if ($null -ne ($dynamicUserGroups = $dynamicGroups | Where-Object{$_.membershipRule -like '*user.*'})) {
+                Write-VerboseMessage "Found $($dynamicUserGroups.Count) dynamic user groups"
+                $AADP1Users.AddRange((Get-AADGroupMembers -GroupIDs $dynamicUserGroups.id))
             }
             # Azure AD P1 based on group-based application assignments
+            # Invoke-MgGraphRequest -Method GET -Uri 'https://graph.microsoft.com/v1.0/servicePrincipals?$filter=accountEnabled eq true and appRoleAssignmentRequired eq true and servicePrincipalType eq ''Application''&$count=true' -Headers @{'ConsistencyLevel'='eventual'}
             $applications = [System.Collections.Generic.List[hashtable]]::new()
             $URI = 'https://graph.microsoft.com/v1.0/servicePrincipals?$expand=appRoleAssignedTo&$top=999'
             while ($null -ne $URI) {
@@ -673,6 +673,7 @@ function Get-AzureADLicenseStatus {
                 $AADP1Users.AddRange((Get-AADGroupMembers -GroupIDs $applicationGroups.principalId))
             }
             # Azure AD P1/P2 based on users covered by Conditional Access
+            # 'https://graph.microsoft.com/v1.0/auditLogs/signIns?$filter=appliedConditionalAccessPolicies/any(x:x/id eq ''{0}'' and x/result eq ''success'')' -f 'abc'
             $conditionalAccessPolicies = [System.Collections.Generic.List[hashtable]]::new()
             $URI = 'https://graph.microsoft.com/v1.0/identity/conditionalAccess/policies?$select=id,conditions,state'
             while ($null -ne $URI) {
