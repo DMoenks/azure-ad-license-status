@@ -5,7 +5,7 @@
 
 ## 1 Use case description
 
-The main motivation for this script was to conquer side-effects of semi-automatic license assignments for Microsoft services in Azure AD, i.e. the combination of group-based licensing with manual group membership management, by regularly reporting both on the amount of available licenses per SKU and any conflicting license assignments per user account. This allows for somewhat easier license management without either implementing a full-fledged software asset management solution or hiring a licensing service provider.
+The main motivation for this script was to conquer side-effects of manual or semi-automatic license assignments for Microsoft services in Azure AD, e.g. the combination of group-based licensing with manual group membership management, by regularly reporting both on the amount of available licenses per SKU and any overlapping license assignments per user account. This allows for somewhat easier license management without either implementing a full-fledged software asset management solution or hiring a licensing service provider.
 
 > DISCLAIMER: The script can merely aid in complying with license terms and agreements. It cannot and never will lower or replace the liability to actually comply with any default or individually negotiated license terms and agreements applying to your organization.
 
@@ -25,15 +25,17 @@ Check for license need based on Azure AD and Office feature information:
 
 :x: Azure Active Directory Premium P1 based on applications using application proxy
 
+:heavy_check_mark: Azure Active Directory Premium P1 based on groups using dynamic user membership
+
 :heavy_check_mark: Azure Active Directory Premium P1 based on applications using group-based assignment
 
-:heavy_check_mark: Azure Active Directory Premium P1 based on groups using dynamic membership
+:heavy_check_mark: Azure Active Directory Premium P1/P2 based on users covered by Conditional Access
 
-:heavy_check_mark: Azure Active Directory Premium P1 based on users enabled for Conditional Access
-
-:heavy_check_mark: Azure Active Directory Premium P2 based on users enabled for Privileged Identity Management
+:heavy_check_mark: Azure Active Directory Premium P2 based on users in scope of Privileged Identity Management
 
 :heavy_check_mark: Defender for Office 365 P1/P2 based on protected Exchange Online recipients
+
+> DISCLAIMER: For performance reasons, Conditional Access coverage calculation only considers two separate 4-day time slots. The first being the most recent full Monday-Friday slot, noon to noon, the second being the same slot two weeks earlier. Although this should result in a mostly accurate coverage calculation, taking at least 3-day time slots into account for each time zone, it will inevitably disregard users with irregular access patterns.
 
 ### 2.2 User level
 
@@ -76,6 +78,7 @@ Check for license need based on Azure AD and Office feature information:
 
 #### 3.2.2 Advanced
 
+- Microsoft Graph permission _AuditLog.Read.All_
 - Microsoft Graph permission _Policy.Read.All_
 - Microsoft Graph permission _RoleManagement.Read.All_
 - Office 365 Exchange Online permission _Exchange.ManageAsApp_
@@ -100,7 +103,7 @@ Check for license need based on Azure AD and Office feature information:
         3. Enable system-assigned managed identity
      2. Create Azure key vault
         1. Create self-signed certificate
-        2. Grant Azure role _Key Vault Secrets User_ for automation account to certificate
+        2. Grant role _Key Vault Secrets User_ to automation account's managed identity
 2. Prepare authentication
    1. Create Azure AD application
    2. Add required permissions
