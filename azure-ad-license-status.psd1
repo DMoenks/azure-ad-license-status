@@ -21,7 +21,7 @@
     Copyright = '(c) DMoenks. All rights reserved.'
     
     # Description of the functionality provided by this module
-    Description = 'Prepares an Azure AD license status report for operative tasks based on license consumption and assignments'
+    Description = 'Creates an Azure AD license report based on license assignments and consumption'
     
     # Minimum version of the PowerShell engine required by this module
     PowerShellVersion = '5.1'
@@ -42,8 +42,8 @@
     # ProcessorArchitecture = ''
     
     # Modules that must be imported into the global environment prior to importing this module
-    RequiredModules = @(@{ModuleName = 'ExchangeOnlineManagement'; GUID = 'b5eced50-afa4-455b-847a-d8fb64140a22'; ModuleVersion = '2.0.5'; }, 
-                   @{ModuleName = 'Microsoft.Graph.Authentication'; GUID = '883916f2-9184-46ee-b1f8-b6a2fb784cee'; ModuleVersion = '1.9.0'; })
+    RequiredModules = @(@{ModuleName = 'ExchangeOnlineManagement'; GUID = 'b5eced50-afa4-455b-847a-d8fb64140a22'; ModuleVersion = '3.1.0'; }, 
+                   @{ModuleName = 'Microsoft.Graph.Authentication'; GUID = '883916f2-9184-46ee-b1f8-b6a2fb784cee'; ModuleVersion = '1.27.0'; })
     
     # Assemblies that must be loaded prior to importing this module
     # RequiredAssemblies = @()
