@@ -387,7 +387,7 @@ function Get-SKUName {
 function Get-AzureADLicenseStatus {
     <#
     .SYNOPSIS
-    Create an Azure AD license report for operative tasks based on license consumption and assignments
+    Creates an Azure AD license report based on license assignments and consumption
     .DESCRIPTION
     This script is meant to conquer side-effects of semi-automatic license assignments for Microsoft services in Azure AD, i.e. the combination of group-based licensing with manual group membership management, by regularly reporting both on the amount of available licenses per SKU and any conflicting license assignments per user account. This allows for somewhat easier license management without either implementing a full-fledged software asset management solution or hiring a licensing service provider.
 
@@ -545,7 +545,6 @@ function Get-AzureADLicenseStatus {
             $organizationSKUs.AddRange([hashtable[]]($data.value))
             $URI = $data['@odata.nextLink']
         }
-        Write-Message "Found $($organizationSKUs.Count) SKUs"
         # Analyze SKUs
         foreach ($SKU in $organizationSKUs | Where-Object{$_.prepaidUnits.enabled -gt $SKUIgnoreThreshold}) {
             $totalCount = $SKU.prepaidUnits.enabled
@@ -579,11 +578,10 @@ function Get-AzureADLicenseStatus {
                 }
             }
         }
-        Write-Message "Found $($superiorSKUs_organization.Count) SKU matches for organization"
+        Write-Message "Found $($superiorSKUs_organization.Count) SKU matches for organization, out ouf $($organizationSKUs.Count) SKUs"
         #endregion
 
         #region: Users
-        Write-Message "Analyzing users"
         $userCount = 0
         $URI = 'https://graph.microsoft.com/v1.0/users?$select=id,licenseAssignmentStates,userPrincipalName&$top={0}' -f $pageSize
         while ($null -ne $URI) {
@@ -677,7 +675,6 @@ function Get-AzureADLicenseStatus {
             $AADP2Users = [System.Collections.Generic.List[guid]]::new()
             $ATPUsers = [System.Collections.Generic.List[guid]]::new()
             # Azure AD P1 based on groups using dynamic user membership
-            Write-Message "Analyzing dynamic groups"
             $dynamicGroupCount = 0
             $URI = 'https://graph.microsoft.com/v1.0/groups?$filter=groupTypes/any(x:x eq ''DynamicMembership'')&$select=id,membershipRule&$top={0}' -f $pageSize
             while ($null -ne $URI) {
@@ -693,7 +690,6 @@ function Get-AzureADLicenseStatus {
             }
             Write-Message "Analyzed $dynamicGroupCount dynamic groups"
             # Azure AD P1 based on applications using group-based assignment
-            Write-Message "Analyzing applications"
             $applicationCount = 0
             $URI = 'https://graph.microsoft.com/v1.0/servicePrincipals?$filter=accountEnabled eq true and appRoleAssignmentRequired eq true and servicePrincipalType eq ''Application''&$top={0}&$count=true' -f $pageSize
             while ($null -ne $URI) {
@@ -712,7 +708,6 @@ function Get-AzureADLicenseStatus {
             }
             Write-Message "Analyzed $applicationCount applications"
             # Azure AD P1/P2 based on users covered by Conditional Access
-            Write-Message "Analyzing Conditional Access policies"
             $CAAADP1Policies = [System.Collections.Generic.List[guid]]::new()
             $CAAADP2Policies = [System.Collections.Generic.List[guid]]::new()
             $conditionalAccessPolicyCount = 0
@@ -731,23 +726,22 @@ function Get-AzureADLicenseStatus {
                     $CAAADP2Policies.AddRange([guid[]]$CAPolicies.id)
                 }
             }
-            Write-Message "Found $(@($CAAADP1Policies).Count) basic conditional access policies"
-            Write-Message "Found $(@($CAAADP2Policies).Count) risk-based conditional access policies"
-            Write-Message "Analyzed $conditionalAccessPolicyCount Conditional Access policies"
-            Write-Message "Analyzing Conditional Access sign-ins"
+            Write-Message "Found $(@($CAAADP1Policies).Count) basic Conditional Access policies, out of $conditionalAccessPolicyCount policies"
+            Write-Message "Found $(@($CAAADP2Policies).Count) risk-based Conditional Access policies, out of $conditionalAccessPolicyCount policies"
             $CAAADP1Users = [System.Collections.Generic.List[guid]]::new()
             $CAAADP2Users = [System.Collections.Generic.List[guid]]::new()
             $signInCount = 0
             $today = [datetime]::Today
-            if (($today.DayOfWeek - [System.DayOfWeek]::Thursday) -lt 1) {
-                $secondTimespanEnd = $today.AddDays(-($today.DayOfWeek - [System.DayOfWeek]::Thursday + 7))
-            }            else {
-                $secondTimespanEnd = $today.AddDays(-($today.DayOfWeek - [System.DayOfWeek]::Thursday))
+            if (($today.DayOfWeek - [System.DayOfWeek]::Friday) -lt 1) {
+                $secondTimespanEnd = $today.AddDays(-($today.DayOfWeek - [System.DayOfWeek]::Friday + 7))
             }
-            $secondTimespanStart = $secondTimespanEnd.AddDays(-2)
+            else {
+                $secondTimespanEnd = $today.AddDays(-($today.DayOfWeek - [System.DayOfWeek]::Friday))
+            }
+            $secondTimespanStart = $secondTimespanEnd.AddDays(-4)
             $firstTimespanEnd = $secondTimespanEnd.AddDays(-14)
-            $firstTimespanStart = $secondTimespanEnd.AddDays(-16)
-            $URI = 'https://graph.microsoft.com/v1.0/auditLogs/signIns?$filter=(conditionalAccessStatus eq ''success'' or conditionalAccessStatus eq ''failure'') and ((createdDateTime ge {0} and createdDateTime le {1}) or (createdDateTime ge {2} and createdDateTime le {3}))&$top={4}' -f $firstTimespanStart.ToString('yyyy-MM-ddT00:00:00Z'), $firstTimespanEnd.ToString('yyyy-MM-ddT23:59:59Z'), $secondTimespanStart.ToString('yyyy-MM-ddT00:00:00Z'), $secondTimespanEnd.ToString('yyyy-MM-ddT23:59:59Z'), $pageSize
+            $firstTimespanStart = $secondTimespanEnd.AddDays(-18)
+            $URI = 'https://graph.microsoft.com/v1.0/auditLogs/signIns?$filter=(conditionalAccessStatus eq ''success'' or conditionalAccessStatus eq ''failure'') and ((createdDateTime ge {0} and createdDateTime le {1}) or (createdDateTime ge {2} and createdDateTime le {3}))&$top={4}' -f $firstTimespanStart.ToString('yyyy-MM-ddT12:00:00Z'), $firstTimespanEnd.ToString('yyyy-MM-ddT12:00:00Z'), $secondTimespanStart.ToString('yyyy-MM-ddT12:00:00Z'), $secondTimespanEnd.ToString('yyyy-MM-ddT12:00:00Z'), $pageSize
             while ($null -ne $URI) {
                 # Retrieve Conditional Access sign-ins
                 $data = Invoke-MgGraphRequest -Method GET -Uri $URI
@@ -770,9 +764,8 @@ function Get-AzureADLicenseStatus {
                     }
                 }
             }
-            Write-Message "Found $(@($CAAADP1Users | Select-Object -Unique).Count) users with basic conditional access sign-ins"
-            Write-Message "Found $(@($CAAADP2Users | Select-Object -Unique).Count) users with risk-based conditional access sign-ins"
-            Write-Message "Analyzed $signInCount Conditional Access sign-ins"
+            Write-Message "Found $(@($CAAADP1Users | Select-Object -Unique).Count) users with basic conditional access sign-ins, based on $signInCount sign-ins"
+            Write-Message "Found $(@($CAAADP2Users | Select-Object -Unique).Count) users with risk-based conditional access sign-ins, based on $signInCount sign-ins"
             $AADP1Users.AddRange([guid[]]@($CAAADP1Users | Select-Object -Unique))
             $AADP2Users.AddRange([guid[]]@($CAAADP2Users | Select-Object -Unique))
             Remove-Variable 'CAAADP1Policies','CAAADP2Policies','CAAADP1Users','CAAADP2Users' -Force
@@ -784,12 +777,12 @@ function Get-AzureADLicenseStatus {
                 $eligibleRoleMembers.AddRange([hashtable[]]($data.value))
                 $URI = $data['@odata.nextLink']
             }
-            Write-Message "Found $($eligibleRoleMembers.Count) eligible role assignments"
             if ($eligibleRoleMembers.Count -gt 0) {
                 if ($null -ne ($actuallyEligibleRoleMembers = $eligibleRoleMembers | Where-Object{$_.scheduleInfo.startDateTime -le [datetime]::Today -and ($_.scheduleInfo.expiration.endDateTime -ge [datetime]::Today -or $_.scheduleInfo.expiration.type -eq 'noExpiration')})) {
                     $AADP2Users.AddRange([guid[]]@($actuallyEligibleRoleMembers.principalId))
                 }
             }
+            Write-Message "Analyzed $($eligibleRoleMembers.Count) eligible role assignments"
             # Defender for Office 365 P1/P2 based on https://learn.microsoft.com/office365/servicedescriptions/office-365-advanced-threat-protection-service-description#licensing-terms
             $orgDomain = (Invoke-MgGraphRequest -Method GET -Uri 'https://graph.microsoft.com/v1.0/organization?$select=verifiedDomains').value.verifiedDomains | Where-Object{$_.isInitial -eq $true}
             try {
