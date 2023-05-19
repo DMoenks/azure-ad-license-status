@@ -2,6 +2,7 @@
 
 [![DevSkim](https://github.com/DMoenks/azure-ad-license-status/actions/workflows/devskim.yml/badge.svg)](https://github.com/DMoenks/azure-ad-license-status/actions/workflows/devskim.yml)
 [![PSScriptAnalyzer](https://github.com/DMoenks/azure-ad-license-status/actions/workflows/powershell.yml/badge.svg)](https://github.com/DMoenks/azure-ad-license-status/actions/workflows/powershell.yml)
+[![PowerShell Gallery Version](https://img.shields.io/powershellgallery/v/azure-ad-license-status?label=PowerShell%20Gallery&logo=powershell&style=flat)](https://www.powershellgallery.com/packages/azure-ad-license-status)
 
 ## 1 Use case description
 
@@ -59,16 +60,20 @@ Check for license need based on Azure AD and Office feature information:
 
 #### 3.1.1 Basic
 
-- For local execution
-  - _Microsoft.Graph.Authentication_
-- For Azure execution
-  - _Az.Accounts_
-  - _Az.KeyVault_
-  - _Microsoft.Graph.Authentication_
+- _Microsoft.Graph.Authentication_  
+  [![PowerShell Gallery Version](https://img.shields.io/powershellgallery/v/Microsoft.Graph.Authentication?label=PowerShell%20Gallery&logo=powershell&style=flat)](https://www.powershellgallery.com/packages/Microsoft.Graph.Authentication)
 
 #### 3.1.2 Advanced
 
-- _ExchangeOnlineManagement_
+- _ExchangeOnlineManagement_  
+  [![PowerShell Gallery Version](https://img.shields.io/powershellgallery/v/ExchangeOnlineManagement?label=PowerShell%20Gallery&logo=powershell&style=flat)](https://www.powershellgallery.com/packages/ExchangeOnlineManagement)
+
+#### 3.1.3 For Azure execution
+
+- _Az.Accounts_  
+  [![PowerShell Gallery Version](https://img.shields.io/powershellgallery/v/Az.Accounts?label=PowerShell%20Gallery&logo=powershell&style=flat)](https://www.powershellgallery.com/packages/Az.Accounts)
+- _Az.KeyVault_  
+  [![PowerShell Gallery Version](https://img.shields.io/powershellgallery/v/Az.KeyVault?label=PowerShell%20Gallery&logo=powershell&style=flat)](https://www.powershellgallery.com/packages/Az.KeyVault)
 
 ### 3.2 Permissions
 
