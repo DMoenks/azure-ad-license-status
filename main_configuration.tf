@@ -100,7 +100,7 @@ data "azurerm_resource_group" "automation_account_resource_group" {
 resource "azurerm_automation_account" "automation_account" {
   provider            = azurerm.automation_account
   resource_group_name = data.azurerm_resource_group.automation_account_resource_group.name
-  name                = var.solution_name
+  name                = "aa-${var.solution_name}"
   location            = data.azurerm_resource_group.automation_account_resource_group.location
   sku_name            = "Basic"
   identity {
@@ -144,7 +144,17 @@ resource "azurerm_automation_module" "automation_module_microsoft_graph_authenti
   automation_account_name = azurerm_automation_account.automation_account.name
   name                    = "Microsoft.Graph.Authentication"
   module_link {
-    uri = "https://www.powershellgallery.com/api/v2/package/Microsoft.Graph.Authentication/1.23.0"
+    uri = "https://www.powershellgallery.com/api/v2/package/Microsoft.Graph.Authentication/1.27.0"
+  }
+}
+
+resource "azurerm_automation_module" "automation_module_main" {
+  provider                = azurerm.automation_account
+  resource_group_name     = data.azurerm_resource_group.automation_account_resource_group.name
+  automation_account_name = azurerm_automation_account.automation_account.name
+  name                    = "azure-ad-license-status"
+  module_link {
+    uri = "https://www.powershellgallery.com/api/v2/package/azure-ad-license-status/1.2.6"
   }
 }
 
@@ -152,26 +162,14 @@ resource "azurerm_automation_runbook" "automation_runbook_script" {
   provider                = azurerm.automation_account
   resource_group_name     = data.azurerm_resource_group.automation_account_resource_group.name
   automation_account_name = azurerm_automation_account.automation_account.name
-  name                    = "Get-AzureADLicenseStatus"
-  location                = data.azurerm_resource_group.automation_account_resource_group.location
-  runbook_type            = "PowerShell"
-  log_progress            = true
-  log_verbose             = true
-  publish_content_link {
-    uri = "https://raw.githubusercontent.com/DMoenks/azure-ad-license-status/main/azure-ad-license-status.psm1"
-  }
-}
-
-resource "azurerm_automation_runbook" "automation_runbook_script_runner" {
-  provider                = azurerm.automation_account
-  resource_group_name     = data.azurerm_resource_group.automation_account_resource_group.name
-  automation_account_name = azurerm_automation_account.automation_account.name
   name                    = "Run-AzureADLicenseStatus"
   location                = data.azurerm_resource_group.automation_account_resource_group.location
   runbook_type            = "PowerShell"
-  log_progress            = true
-  log_verbose             = true
-  content                 = "Get-AzureADLicenseStatus -DirectoryID '${var.tenant_id}' -ApplicationID '${azuread_application.application.id}' -SubscriptionID '${var.key_vault_subscription_id}' -KeyVaultName '${var.solution_name}' -CertificateName '${azurerm_key_vault_certificate.key_vault_certificate.name}' -SenderAddress 'sender@example.com' -RecipientAddresses_normal @('recipient@example.com') -AdvancedCheckups"
+  log_progress            = false
+  log_verbose             = false
+  publish_content_link {
+    uri = "https://raw.githubusercontent.com/DMoenks/azure-ad-license-status/main/Run-AzureADLicenseStatus.ps1"
+  }
 }
 
 data "azurerm_resource_group" "key_vault_resource_group" {
@@ -182,7 +180,7 @@ data "azurerm_resource_group" "key_vault_resource_group" {
 resource "azurerm_key_vault" "key_vault" {
   provider                  = azurerm.key_vault
   resource_group_name       = data.azurerm_resource_group.key_vault_resource_group.name
-  name                      = var.solution_name
+  name                      = "kv-${var.solution_name}"
   location                  = data.azurerm_resource_group.key_vault_resource_group.location
   sku_name                  = "standard"
   tenant_id                 = var.tenant_id
