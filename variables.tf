@@ -1,6 +1,6 @@
 #region: Connection variables
 variable "tenant_id" {
-  description = "Specifies the tenant"
+  description = "Specifies the tenant to authenticate against"
   type        = string
   validation {
     condition     = length(regexall("^[[:alnum:]]{8}(?:-[[:alnum:]]{4}){3}-[[:alnum:]]{12}$", var.tenant_id)) > 0
@@ -13,7 +13,7 @@ variable "tenant_id" {
 }
 
 variable "azuread_client_id" {
-  description = "Specifies the application ID for the 'azuread' provider"
+  description = "Specifies the application ID for the 'azuread' provider to authenticate with"
   type        = string
   validation {
     condition     = length(regexall("^[[:alnum:]]{8}(?:-[[:alnum:]]{4}){3}-[[:alnum:]]{12}$", var.azuread_client_id)) > 0
@@ -26,14 +26,14 @@ variable "azuread_client_id" {
 }
 
 variable "azuread_client_secret" {
-  description = "Specifies the application secret for the 'azuread' provider"
+  description = "Specifies the application secret for the 'azuread' provider to authenticate with"
   type        = string
   sensitive   = true
   nullable    = false
 }
 
 variable "azurerm_client_id" {
-  description = "Specifies the application ID for the 'azurerm' provider"
+  description = "Specifies the application ID for the 'azurerm' provider to authenticate with"
   type        = string
   validation {
     condition     = length(regexall("^[[:alnum:]]{8}(?:-[[:alnum:]]{4}){3}-[[:alnum:]]{12}$", var.azurerm_client_id)) > 0
@@ -46,7 +46,7 @@ variable "azurerm_client_id" {
 }
 
 variable "azurerm_client_secret" {
-  description = "Specifies the application secret for the 'azurerm' provider"
+  description = "Specifies the application secret for the 'azurerm' provider to authenticate with"
   type        = string
   sensitive   = true
   nullable    = false
@@ -55,7 +55,7 @@ variable "azurerm_client_secret" {
 
 #region: Deployment variables
 variable "automation_account_subscription_id" {
-  description = "Specifies the subscription for the automation account"
+  description = "Specifies the target subscription for the automation account, which needs to exist"
   type        = string
   validation {
     condition     = length(regexall("^[[:alnum:]]{8}(?:-[[:alnum:]]{4}){3}-[[:alnum:]]{12}$", var.automation_account_subscription_id)) > 0
@@ -68,13 +68,13 @@ variable "automation_account_subscription_id" {
 }
 
 variable "automation_account_resource_group_name" {
-  description = "Specifies the resource group for the automation account"
+  description = "Specifies the target resource group for the automation account, which needs to exist"
   type        = string
   nullable    = false
 }
 
 variable "key_vault_subscription_id" {
-  description = "Specifies the subscription for the key vault"
+  description = "Specifies the target subscription for the key vault, which needs to exist"
   type        = string
   validation {
     condition     = length(regexall("^[[:alnum:]]{8}(?:-[[:alnum:]]{4}){3}-[[:alnum:]]{12}$", var.key_vault_subscription_id)) > 0
@@ -87,15 +87,14 @@ variable "key_vault_subscription_id" {
 }
 
 variable "key_vault_resource_group_name" {
-  description = "Specifies the resource group for the key vault"
+  description = "Specifies the target resource group for the key vault, which needs to exist"
   type        = string
   nullable    = false
 }
 
 variable "solution_name" {
-  description = "Specifies the name used for the Azure AD application, the automation account and both the keyvault and the certificate"
+  description = "Specifies the name to be used for the Azure AD application, the automation account and both the keyvault and the certificate, which will be created"
   type        = string
   nullable    = false
-  default     = "azure-ad-license-status"
 }
 #endregion

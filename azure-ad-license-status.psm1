@@ -389,7 +389,7 @@ function Get-AzureADLicenseStatus {
     .SYNOPSIS
     Creates an Azure AD license report based on license assignments and consumption
     .DESCRIPTION
-    This script is meant to conquer side-effects of semi-automatic license assignments for Microsoft services in Azure AD, i.e. the combination of group-based licensing with manual group membership management, by regularly reporting both on the amount of available licenses per SKU and any conflicting license assignments per user account. This allows for somewhat easier license management without either implementing a full-fledged software asset management solution or hiring a licensing service provider.
+    This function is meant to conquer side-effects of semi-automatic license assignments for Microsoft services in Azure AD, i.e. the combination of group-based licensing with manual group membership management, by regularly reporting both on the amount of available licenses per SKU and any conflicting license assignments per user account. This allows for somewhat easier license management without either implementing a full-fledged software asset management solution or hiring a licensing service provider.
 
     SKU IDs and names are in accordance with https://learn.microsoft.com/en-us/azure/active-directory/enterprise-users/licensing-service-plan-reference
     .PARAMETER DirectoryID
