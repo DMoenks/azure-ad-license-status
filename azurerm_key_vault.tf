@@ -7,20 +7,20 @@ provider "azurerm" {
   features {}
 }
 
-data "azurerm_client_config" "key_vault_client_config" {
+data "azurerm_client_config" "client_config_azurerm_key_vault" {
   provider = azurerm.key_vault
 }
 
-data "azurerm_resource_group" "key_vault_resource_group" {
+data "azurerm_resource_group" "resource_group_key_vault" {
   provider = azurerm.key_vault
   name     = var.key_vault_resource_group_name
 }
 
 resource "azurerm_key_vault" "key_vault" {
   provider                  = azurerm.key_vault
-  resource_group_name       = data.azurerm_resource_group.key_vault_resource_group.name
+  resource_group_name       = data.azurerm_resource_group.resource_group_key_vault.name
   name                      = "kv-${var.solution_name}"
-  location                  = data.azurerm_resource_group.key_vault_resource_group.location
+  location                  = data.azurerm_resource_group.resource_group_key_vault.location
   sku_name                  = "standard"
   tenant_id                 = var.tenant_id
   enable_rbac_authorization = true
@@ -67,7 +67,7 @@ data "azurerm_role_definition" "role_definition_key_vault_certificates_officer" 
 resource "azurerm_role_assignment" "role_assignment_key_vault_certificates_officer" {
   provider           = azurerm.key_vault
   scope              = azurerm_key_vault.key_vault.id
-  principal_id       = data.azurerm_client_config.key_vault_client_config.object_id
+  principal_id       = data.azurerm_client_config.client_config_azurerm_key_vault.object_id
   role_definition_id = data.azurerm_role_definition.role_definition_key_vault_certificates_officer.id
 }
 

@@ -4,11 +4,9 @@ provider "azuread" {
   client_secret = var.azuread_client_secret
 }
 
-data "azuread_client_config" "client_config" {
+data "azuread_client_config" "client_config_azuread_application" {}
 
-}
-
-resource "azuread_application" "application_azure_ad_license_status" {
+resource "azuread_application" "application" {
   display_name = var.solution_name
   required_resource_access {
     resource_app_id = azuread_service_principal.service_principal_graph.application_id
@@ -69,7 +67,7 @@ resource "azuread_app_role_assignment" "app_role_assignment_exchange_online_exch
 }
 
 resource "azuread_application_certificate" "application_certificate" {
-  application_object_id = azuread_application.application_azure_ad_license_status.object_id
+  application_object_id = azuread_application.application.object_id
   encoding              = "hex"
   type                  = "AsymmetricX509Cert"
   value                 = azurerm_key_vault_certificate.key_vault_certificate.certificate_data
@@ -90,13 +88,13 @@ resource "azuread_service_principal" "service_principal_exchange_online" {
 }
 
 resource "azuread_service_principal" "service_principal_azure_ad_license_status" {
-  application_id = azuread_application.application_azure_ad_license_status.application_id
+  application_id = azuread_application.application.application_id
   owners = [
-    data.azuread_client_config.client_config.object_id
+    data.azuread_client_config.client_config_azuread_application.object_id
   ]
 }
 
-resource "azuread_directory_role_assignment" "directory_role_assignment_global_reader" {
+resource "azuread_directory_role_assignment" "directory_role_assignment" {
   # Role: Global Reader
   principal_object_id = azuread_service_principal.service_principal_azure_ad_license_status.object_id
   role_id             = "f2ef992c-3afb-46b9-b7cf-a126ee74c451"

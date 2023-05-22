@@ -7,16 +7,16 @@ provider "azurerm" {
   features {}
 }
 
-data "azurerm_resource_group" "automation_account_resource_group" {
+data "azurerm_resource_group" "resource_group_automation_account" {
   provider = azurerm.automation_account
   name     = var.automation_account_resource_group_name
 }
 
 resource "azurerm_automation_account" "automation_account" {
   provider            = azurerm.automation_account
-  resource_group_name = data.azurerm_resource_group.automation_account_resource_group.name
+  resource_group_name = data.azurerm_resource_group.resource_group_automation_account.name
   name                = "aa-${var.solution_name}"
-  location            = data.azurerm_resource_group.automation_account_resource_group.location
+  location            = data.azurerm_resource_group.resource_group_automation_account.location
   sku_name            = "Basic"
   identity {
     type = "SystemAssigned"
@@ -25,7 +25,7 @@ resource "azurerm_automation_account" "automation_account" {
 
 resource "azurerm_automation_module" "automation_module_az_accounts" {
   provider                = azurerm.automation_account
-  resource_group_name     = data.azurerm_resource_group.automation_account_resource_group.name
+  resource_group_name     = data.azurerm_resource_group.resource_group_automation_account.name
   automation_account_name = azurerm_automation_account.automation_account.name
   name                    = "Az.Accounts"
   module_link {
@@ -38,7 +38,7 @@ resource "azurerm_automation_module" "automation_module_az_keyvault" {
     azurerm_automation_module.automation_module_az_accounts
   ]
   provider                = azurerm.automation_account
-  resource_group_name     = data.azurerm_resource_group.automation_account_resource_group.name
+  resource_group_name     = data.azurerm_resource_group.resource_group_automation_account.name
   automation_account_name = azurerm_automation_account.automation_account.name
   name                    = "Az.KeyVault"
   module_link {
@@ -48,7 +48,7 @@ resource "azurerm_automation_module" "automation_module_az_keyvault" {
 
 resource "azurerm_automation_module" "automation_module_packagemanagement" {
   provider                = azurerm.automation_account
-  resource_group_name     = data.azurerm_resource_group.automation_account_resource_group.name
+  resource_group_name     = data.azurerm_resource_group.resource_group_automation_account.name
   automation_account_name = azurerm_automation_account.automation_account.name
   name                    = "PackageManagement"
   module_link {
@@ -60,7 +60,7 @@ resource "azurerm_automation_module" "automation_module_powershellget" {
     azurerm_automation_module.automation_module_packagemanagement
   ]
   provider                = azurerm.automation_account
-  resource_group_name     = data.azurerm_resource_group.automation_account_resource_group.name
+  resource_group_name     = data.azurerm_resource_group.resource_group_automation_account.name
   automation_account_name = azurerm_automation_account.automation_account.name
   name                    = "PowerShellGet"
   module_link {
@@ -74,7 +74,7 @@ resource "azurerm_automation_module" "automation_module_exchangeonlinemanagement
     azurerm_automation_module.automation_module_powershellget
   ]
   provider                = azurerm.automation_account
-  resource_group_name     = data.azurerm_resource_group.automation_account_resource_group.name
+  resource_group_name     = data.azurerm_resource_group.resource_group_automation_account.name
   automation_account_name = azurerm_automation_account.automation_account.name
   name                    = "ExchangeOnlineManagement"
   module_link {
@@ -84,7 +84,7 @@ resource "azurerm_automation_module" "automation_module_exchangeonlinemanagement
 
 resource "azurerm_automation_module" "automation_module_microsoft_graph_authentication" {
   provider                = azurerm.automation_account
-  resource_group_name     = data.azurerm_resource_group.automation_account_resource_group.name
+  resource_group_name     = data.azurerm_resource_group.resource_group_automation_account.name
   automation_account_name = azurerm_automation_account.automation_account.name
   name                    = "Microsoft.Graph.Authentication"
   module_link {
@@ -98,7 +98,7 @@ resource "azurerm_automation_module" "automation_module_azure_ad_license_status"
     azurerm_automation_module.automation_module_microsoft_graph_authentication
   ]
   provider                = azurerm.automation_account
-  resource_group_name     = data.azurerm_resource_group.automation_account_resource_group.name
+  resource_group_name     = data.azurerm_resource_group.resource_group_automation_account.name
   automation_account_name = azurerm_automation_account.automation_account.name
   name                    = "azure-ad-license-status"
   module_link {
@@ -108,10 +108,10 @@ resource "azurerm_automation_module" "automation_module_azure_ad_license_status"
 
 resource "azurerm_automation_runbook" "automation_runbook" {
   provider                = azurerm.automation_account
-  resource_group_name     = data.azurerm_resource_group.automation_account_resource_group.name
+  resource_group_name     = data.azurerm_resource_group.resource_group_automation_account.name
   automation_account_name = azurerm_automation_account.automation_account.name
   name                    = "Run-AzureADLicenseStatus"
-  location                = data.azurerm_resource_group.automation_account_resource_group.location
+  location                = data.azurerm_resource_group.resource_group_automation_account.location
   runbook_type            = "PowerShell"
   log_progress            = false
   log_verbose             = false
