@@ -741,7 +741,7 @@ function Get-AzureADLicenseStatus {
             $secondTimespanStart = $secondTimespanEnd.AddDays(-4)
             $firstTimespanEnd = $secondTimespanEnd.AddDays(-14)
             $firstTimespanStart = $secondTimespanEnd.AddDays(-18)
-            $URI = 'https://graph.microsoft.com/v1.0/auditLogs/signIns?$filter=(conditionalAccessStatus eq ''success'' or conditionalAccessStatus eq ''failure'') and ((createdDateTime ge {0} and createdDateTime le {1}) or (createdDateTime ge {2} and createdDateTime le {3}))&$top={4}' -f $firstTimespanStart.ToString('yyyy-MM-ddT12:00:00Z'), $firstTimespanEnd.ToString('yyyy-MM-ddT12:00:00Z'), $secondTimespanStart.ToString('yyyy-MM-ddT12:00:00Z'), $secondTimespanEnd.ToString('yyyy-MM-ddT12:00:00Z'), $pageSize
+            $URI = 'https://graph.microsoft.com/v1.0/auditLogs/signIns?$filter=(conditionalAccessStatus eq ''success'' or conditionalAccessStatus eq ''failure'') and ((createdDateTime ge {0} and createdDateTime le {1}) or (createdDateTime ge {2} and createdDateTime le {3}))&$top={4}' -f $firstTimespanStart.ToString('yyyy-MM-ddT00:00:00Z'), $firstTimespanEnd.ToString('yyyy-MM-ddT23:59:59Z'), $secondTimespanStart.ToString('yyyy-MM-ddT00:00:00Z'), $secondTimespanEnd.ToString('yyyy-MM-ddT23:59:59Z'), $pageSize
             while ($null -ne $URI) {
                 # Retrieve Conditional Access sign-ins
                 $data = Invoke-MgGraphRequest -Method GET -Uri $URI

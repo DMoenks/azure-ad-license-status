@@ -6,11 +6,11 @@
 
 ## 1 Use case description
 
-The main motivation for this was to conquer side-effects of manual or semi-automatic license assignments for Microsoft services in Azure AD, e.g. the combination of group-based licensing with manual group membership management, by regularly reporting both on the amount of available licenses per SKU and any overlapping license assignments per user account. This allows for somewhat easier license management without either implementing a full-fledged software asset management solution or hiring a licensing service provider.
+The main motivation for this report was to conquer side-effects of manual or semi-automatic license assignments for Microsoft services in Azure AD, e.g. the combination of group-based licensing with manual group membership management, by regularly reporting both on the amount of available licenses per SKU and any overlapping license assignments per user account. This allows for somewhat easier license management without either implementing a full-fledged software asset management solution or hiring a licensing service provider.
 
-> DISCLAIMER: The script can merely aid in complying with license terms and agreements. It cannot and never will lower or replace the liability to actually comply with any default or individually negotiated license terms and agreements applying to your organization.
+> DISCLAIMER: The report can merely aid in complying with license terms and agreements. It cannot and never will lower or replace the liability to actually comply with any default or individually negotiated license terms and agreements applying to your organization.
 
-> HINT: Most of the requirements and preparations mentioned below can be deployed by using the provided Terraform module, the exception being an Exchange Online application access policy. Resources created this way follow isolation recommendations, names of resources follow [Abbreviation examples for Azure resources](https://learn.microsoft.com/azure/cloud-adoption-framework/ready/azure-best-practices/resource-abbreviations).
+> HINT: Most of the requirements and preparations for Azure execution mentioned below can be deployed by using the provided Terraform module, the exception being an Exchange Online application access policy.
 
 ## 2 Feature overview
 
@@ -34,13 +34,13 @@ Check for license need based on Azure AD and Office feature information:
 
 :heavy_check_mark: Azure Active Directory Premium P1/P2 based on users covered by Conditional Access
 
+> DISCLAIMER: For performance reasons, Conditional Access coverage calculation only considers two separate 5-day time slots. The first being the most recent full Monday-Friday slot, the second being the same slot two weeks earlier. Although this should result in a mostly accurate coverage calculation, taking at least 4-day time slots into account for each time zone, it will inevitably disregard users with irregular access patterns.
+
 :heavy_check_mark: Azure Active Directory Premium P2 based on users in scope of Privileged Identity Management
 
 :heavy_check_mark: Defender for Office 365 P1/P2 based on protected Exchange Online recipients
 
 :x: Intune Device based on devices managed by Intune and used by unlicensed users
-
-> DISCLAIMER: For performance reasons, Conditional Access coverage calculation only considers two separate 4-day time slots. The first being the most recent full Monday-Friday slot, noon to noon, the second being the same slot two weeks earlier. Although this should result in a mostly accurate coverage calculation, taking at least 3-day time slots into account for each time zone, it will inevitably disregard users with irregular access patterns.
 
 ### 2.2 User level
 
