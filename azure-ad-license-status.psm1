@@ -389,7 +389,7 @@ function Get-AzureADLicenseStatus {
     .SYNOPSIS
     Creates an Azure AD license report based on license assignments and consumption
     .DESCRIPTION
-    This script is meant to conquer side-effects of semi-automatic license assignments for Microsoft services in Azure AD, i.e. the combination of group-based licensing with manual group membership management, by regularly reporting both on the amount of available licenses per SKU and any conflicting license assignments per user account. This allows for somewhat easier license management without either implementing a full-fledged software asset management solution or hiring a licensing service provider.
+    This function is meant to conquer side-effects of semi-automatic license assignments for Microsoft services in Azure AD, i.e. the combination of group-based licensing with manual group membership management, by regularly reporting both on the amount of available licenses per SKU and any conflicting license assignments per user account. This allows for somewhat easier license management without either implementing a full-fledged software asset management solution or hiring a licensing service provider.
 
     SKU IDs and names are in accordance with https://learn.microsoft.com/en-us/azure/active-directory/enterprise-users/licensing-service-plan-reference
     .PARAMETER DirectoryID
@@ -741,7 +741,7 @@ function Get-AzureADLicenseStatus {
             $secondTimespanStart = $secondTimespanEnd.AddDays(-4)
             $firstTimespanEnd = $secondTimespanEnd.AddDays(-14)
             $firstTimespanStart = $secondTimespanEnd.AddDays(-18)
-            $URI = 'https://graph.microsoft.com/v1.0/auditLogs/signIns?$filter=(conditionalAccessStatus eq ''success'' or conditionalAccessStatus eq ''failure'') and ((createdDateTime ge {0} and createdDateTime le {1}) or (createdDateTime ge {2} and createdDateTime le {3}))&$top={4}' -f $firstTimespanStart.ToString('yyyy-MM-ddT12:00:00Z'), $firstTimespanEnd.ToString('yyyy-MM-ddT12:00:00Z'), $secondTimespanStart.ToString('yyyy-MM-ddT12:00:00Z'), $secondTimespanEnd.ToString('yyyy-MM-ddT12:00:00Z'), $pageSize
+            $URI = 'https://graph.microsoft.com/v1.0/auditLogs/signIns?$filter=(conditionalAccessStatus eq ''success'' or conditionalAccessStatus eq ''failure'') and ((createdDateTime ge {0} and createdDateTime le {1}) or (createdDateTime ge {2} and createdDateTime le {3}))&$top={4}' -f $firstTimespanStart.ToString('yyyy-MM-ddT00:00:00Z'), $firstTimespanEnd.ToString('yyyy-MM-ddT23:59:59Z'), $secondTimespanStart.ToString('yyyy-MM-ddT00:00:00Z'), $secondTimespanEnd.ToString('yyyy-MM-ddT23:59:59Z'), $pageSize
             while ($null -ne $URI) {
                 # Retrieve Conditional Access sign-ins
                 $data = Invoke-MgGraphRequest -Method GET -Uri $URI

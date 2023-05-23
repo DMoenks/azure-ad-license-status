@@ -6,9 +6,9 @@ param (
     [Parameter(Mandatory = $true)]
     [string]$SubscriptionID,
     [Parameter(Mandatory = $true)]
-    [string]$KeyVaultName = 'kv-azure-ad-license-status',
+    [string]$KeyVaultName,
     [Parameter(Mandatory = $true)]
-    [string]$CertificateName = 'azure-ad-license-status',
+    [string]$CertificateName,
     [Parameter(Mandatory = $true)]
     [string]$SenderAddress,
     [Parameter(Mandatory = $true)]
