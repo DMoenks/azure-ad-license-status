@@ -900,6 +900,14 @@ function Get-AzureADLicenseStatus {
                 }
                 Disconnect-ExchangeOnline -Confirm:$false
             }
+            # Intune Device based on devices managed by Intune and used by unlicensed users
+            $managedDevices = [System.Collections.Generic.List[hashtable]]::new()
+            $URI = 'https://graph.microsoft.com/v1.0/deviceManagement/managedDevices?$expand=users'
+            while ($null -ne $URI) {
+                $data = Invoke-MgGraphRequest -Method GET -Uri $URI
+                $managedDevices.AddRange([hashtable[]]($data.value))
+                $URI = $data['@odata.nextLink']
+            }
             # Add results
             if ($AADP1Users.Count -gt 0) {
                 if ($null -ne ($AADP1SKUs = @($organizationSKUs | Where-Object{@($_.servicePlans.servicePlanId) -contains '41781fb2-bc02-4b7c-bd55-b576c07bb09d'}))) {
