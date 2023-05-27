@@ -17,15 +17,16 @@ data "azurerm_resource_group" "resource_group_key_vault" {
 }
 
 resource "azurerm_key_vault" "key_vault" {
-  provider                  = azurerm.key_vault
-  resource_group_name       = data.azurerm_resource_group.resource_group_key_vault.name
-  name                      = "kv-${var.solution_name}"
-  location                  = data.azurerm_resource_group.resource_group_key_vault.location
-  sku_name                  = "standard"
-  tenant_id                 = var.tenant_id
-  enable_rbac_authorization = true
-  access_policy             = []
-  purge_protection_enabled  = true
+  provider                   = azurerm.key_vault
+  resource_group_name        = data.azurerm_resource_group.resource_group_key_vault.name
+  name                       = "kv-${var.solution_name}"
+  location                   = data.azurerm_resource_group.resource_group_key_vault.location
+  sku_name                   = "standard"
+  tenant_id                  = var.tenant_id
+  enable_rbac_authorization  = true
+  access_policy              = []
+  purge_protection_enabled   = true
+  soft_delete_retention_days = 90
   network_acls {
     default_action = "Allow"
     bypass         = "AzureServices"
