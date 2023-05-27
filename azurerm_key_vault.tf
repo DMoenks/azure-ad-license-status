@@ -23,11 +23,12 @@ resource "azurerm_key_vault" "key_vault" {
   location                   = data.azurerm_resource_group.resource_group_key_vault.location
   sku_name                   = "standard"
   tenant_id                  = var.tenant_id
+  soft_delete_retention_days = 7
+  purge_protection_enabled   = true
   enable_rbac_authorization  = true
   access_policy              = []
-  purge_protection_enabled   = true
-  soft_delete_retention_days = 90
   network_acls {
+    # The key vault needs to be accessed by the automation account (which isn't one of the trusted Azure services) for certificate retrieval, therefore requiring public access
     default_action = "Allow"
     bypass         = "AzureServices"
   }

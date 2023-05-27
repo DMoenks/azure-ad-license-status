@@ -41,7 +41,7 @@ Check for license need based on Azure AD and Office feature information:
 
 :heavy_check_mark: Defender for Office 365 P1/P2 based on protected Exchange Online recipients
 
-:x: Intune Device based on devices managed by Intune and used by unlicensed users
+:heavy_check_mark: Intune Device based on devices managed by Intune and used by unlicensed users
 
 ### 2.2 User level
 
@@ -89,6 +89,7 @@ Check for license need based on Azure AD and Office feature information:
 #### 3.2.2 Advanced
 
 - Microsoft Graph permission _AuditLog.Read.All_
+- Microsoft Graph permission _DeviceManagementManagedDevices.Read.All_
 - Microsoft Graph permission _Policy.Read.All_
 - Microsoft Graph permission _RoleManagement.Read.All_
 - Office 365 Exchange Online permission _Exchange.ManageAsApp_
@@ -126,4 +127,5 @@ Check for license need based on Azure AD and Office feature information:
 - [Azure automation account](https://learn.microsoft.com/azure/automation/automation-create-standalone-account)
 - [Azure key vault](https://learn.microsoft.com/azure/key-vault/general/quick-create-portal)
 - [Azure AD application](https://learn.microsoft.com/azure/active-directory/develop/quickstart-register-app)
+- [Graph permissions](https://learn.microsoft.com/graph/permissions-reference)
 - [Exchange Online application access policy](https://learn.microsoft.com/graph/auth-limit-mailbox-access)
