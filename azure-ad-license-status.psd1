@@ -97,7 +97,7 @@
 
             # A URL to an icon representing this module.
             # IconUri = ''
- 
+
             # ReleaseNotes of this module
             # ReleaseNotes = ''
 
