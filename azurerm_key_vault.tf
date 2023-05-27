@@ -25,6 +25,11 @@ resource "azurerm_key_vault" "key_vault" {
   tenant_id                 = var.tenant_id
   enable_rbac_authorization = true
   access_policy             = []
+  purge_protection_enabled  = true
+  network_acls {
+    default_action = "Allow"
+    bypass         = "AzureServices"
+  }
 }
 
 resource "azurerm_key_vault_certificate" "key_vault_certificate" {

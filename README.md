@@ -2,6 +2,7 @@
 
 [![DevSkim](https://github.com/DMoenks/azure-ad-license-status/actions/workflows/devskim.yml/badge.svg)](https://github.com/DMoenks/azure-ad-license-status/actions/workflows/devskim.yml)
 [![PSScriptAnalyzer](https://github.com/DMoenks/azure-ad-license-status/actions/workflows/powershell.yml/badge.svg)](https://github.com/DMoenks/azure-ad-license-status/actions/workflows/powershell.yml)
+[![tfsec](https://github.com/DMoenks/azure-ad-license-status/actions/workflows/tfsec.yml/badge.svg)](https://github.com/DMoenks/azure-ad-license-status/actions/workflows/tfsec.yml)
 [![PowerShell Gallery Version](https://img.shields.io/powershellgallery/v/azure-ad-license-status?label=PowerShell%20Gallery&logo=powershell&style=flat)](https://www.powershellgallery.com/packages/azure-ad-license-status)
 
 ## 1 Use case description
