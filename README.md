@@ -27,21 +27,21 @@ The main motivation for this report was to conquer side-effects of manual or sem
 
 Check for license need based on Azure AD and Office feature information:
 
-:x: Azure Active Directory Premium P1 based on applications using application proxy
+:x: _Azure Active Directory Premium P1_ based on applications using application proxy
 
-:heavy_check_mark: Azure Active Directory Premium P1 based on groups using dynamic user membership
+:heavy_check_mark: _Azure Active Directory Premium P1_ based on groups using dynamic user membership
 
-:heavy_check_mark: Azure Active Directory Premium P1 based on applications using group-based assignment
+:heavy_check_mark: _Azure Active Directory Premium P1_ based on applications using group-based assignment
 
-:heavy_check_mark: Azure Active Directory Premium P1/P2 based on users covered by Conditional Access
+:heavy_check_mark: _Azure Active Directory Premium P1/P2_ based on users covered by Conditional Access
 
 > DISCLAIMER: For performance reasons, Conditional Access coverage calculation only considers two separate 5-day time slots. The first being the most recent full Monday-Friday slot, the second being the same slot two weeks earlier. Although this should result in a mostly accurate coverage calculation, taking at least 4-day time slots into account for each time zone, it will inevitably disregard users with irregular access patterns.
 
-:heavy_check_mark: Azure Active Directory Premium P2 based on users in scope of Privileged Identity Management
+:heavy_check_mark: _Azure Active Directory Premium P2_ based on users in scope of Privileged Identity Management
 
-:heavy_check_mark: Defender for Office 365 P1/P2 based on protected Exchange Online recipients
+:heavy_check_mark: _Defender for Office 365 P1/P2_ based on protected Exchange Online recipients
 
-:heavy_check_mark: Intune Device based on devices managed by Intune and used by unlicensed users
+:heavy_check_mark: _Intune Device_ based on devices managed by Intune and used by unlicensed users
 
 ### 2.2 User level
 

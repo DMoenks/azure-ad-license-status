@@ -674,6 +674,7 @@ function Get-AzureADLicenseStatus {
             $AADP1Users = [System.Collections.Generic.List[guid]]::new()
             $AADP2Users = [System.Collections.Generic.List[guid]]::new()
             $ATPUsers = [System.Collections.Generic.List[guid]]::new()
+            $IntuneDevices = [System.Collections.Generic.List[guid]]::new()
             # Azure AD P1 based on groups using dynamic user membership
             $dynamicGroupCount = 0
             $URI = 'https://graph.microsoft.com/v1.0/groups?$filter=groupTypes/any(x:x eq ''DynamicMembership'')&$select=id,membershipRule&$top={0}' -f $pageSize
@@ -901,13 +902,33 @@ function Get-AzureADLicenseStatus {
                 Disconnect-ExchangeOnline -Confirm:$false
             }
             # Intune Device based on devices managed by Intune and used by unlicensed users
-            $managedDevices = [System.Collections.Generic.List[hashtable]]::new()
-            $URI = 'https://graph.microsoft.com/v1.0/deviceManagement/managedDevices?$expand=users'
+            $managedDeviceCount = 0
+            # Retrieve Intune licensed users
+            $intuneUsers = [System.Collections.Generic.List[hashtable]]::new()
+            $URI = 'https://graph.microsoft.com/v1.0/users?$filter=assignedPlans/any(x:x/servicePlanId eq c1ec4a95-1f05-45b3-a911-aa3fa01094f5 and capabilityStatus eq ''Enabled'')&$select=id&top={0}&$count=true' -f $pageSize
             while ($null -ne $URI) {
-                $data = Invoke-MgGraphRequest -Method GET -Uri $URI
-                $managedDevices.AddRange([hashtable[]]($data.value))
+                $data = Invoke-MgGraphRequest -Method GET -Uri $URI -Headers @{'ConsistencyLevel'='eventual'}
+                $intuneUsers.AddRange([hashtable[]]($data.value))
                 $URI = $data['@odata.nextLink']
             }
+            $URI = 'https://graph.microsoft.com/v1.0/deviceManagement/managedDevices?$expand=users'
+            while ($null -ne $URI) {
+                # Retrieve managed devices
+                $data = Invoke-MgGraphRequest -Method GET -Uri $URI
+                $managedDevices = [System.Collections.Generic.List[hashtable]]::new([hashtable[]]($data.value))
+                $managedDeviceCount += $managedDevices.Count
+                $URI = $data['@odata.nextLink']
+                # Analyze managed devices
+                foreach ($managedDevice in $managedDevices) {
+                    if ($null -ne $managedDevice.users) {
+                        $IntuneDevices.Add($managedDevice.id)
+                    }
+                    elseif ($null -ne (Compare-Object $managedDevice.users.id $intuneUsers.id | Where-Object{$_.SideIndicator -eq '<='})) {
+                        $IntuneDevices.Add($managedDevice.id)
+                    }
+                }
+            }
+            Write-Message "Analyzed $managedDeviceCount managed devices"
             # Add results
             if ($AADP1Users.Count -gt 0) {
                 if ($null -ne ($AADP1SKUs = @($organizationSKUs | Where-Object{@($_.servicePlans.servicePlanId) -contains '41781fb2-bc02-4b7c-bd55-b576c07bb09d'}))) {
@@ -954,6 +975,19 @@ function Get-AzureADLicenseStatus {
                             Add-Result -PlanName 'Microsoft Defender for Office 365 P2' -EnabledCount $ATPLicenses -NeededCount $neededCount
                         }
                     }
+                }
+            }
+            if ($IntuneDevices.Count -gt 0) {
+                if ($null -ne ($IntuneDeviceSKUs = @($organizationSKUs | Where-Object{$_.skuId -eq '2b317a4a-77a6-4188-9437-b68a77b4e2c6'}))) {
+                    $IntuneDeviceLicenses = ($IntuneDeviceSKUs.prepaidUnits.enabled | Measure-Object -Sum).Sum
+                }
+                else {
+                    $IntuneDeviceLicenses = 0
+                }
+                $neededCount = ($IntuneDevices | Select-Object -Unique).Count
+                Write-Message "Found $neededCount needed, $IntuneDeviceLicenses enabled Intune Device licenses"
+                if ($IntuneDeviceLicenses -lt $neededCount) {
+                    Add-Result -PlanName 'Intune Device' -EnabledCount $IntuneDeviceLicenses -NeededCount $neededCount
                 }
             }
         }
