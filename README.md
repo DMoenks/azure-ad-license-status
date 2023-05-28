@@ -11,7 +11,7 @@ The main motivation for this report was to conquer side-effects of manual or sem
 
 > DISCLAIMER: The report can merely aid in complying with license terms and agreements. It cannot and never will lower or replace the liability to actually comply with any default or individually negotiated license terms and agreements applying to your organization.
 
-> HINT: Most of the requirements and preparations for Azure execution mentioned below can be deployed by using the provided Terraform module, the exception being an Exchange Online application access policy.
+> HINT: Most of the requirements and preparations for advanced Azure execution mentioned below can be deployed by using the provided Terraform module, the exception being an Exchange Online application access policy.
 
 ## 2 Feature overview
 
@@ -116,10 +116,10 @@ Check for license need based on Azure AD and Office feature information:
         1. Generate, request or import certificate
         2. Grant role _Key Vault Secrets User_ to automation account's managed identity
 2. Prepare authentication
-   1. Create Azure AD application
+   1. Register Azure AD application
    2. Add required permissions
-   3. Add certificate
-3. (optional) Limit permissions
+   3. Upload certificate
+3. (optional, recommended) Limit permissions
    1. Create Exchange Online application access policy to restrict Azure AD application's _Mail.Send_ permission to intended sender mailbox
 
 ## 5 Links
