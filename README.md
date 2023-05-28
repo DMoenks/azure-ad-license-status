@@ -106,14 +106,14 @@ Check for license need based on Azure AD and Office feature information:
    - For local execution
      1. Install required modules
      2. Install this module
-     3. Create self-signed certificate
+     3. Generate or request certificate
    - For Azure execution
      1. Create Azure automation account
         1. Add required modules
         2. Add this module
         3. Enable system-assigned managed identity
      2. Create Azure key vault
-        1. Create self-signed certificate
+        1. Generate, request or import certificate
         2. Grant role _Key Vault Secrets User_ to automation account's managed identity
 2. Prepare authentication
    1. Create Azure AD application
