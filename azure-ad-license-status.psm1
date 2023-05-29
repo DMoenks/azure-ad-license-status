@@ -78,7 +78,7 @@ function Write-Message {
         [string]$Type
     )
 
-    $formattedMessage = "[$([datetime]::Now.ToString('yyyy-MM-dd HH:mm:ss'))] $([string]::new('-', $nestingLevel)) $Message"
+    $formattedMessage = "[$([datetime]::Now.ToString('yyyy-MM-dd HH:mm:ss'))] $([string]::new('-', $nestingLevel))$Message"
     if ($Type -eq 'Error') {
         Write-Error -Message $formattedMessage -Category AuthenticationError
     }
@@ -332,7 +332,7 @@ function Get-ATPRecipient {
     $null -eq $IncludedDomains) {
         $userRecipients = [pscustomobject[]]@(Get-EXORecipient -RecipientTypeDetails $EXOTypes_user -Properties $EXOProperties -ResultSize Unlimited) | Select-Object -Property $EXOProperties
         $groupRecipients = Get-EXOGroupMember -GroupIDs ([pscustomobject[]]@(Get-EXORecipient -RecipientTypeDetails $EXOTypes_group -Properties $EXOProperties -ResultSize Unlimited)).ExchangeObjectId
-        $includedRecipients = $userRecipients + $groupRecipients | Select-Object -Unique
+        $includedRecipients = [pscustomobject[]]@($userRecipients + $groupRecipients | Select-Object -Unique)
     }
     else {
         $includedRecipients = Resolve-ATPRecipient -Users $IncludedUsers -Groups $IncludedGroups -Domains $IncludedDomains
@@ -820,12 +820,10 @@ function Get-AzureADLicenseStatus {
                         $ATPvariant = 'DfOP1'
                         Write-Message 'Identified a Defender for Office P1 tenant'
                         # Order of precedence according to https://learn.microsoft.com/en-us/microsoft-365/security/office-365-security/preset-security-policies?view=o365-worldwide#order-of-precedence-for-preset-security-policies-and-other-policies
-                        $matchedRecipients = [System.Collections.Generic.List[guid]]::new()
                         # Handle strict protection rule
                         if ($null -ne ($strictProtectionRule = Get-ATPProtectionPolicyRule -Identity 'Strict Preset Security Policy' -State Enabled -ErrorAction SilentlyContinue)) {
                             Write-Message 'ATP strict rule'
-                            if ($null -ne ($recipients = Get-ATPRecipient -IncludedUsers $strictProtectionRule.SentTo -IncludedGroups $strictProtectionRule.SentToMemberOf -IncludedDomains $strictProtectionRule.RecipientDomainIs -ExcludedUsers $strictProtectionRule.ExceptIfSentTo -ExcludedGroups $strictProtectionRule.ExceptIfSentToMemberOf -ExcludedDomains $strictProtectionRule.ExceptIfRecipientDomainIs | Where-Object{$_.ExternalDirectoryObjectId -notin $matchedRecipients})) {
-                                $matchedRecipients.AddRange([guid[]]@($recipients.ExternalDirectoryObjectId))
+                            if (($recipients = Get-ATPRecipient -IncludedUsers $strictProtectionRule.SentTo -IncludedGroups $strictProtectionRule.SentToMemberOf -IncludedDomains $strictProtectionRule.RecipientDomainIs -ExcludedUsers $strictProtectionRule.ExceptIfSentTo -ExcludedGroups $strictProtectionRule.ExceptIfSentToMemberOf -ExcludedDomains $strictProtectionRule.ExceptIfRecipientDomainIs).Count -gt 0) {
                                 $ATPUsers.AddRange([guid[]]@($recipients.ExternalDirectoryObjectId))
                                 Write-Message "Found $($recipients.Count) affected/protected recipients"
                             }
@@ -833,18 +831,16 @@ function Get-AzureADLicenseStatus {
                         # Handle standard protection rule
                         if ($null -ne ($standardProtectionRule = Get-ATPProtectionPolicyRule -Identity 'Standard Preset Security Policy' -State Enabled -ErrorAction SilentlyContinue)) {
                             Write-Message 'ATP standard rule'
-                            if ($null -ne ($recipients = Get-ATPRecipient -IncludedUsers $standardProtectionRule.SentTo -IncludedGroups $standardProtectionRule.SentToMemberOf -IncludedDomains $standardProtectionRule.RecipientDomainIs -ExcludedUsers $standardProtectionRule.ExceptIfSentTo -ExcludedGroups $standardProtectionRule.ExceptIfSentToMemberOf -ExcludedDomains $standardProtectionRule.ExceptIfRecipientDomainIs | Where-Object{$_.ExternalDirectoryObjectId -notin $matchedRecipients})) {
-                                $matchedRecipients.AddRange([guid[]]@($recipients.ExternalDirectoryObjectId))
+                            if (($recipients = Get-ATPRecipient -IncludedUsers $standardProtectionRule.SentTo -IncludedGroups $standardProtectionRule.SentToMemberOf -IncludedDomains $standardProtectionRule.RecipientDomainIs -ExcludedUsers $standardProtectionRule.ExceptIfSentTo -ExcludedGroups $standardProtectionRule.ExceptIfSentToMemberOf -ExcludedDomains $standardProtectionRule.ExceptIfRecipientDomainIs).Count -gt 0) {
                                 $ATPUsers.AddRange([guid[]]@($recipients.ExternalDirectoryObjectId))
                                 Write-Message "Found $($recipients.Count) affected/protected recipients"
                             }
                         }
                         # Handle custom protection rules
-                        foreach ($customAntiPhishPolicy in Get-AntiPhishPolicy | Where-Object{$_.Identity -ne 'Office 365 AntiPhish Default' -and $_.RecommendedPolicyType -notin @('Standard', 'Strict')}) {
+                        foreach ($customAntiPhishPolicy in Get-AntiPhishPolicy | Where-Object{$_.Identity -ne 'Office365 AntiPhish Default' -and $_.RecommendedPolicyType -notin @('Standard', 'Strict')}) {
                             if (($customAntiPhishRule = Get-AntiPhishRule | Where-Object{$_.AntiPhishPolicy -eq $customAntiPhishPolicy.Identity}).State -eq 'Enabled'){
                                 Write-Message "ATP custom anti-phishing policy '$($customAntiPhishPolicy.Name)'"
-                                if ($null -ne ($recipients = Get-ATPRecipient -IncludedUsers $customAntiPhishRule.SentTo -IncludedGroups $customAntiPhishRule.SentToMemberOf -IncludedDomains $customAntiPhishRule.RecipientDomainIs -ExcludedUsers $customAntiPhishRule.ExceptIfSentTo -ExcludedGroups $customAntiPhishRule.ExceptIfSentToMemberOf -ExcludedDomains $customAntiPhishRule.ExceptIfRecipientDomainIs | Where-Object{$_.ExternalDirectoryObjectId -notin $matchedRecipients})) {
-                                    $matchedRecipients.AddRange([guid[]]@($recipients.ExternalDirectoryObjectId))
+                                if (($recipients = Get-ATPRecipient -IncludedUsers $customAntiPhishRule.SentTo -IncludedGroups $customAntiPhishRule.SentToMemberOf -IncludedDomains $customAntiPhishRule.RecipientDomainIs -ExcludedUsers $customAntiPhishRule.ExceptIfSentTo -ExcludedGroups $customAntiPhishRule.ExceptIfSentToMemberOf -ExcludedDomains $customAntiPhishRule.ExceptIfRecipientDomainIs).Count -gt 0) {
                                     if ($customAntiPhishPolicy.Enabled) {
                                         $ATPUsers.AddRange([guid[]]@($recipients.ExternalDirectoryObjectId))
                                         Write-Message "Found $($recipients.Count) affected, $($recipients.Count) protected recipients"
@@ -858,8 +854,7 @@ function Get-AzureADLicenseStatus {
                         foreach ($customSafeAttachmentPolicy in Get-SafeAttachmentPolicy | Where-Object{$_.IsBuiltInProtection -eq $false -and $_.RecommendedPolicyType -notin @('Standard', 'Strict')}) {
                             if (($customSafeAttachmentRule = Get-SafeAttachmentRule | Where-Object{$_.SafeAttachmentPolicy -eq $customSafeAttachmentPolicy.Identity}).State -eq 'Enabled'){
                                 Write-Message "ATP custom Safe Attachments policy '$($customSafeAttachmentPolicy.Name)'"
-                                if ($null -ne ($recipients = Get-ATPRecipient -IncludedUsers $customSafeAttachmentRule.SentTo -IncludedGroups $customSafeAttachmentRule.SentToMemberOf -IncludedDomains $customSafeAttachmentRule.RecipientDomainIs -ExcludedUsers $customSafeAttachmentRule.ExceptIfSentTo -ExcludedGroups $customSafeAttachmentRule.ExceptIfSentToMemberOf -ExcludedDomains $customSafeAttachmentRule.ExceptIfRecipientDomainIs | Where-Object{$_.ExternalDirectoryObjectId -notin $matchedRecipients})) {
-                                    $matchedRecipients.AddRange([guid[]]@($recipients.ExternalDirectoryObjectId))
+                                if (($recipients = Get-ATPRecipient -IncludedUsers $customSafeAttachmentRule.SentTo -IncludedGroups $customSafeAttachmentRule.SentToMemberOf -IncludedDomains $customSafeAttachmentRule.RecipientDomainIs -ExcludedUsers $customSafeAttachmentRule.ExceptIfSentTo -ExcludedGroups $customSafeAttachmentRule.ExceptIfSentToMemberOf -ExcludedDomains $customSafeAttachmentRule.ExceptIfRecipientDomainIs).Count -gt 0) {
                                     if ($customSafeAttachmentPolicy.Enable) {
                                         $ATPUsers.AddRange([guid[]]@($recipients.ExternalDirectoryObjectId))
                                         Write-Message "Found $($recipients.Count) affected, $($recipients.Count) protected recipients"
@@ -873,8 +868,7 @@ function Get-AzureADLicenseStatus {
                         foreach ($customSafeLinksPolicy in Get-SafeLinksPolicy | Where-Object{$_.IsBuiltInProtection -eq $false -and $_.RecommendedPolicyType -notin @('Standard', 'Strict')}) {
                             if (($customSafeLinksRule = Get-SafeLinksRule | Where-Object{$_.SafeLinksPolicy -eq $customSafeLinksPolicy.Identity}).State -eq 'Enabled'){
                                 Write-Message "ATP custom Safe Links policy '$($customSafeLinksPolicy.Name)'"
-                                if ($null -ne ($recipients = Get-ATPRecipient -IncludedUsers $customSafeLinksRule.SentTo -IncludedGroups $customSafeLinksRule.SentToMemberOf -IncludedDomains $customSafeLinksRule.RecipientDomainIs -ExcludedUsers $customSafeLinksRule.ExceptIfSentTo -ExcludedGroups $customSafeLinksRule.ExceptIfSentToMemberOf -ExcludedDomains $customSafeLinksRule.ExceptIfRecipientDomainIs | Where-Object{$_.ExternalDirectoryObjectId -notin $matchedRecipients})) {
-                                    $matchedRecipients.AddRange([guid[]]@($recipients.ExternalDirectoryObjectId))
+                                if (($recipients = Get-ATPRecipient -IncludedUsers $customSafeLinksRule.SentTo -IncludedGroups $customSafeLinksRule.SentToMemberOf -IncludedDomains $customSafeLinksRule.RecipientDomainIs -ExcludedUsers $customSafeLinksRule.ExceptIfSentTo -ExcludedGroups $customSafeLinksRule.ExceptIfSentToMemberOf -ExcludedDomains $customSafeLinksRule.ExceptIfRecipientDomainIs).Count -gt 0) {
                                     if ($customSafeLinksPolicy.EnableSafeLinksForEmail -or $customSafeLinksPolicy.EnableSafeLinksForOffice -or $customSafeLinksPolicy.EnableSafeLinksForTeams) {
                                         $ATPUsers.AddRange([guid[]]@($recipients.ExternalDirectoryObjectId))
                                         Write-Message "Found $($recipients.Count) affected, $($recipients.Count) protected recipients"
@@ -888,8 +882,7 @@ function Get-AzureADLicenseStatus {
                         # Handle built-in protection rule
                         Write-Message 'ATP built-in rule'
                         $builtinProtectionRule = Get-ATPBuiltInProtectionRule
-                        if ($null -ne ($recipients = Get-ATPRecipient -IncludedUsers $builtinProtectionRule.SentTo -IncludedGroups $builtinProtectionRule.SentToMemberOf -IncludedDomains $builtinProtectionRule.RecipientDomainIs -ExcludedUsers $builtinProtectionRule.ExceptIfSentTo -ExcludedGroups $builtinProtectionRule.ExceptIfSentToMemberOf -ExcludedDomains $builtinProtectionRule.ExceptIfRecipientDomainIs | Where-Object{$_.ExternalDirectoryObjectId -notin $matchedRecipients})) {
-                            $matchedRecipients.AddRange([guid[]]@($recipients.ExternalDirectoryObjectId))
+                        if (($recipients = Get-ATPRecipient -IncludedUsers $builtinProtectionRule.SentTo -IncludedGroups $builtinProtectionRule.SentToMemberOf -IncludedDomains $builtinProtectionRule.RecipientDomainIs -ExcludedUsers $builtinProtectionRule.ExceptIfSentTo -ExcludedGroups $builtinProtectionRule.ExceptIfSentToMemberOf -ExcludedDomains $builtinProtectionRule.ExceptIfRecipientDomainIs).Count -gt 0) {
                             $ATPUsers.AddRange([guid[]]@($recipients.ExternalDirectoryObjectId))
                             Write-Message "Found $($recipients.Count) affected/protected recipients"
                         }
@@ -937,7 +930,7 @@ function Get-AzureADLicenseStatus {
                 else {
                     $AADP1Licenses = 0
                 }
-                $neededCount = ($AADP1Users | Select-Object -Unique).Count
+                $neededCount = @($AADP1Users | Select-Object -Unique).Count
                 Write-Message "Found $neededCount needed, $AADP1Licenses enabled AADP1 licenses"
                 if ($AADP1Licenses -lt $neededCount) {
                     Add-Result -PlanName 'Azure Active Directory Premium P1' -EnabledCount $AADP1Licenses -NeededCount $neededCount
@@ -950,14 +943,14 @@ function Get-AzureADLicenseStatus {
                 else {
                     $AADP2Licenses = 0
                 }
-                $neededCount = ($AADP2Users | Select-Object -Unique).Count
+                $neededCount = @($AADP2Users | Select-Object -Unique).Count
                 Write-Message "Found $neededCount needed, $AADP2Licenses enabled AADP2 licenses"
                 if ($AADP2Licenses -lt $neededCount) {
                     Add-Result -PlanName 'Azure Active Directory Premium P2' -EnabledCount $AADP2Licenses -NeededCount $neededCount
                 }
             }
             if ($ATPUsers.Count -gt 0) {
-                $neededCount = ($ATPUsers | Select-Object -Unique).Count
+                $neededCount = @($ATPUsers | Select-Object -Unique).Count
                 switch ($ATPvariant) {
                     'DfOP1' {
                         $ATPSKUs = @($organizationSKUs | Where-Object{@($_.servicePlans.servicePlanId) -contains 'f20fedf3-f3c3-43c3-8267-2bfdd51c0939'})
@@ -984,7 +977,7 @@ function Get-AzureADLicenseStatus {
                 else {
                     $IntuneDeviceLicenses = 0
                 }
-                $neededCount = ($IntuneDevices | Select-Object -Unique).Count
+                $neededCount = @($IntuneDevices | Select-Object -Unique).Count
                 Write-Message "Found $neededCount needed, $IntuneDeviceLicenses enabled Intune Device licenses"
                 if ($IntuneDeviceLicenses -lt $neededCount) {
                     Add-Result -PlanName 'Intune Device' -EnabledCount $IntuneDeviceLicenses -NeededCount $neededCount
