@@ -581,7 +581,18 @@ function Get-AzureADLicenseStatus {
         Write-Message "Found $($superiorSKUs_organization.Count) SKU matches for organization, out ouf $($organizationSKUs.Count) SKUs"
         #endregion
 
+        #region: Reports
+        # Possibly 'de-anonymize' usage reports
+        Invoke-MgGraphRequest -Method GET -Uri 'https://graph.microsoft.com/v1.0/reports/getM365AppUserDetail(period=''D7'')?$format=text/csv' -OutputFilePath "$env:TEMP\M365AppUserDetail.csv"
+        $M365AppUserDetail = Import-Csv "$env:TEMP\M365AppUserDetail.csv" | Select-Object 'User Principal Name','Windows','Mac','Mobile','Web'
+        Invoke-MgGraphRequest -Method GET -Uri 'https://graph.microsoft.com/v1.0/reports/getMailboxUsageDetail(period=''D7'')' -OutputFilePath "$env:TEMP\MailboxUsageDetail.csv"
+        $MailboxUsageDetail = Import-Csv "$env:TEMP\MailboxUsageDetail.csv" | Select-Object 'User Principal Name','Storage Used (Byte)','Has Archive'
+        Invoke-MgGraphRequest -Method GET -Uri 'https://graph.microsoft.com/v1.0/reports/getOneDriveUsageAccountDetail(period=''D7'')' -OutputFilePath "$env:TEMP\OneDriveUsageAccountDetail.csv"
+        $OneDriveUsageAccountDetail = Import-Csv "$env:TEMP\OneDriveUsageAccountDetail.csv" | Select-Object 'Owner Principal Name','Storage Used (Byte)'
+        #endregion
+
         #region: Users
+        $hashCalculator = [System.Security.Cryptography.MD5]::Create()
         $userCount = 0
         $URI = 'https://graph.microsoft.com/v1.0/users?$select=id,licenseAssignmentStates,userPrincipalName&$top={0}' -f $pageSize
         while ($null -ne $URI) {
@@ -592,6 +603,7 @@ function Get-AzureADLicenseStatus {
             $URI = $data['@odata.nextLink']
             # Analyze users
             foreach ($user in $users) {
+                $userHash = ($hashCalculator.ComputeHash([Text.Encoding]::ASCII.GetBytes($user.userPrincipalName)) | ForEach-Object{$_.ToString('X2')}) -join ''
                 if ($user.licenseAssignmentStates.count -gt 0) {
                     if ($null -ne ($userSKUAssignments = $user.licenseAssignmentStates | Where-Object{$_.state -eq 'Active' -or $_.error -in @('CountViolation', 'MutuallyExclusiveViolation')})) {
                         $userSKUs = $userSKUAssignments.skuId
