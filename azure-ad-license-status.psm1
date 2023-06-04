@@ -65,6 +65,7 @@ function Initialize-Module {
                             'UserMailbox')
     # Graph
     $script:pageSize = 500
+    $script:reportDays = 180
     # Process
     $script:nestingLevel = 0
 }
@@ -120,7 +121,7 @@ function Add-Result {
         [ValidateNotNullOrEmpty()]
         [string]$UserPrincipalName,
         [Parameter(Mandatory = $true, ParameterSetName = 'User')]
-        [ValidateSet('Interchangeable', 'Optimizable', 'Removable')]
+        [ValidateSet('Interchangeable', 'Optimizable', 'Removable', 'Preferred')]
         [string]$ConflictType,
         [Parameter(Mandatory = $true, ParameterSetName = 'User')]
         [ValidateNotNullOrEmpty()]
@@ -384,6 +385,22 @@ function Get-SKUName {
 }
 #endregion
 
+class PreferredSKURule {
+    [UInt16]$OneDriveStorageMaxGB = [UInt16]::MaxValue
+    [UInt16]$MailboxStorageMaxGB = [UInt16]::MaxValue
+    [ValidateSet('True', 'False', 'Skip')]
+    [string]$MailboxArchive = 'Skip'
+    [ValidateSet('True', 'False', 'Skip')]
+    [string]$WindowsAppUsed = 'Skip'
+    [ValidateSet('True', 'False', 'Skip')]
+    [string]$MacAppUsed = 'Skip'
+    [ValidateSet('True', 'False', 'Skip')]
+    [string]$MobileAppUsed = 'Skip'
+    [ValidateSet('True', 'False', 'Skip')]
+    [string]$WebAppUsed = 'Skip'
+    [guid]$SKUID
+}
+
 function Get-AzureADLicenseStatus {
     <#
     .SYNOPSIS
@@ -391,7 +408,7 @@ function Get-AzureADLicenseStatus {
     .DESCRIPTION
     This function is meant to conquer side-effects of semi-automatic license assignments for Microsoft services in Azure AD, i.e. the combination of group-based licensing with manual group membership management, by regularly reporting both on the amount of available licenses per SKU and any conflicting license assignments per user account. This allows for somewhat easier license management without either implementing a full-fledged software asset management solution or hiring a licensing service provider.
 
-    SKU IDs and names are in accordance with https://learn.microsoft.com/en-us/azure/active-directory/enterprise-users/licensing-service-plan-reference
+    SKU IDs and names are in accordance with https://learn.microsoft.com/azure/active-directory/enterprise-users/licensing-service-plan-reference
     .PARAMETER DirectoryID
     Specifies the directory to connect to
     .PARAMETER ApplicationID
@@ -503,9 +520,11 @@ function Get-AzureADLicenseStatus {
         [ValidateScript({$_ -in 1..99 -and $_ -lt $SKUWarningThreshold_advanced})]
         [UInt16]$SKUCriticalThreshold_advanced = 95,
         [ValidateNotNullOrEmpty()]
-        [guid[]]$ImportantSKUs = @(),
+        [guid[]]$ImportantSKUs,
         [ValidateNotNullOrEmpty()]
-        [guid[]]$InterchangeableSKUs = @(),
+        [guid[]]$InterchangeableSKUs,
+        [ValidateNotNullOrEmpty()]
+        [PreferredSKURule[]]$PreferredSKUs,
         [ValidateNotNullOrEmpty()]
         [string]$LicensingURL = 'https://www.microsoft.com/licensing/servicecenter',
         [switch]$AdvancedCheckups
@@ -582,17 +601,25 @@ function Get-AzureADLicenseStatus {
         #endregion
 
         #region: Reports
-        # Possibly 'de-anonymize' usage reports
-        Invoke-MgGraphRequest -Method GET -Uri 'https://graph.microsoft.com/v1.0/reports/getM365AppUserDetail(period=''D7'')?$format=text/csv' -OutputFilePath "$env:TEMP\M365AppUserDetail.csv"
-        $M365AppUserDetail = Import-Csv "$env:TEMP\M365AppUserDetail.csv" | Select-Object 'User Principal Name','Windows','Mac','Mobile','Web'
-        Invoke-MgGraphRequest -Method GET -Uri 'https://graph.microsoft.com/v1.0/reports/getMailboxUsageDetail(period=''D7'')' -OutputFilePath "$env:TEMP\MailboxUsageDetail.csv"
-        $MailboxUsageDetail = Import-Csv "$env:TEMP\MailboxUsageDetail.csv" | Select-Object 'User Principal Name','Storage Used (Byte)','Has Archive'
-        Invoke-MgGraphRequest -Method GET -Uri 'https://graph.microsoft.com/v1.0/reports/getOneDriveUsageAccountDetail(period=''D7'')' -OutputFilePath "$env:TEMP\OneDriveUsageAccountDetail.csv"
-        $OneDriveUsageAccountDetail = Import-Csv "$env:TEMP\OneDriveUsageAccountDetail.csv" | Select-Object 'Owner Principal Name','Storage Used (Byte)'
+        if ($AdvancedCheckups.IsPresent) {
+            Invoke-MgGraphRequest -Method GET -Uri ('https://graph.microsoft.com/v1.0/reports/getM365AppUserDetail(period=''D{0}'')?$format=text/csv' -f $reportDays) -OutputFilePath "$env:TEMP\M365AppUserDetail.csv"
+            $M365AppUserDetail = Import-Csv "$env:TEMP\M365AppUserDetail.csv" | Select-Object 'User Principal Name','Windows','Mac','Mobile','Web'
+            Invoke-MgGraphRequest -Method GET -Uri ('https://graph.microsoft.com/v1.0/reports/getMailboxUsageDetail(period=''D{0}'')' -f $reportDays) -OutputFilePath "$env:TEMP\MailboxUsageDetail.csv"
+            $MailboxUsageDetail = Import-Csv "$env:TEMP\MailboxUsageDetail.csv" | Select-Object 'User Principal Name','Storage Used (Byte)','Has Archive'
+            Invoke-MgGraphRequest -Method GET -Uri ('https://graph.microsoft.com/v1.0/reports/getOneDriveUsageAccountDetail(period=''D{0}'')' -f $reportDays) -OutputFilePath "$env:TEMP\OneDriveUsageAccountDetail.csv"
+            $OneDriveUsageAccountDetail = Import-Csv "$env:TEMP\OneDriveUsageAccountDetail.csv" | Select-Object 'Owner Principal Name','Storage Used (Byte)'
+            if ($M365AppUserDetail.'User Principal Name' -like '*@*' -or
+                $MailboxUsageDetail.'User Principal Name' -like '*@*' -or
+                $OneDriveUsageAccountDetail.'Owner Principal Name' -like '*@*') {
+                $hashedReports = $false
+            }
+            else {
+                $hashedReports = $true
+            }
+        }
         #endregion
 
         #region: Users
-        $hashCalculator = [System.Security.Cryptography.MD5]::Create()
         $userCount = 0
         $URI = 'https://graph.microsoft.com/v1.0/users?$select=id,licenseAssignmentStates,userPrincipalName&$top={0}' -f $pageSize
         while ($null -ne $URI) {
@@ -603,7 +630,6 @@ function Get-AzureADLicenseStatus {
             $URI = $data['@odata.nextLink']
             # Analyze users
             foreach ($user in $users) {
-                $userHash = ($hashCalculator.ComputeHash([Text.Encoding]::ASCII.GetBytes($user.userPrincipalName)) | ForEach-Object{$_.ToString('X2')}) -join ''
                 if ($user.licenseAssignmentStates.count -gt 0) {
                     if ($null -ne ($userSKUAssignments = $user.licenseAssignmentStates | Where-Object{$_.state -eq 'Active' -or $_.error -in @('CountViolation', 'MutuallyExclusiveViolation')})) {
                         $userSKUs = $userSKUAssignments.skuId
@@ -618,7 +644,7 @@ function Get-AzureADLicenseStatus {
                     }
                     # Identify interchangeable SKUs, based on specifications
                     $userSKUs_interchangeable = @()
-                    if ($null -ne $userSKUs) {
+                    if ($null -ne $userSKUs -and $null -ne $InterchangeableSKUs) {
                         if ($null -ne ($comparison_interchangeable = Compare-Object -ReferenceObject $userSKUs -DifferenceObject $InterchangeableSKUs -ExcludeDifferent -IncludeEqual)) {
                             $userSKUs_interchangeable = @($comparison_interchangeable.InputObject)
                         }
@@ -662,6 +688,76 @@ function Get-AzureADLicenseStatus {
                     else {
                         $userSKUs_removable = $null
                     }
+                    # Identify preferred SKUs, based on user-level calculations
+                    $hashCalculator = [System.Security.Cryptography.MD5]::Create()
+                    if ($AdvancedCheckups.IsPresent) {
+                        if ($hashedReports) {
+                            $userName = ($hashCalculator.ComputeHash([Text.Encoding]::ASCII.GetBytes($user.userPrincipalName)) | ForEach-Object{$_.ToString('X2')}) -join ''
+                        }
+                        else {
+                            $userName = $user.userPrincipalName
+                        }
+                        if ($null -ne ($userOneDrive = $OneDriveUsageAccountDetail | Where-Object{$_.'Owner Principal Name' -eq $userName})) {
+                            $userOneDriveStorageGB = $userOneDrive.'Storage Used (Byte)' / [System.Math]::Pow(1000, 3)
+                        }
+                        else {
+                            $userOneDriveStorageGB = 0
+                        }
+                        if ($null -ne ($userMailbox = $MailboxUsageDetail | Where-Object{$_.'User Principal Name' -eq $userName})) {
+                            $userMailboxStorageGB = $userMailbox.'Storage Used (Byte)' / [System.Math]::Pow(1000, 3)
+                            $userMailboxArchive = $userMailbox.'Has Archive'
+                        }
+                        else {
+                            $userMailboxStorageGB = 0
+                            $userMailboxArchive = $false
+                        }
+                        if ($null -ne ($userAppsUsed = $M365AppUserDetail | Where-Object{$_.'User Principal Name' -eq $userName})) {
+                            if ($userAppsUsed.'Windows' -eq 'Yes') {
+                                $userWindowsAppUsed = $true
+                            }
+                            else {
+                                $userWindowsAppUsed = $false
+                            }
+                            if ($userAppsUsed.'Mac' -eq 'Yes') {
+                                $userMacAppUsed = $true
+                            }
+                            else {
+                                $userMacAppUsed = $false
+                            }
+                            if ($userAppsUsed.'Mobile' -eq 'Yes') {
+                                $userMobileAppUsed = $true
+                            }
+                            else {
+                                $userMobileAppUsed = $false
+                            }
+                            if ($userAppsUsed.'Web' -eq 'Yes') {
+                                $userWebAppUsed = $true
+                            }
+                            else {
+                                $userWebAppUsed = $false
+                            }
+                        }
+                        else {
+                            $userWindowsAppUsed = $false
+                            $userMacAppUsed = $false
+                            $userMobileAppUsed = $false
+                            $userWebAppUsed = $false
+                        }
+                        $userSKUs_preferred = $null
+                        foreach ($preferredSKU in $PreferredSKUs) {
+                            if ($null -eq $userSKUs_preferred) {
+                                if ($userOneDriveStorageGB -le $preferredSKU.OneDriveStorageMaxGB -and
+                                    $userMailboxStorageGB -le $preferredSKU.MailboxStorageMaxGB -and
+                                    ($userMailboxArchive.ToString() -eq $preferredSKU.MailboxArchive -or $preferredSKU.MailboxArchive -eq 'Skip') -and
+                                    ($userWindowsAppUsed.ToString() -eq $preferredSKU.WindowsAppUsed -or $preferredSKU.WindowsAppUsed -eq 'Skip') -and
+                                    ($userMacAppUsed.ToString() -eq $preferredSKU.MacAppUsed -or $preferredSKU.MacAppUsed -eq 'Skip') -and
+                                    ($userMobileAppUsed.ToString() -eq $preferredSKU.MobileAppUsed -or $preferredSKU.MobileAppUsed -eq 'Skip') -and
+                                    ($userWebAppUsed.ToString() -eq $preferredSKU.WebAppUsed -or $preferredSKU.WebAppUsed -eq 'Skip')) {
+                                    $userSKUs_preferred = $preferredSKU.SKUID
+                                }
+                            }
+                        }
+                    }
                     # Add results
                     if ($userSKUs_interchangeable.Count -gt 1) {
                         Write-Message "Found $($userSKUs_interchangeable.Count) interchangeable SKUs for user $($user.userPrincipalName)"
@@ -675,6 +771,12 @@ function Get-AzureADLicenseStatus {
                         Write-Message "Found $(@($userSKUs_removable).Count) removable SKUs for user $($user.userPrincipalName)"
                         Add-Result -UserPrincipalName $user.userPrincipalName -ConflictType Removable -ConflictSKUs $userSKUs_removable
                     }
+                    if ($null -ne $userSKUs_preferred) {
+                        if ($userSKUs -notcontains $userSKUs_preferred) {
+                            Write-Message "Found preferred SKU for user $($user.userPrincipalName)"
+                            Add-Result -UserPrincipalName $user.userPrincipalName -ConflictType Preferred -ConflictSKUs $userSKUs_preferred
+                        }
+                    }
                 }
             }
         }
@@ -682,7 +784,7 @@ function Get-AzureADLicenseStatus {
         #endregion
 
         #region: Advanced
-        if ($AdvancedCheckups) {
+        if ($AdvancedCheckups.IsPresent) {
             $AADP1Users = [System.Collections.Generic.List[guid]]::new()
             $AADP2Users = [System.Collections.Generic.List[guid]]::new()
             $ATPUsers = [System.Collections.Generic.List[guid]]::new()

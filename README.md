@@ -57,6 +57,10 @@ Check for license need based on Azure AD and Office feature information:
 
 :heavy_check_mark: Calculate removable licenses based on enabled features
 
+#### 2.2.2 Advanced
+
+:heavy_check_mark: Check for organization's preferred licenses
+
 ## 3 Requirements
 
 ### 3.1 Modules
@@ -90,6 +94,7 @@ Check for license need based on Azure AD and Office feature information:
 
 - Microsoft Graph permission _AuditLog.Read.All_
 - Microsoft Graph permission _Policy.Read.All_
+- Microsoft Graph permission _Reports.Read.All_
 - Microsoft Graph permission _RoleManagement.Read.All_
 - Office 365 Exchange Online permission _Exchange.ManageAsApp_
 - Azure AD role _Global Reader_
