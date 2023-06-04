@@ -1219,7 +1219,7 @@ function Get-AzureADLicenseStatus {
                                             Sort-Object) -join '<br>')</td></tr>"
                 }
                 Add-Output -Output '</table></p>
-                                    <p>The following criteria were used during the checkup:</p>
+                                    <p>The following criteria were used during the checkup, in order:</p>
                                     <p><table><tr>
                                     <th>License type</th>
                                     <th>OneDrive limit</th>
