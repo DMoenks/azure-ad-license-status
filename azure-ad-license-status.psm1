@@ -1098,7 +1098,11 @@ function Get-AzureADLicenseStatus {
             Add-Output -Output '<p class=gray>Basic checkup - Products</p>'
             if ($results.ContainsKey('SKU_Basic')) {
                 Add-Output -Output "<p>Please check license counts for the following product SKUs and <a href=""$LicensingURL"">reserve</a> additional licenses:</p> `
-                                    <p><table><tr><th>License type</th><th>Available count</th><th>Minimum count</th><th>Difference</th></tr>"
+                                    <p><table><tr>
+                                    <th>License type</th>
+                                    <th>Available count</th>
+                                    <th>Minimum count</th>
+                                    <th>Difference</th></tr>"
                 foreach ($SKU in $results['SKU_Basic'].Keys) {
                     $differenceCount = $results['SKU_Basic'][$SKU]['availableCount'] - $results['SKU_Basic'][$SKU]['minimumCount']
                     Add-Output -Output "<tr> `
@@ -1130,7 +1134,11 @@ function Get-AzureADLicenseStatus {
             Add-Output -Output '<p class=gray>Advanced checkup - Products</p>'
             if ($results.ContainsKey('SKU_Advanced')) {
                 Add-Output -Output "<p>Please check license counts for the following product SKUs and <a href=""$LicensingURL"">reserve</a> additional licenses:</p> `
-                                    <p><table><tr><th>License type</th><th>Enabled count</th><th>Needed count</th><th>Difference</th></tr>"
+                                    <p><table><tr>
+                                    <th>License type</th>
+                                    <th>Enabled count</th>
+                                    <th>Needed count</th>
+                                    <th>Difference</th></tr>"
                 foreach ($plan in $results['SKU_Advanced'].Keys) {
                     $differenceCount = $results['SKU_Advanced'][$plan]['enabledCount'] - $results['SKU_Advanced'][$plan]['neededCount']
                     Add-Output -Output "<tr> `
@@ -1164,7 +1172,11 @@ function Get-AzureADLicenseStatus {
             Add-Output -Output '<p class=gray>Basic checkup - Users</p>'
             if ($results.ContainsKey('User_Basic')) {
                 Add-Output -Output '<p>Please check license assignments for the following user accounts and mitigate impact:</p>
-                                    <p><table><tr><th>Account</th><th>Interchangeable</th><th>Optimizable</th><th>Removable</th></tr>'
+                                    <p><table><tr>
+                                    <th>Account</th>
+                                    <th>Interchangeable</th>
+                                    <th>Optimizable</th>
+                                    <th>Removable</th></tr>'
                 foreach ($user in $results['User_Basic'].Keys | Sort-Object) {
                     Add-Output -Output "<tr> `
                                         <td>$user</td> `
@@ -1179,8 +1191,7 @@ function Get-AzureADLicenseStatus {
                                         <td>$(($results['User_Basic'][$user]['Removable'] |
                                                 Where-Object{$null -ne $_} |
                                                 ForEach-Object{Get-SKUName -SKUID $_} |
-                                                Sort-Object) -join '<br>')</td> `
-                                        </tr>"
+                                                Sort-Object) -join '<br>')</td></tr>"
                 }
                 Add-Output -Output '</table></p>
                                     <p>The following criteria were used during the checkup:<ul>
@@ -1196,19 +1207,28 @@ function Get-AzureADLicenseStatus {
             Add-Output -Output '<p class=gray>Advanced checkup - Users</p>'
             if ($results.ContainsKey('User_Advanced')) {
                 Add-Output -Output '<p>Please check license assignments for the following user accounts and mitigate impact:</p>
-                                    <p><table><tr><th>Account</th><th>Preferred</th></tr>'
+                                    <p><table><tr>
+                                    <th>Account</th>
+                                    <th>Preferred</th></tr>'
                 foreach ($user in $results['User_Advanced'].Keys | Sort-Object) {
                     Add-Output -Output "<tr> `
                                         <td>$user</td> `
                                         <td>$(($results['User_Advanced'][$user]['Preferred'] |
-                                                Where-Object{$null -ne $_} |
-                                                ForEach-Object{Get-SKUName -SKUID $_} |
-                                                Sort-Object) -join '<br>')</td> `
-                                        </tr>"
+                                            Where-Object{$null -ne $_} |
+                                            ForEach-Object{Get-SKUName -SKUID $_} |
+                                            Sort-Object) -join '<br>')</td></tr>"
                 }
                 Add-Output -Output '</table></p>
                                     <p>The following criteria were used during the checkup:</p>
-                                    <p><table><tr><th>License type</th><th>OneDrive limit</th><th>Mailbox limit</th><th>Mailbox archive</th><th>Windows app</th><th>Mac app</th><th>Mobile app</th><th>Web app</th></tr>'
+                                    <p><table><tr>
+                                    <th>License type</th>
+                                    <th>OneDrive limit</th>
+                                    <th>Mailbox limit</th>
+                                    <th>Mailbox archive</th>
+                                    <th>Windows app</th>
+                                    <th>Mac app</th>
+                                    <th>Mobile app</th>
+                                    <th>Web app</th></tr>'
                 foreach ($preferredSKU in $PreferredSKUs) {
                     Add-Output -Output "<tr> `
                                         <td>$(Get-SKUName -SKUID $preferredSKU.SKUID)</td> `
@@ -1218,8 +1238,7 @@ function Get-AzureADLicenseStatus {
                                         <td>$($preferredSKU.WindowsAppUsed)</td> `
                                         <td>$($preferredSKU.MacAppUsed)</td> `
                                         <td>$($preferredSKU.MobileAppUsed)</td> `
-                                        <td>$($preferredSKU.WebAppUsed)</td> `
-                                        </tr>"
+                                        <td>$($preferredSKU.WebAppUsed)</td></tr>"
                 }
                 Add-Output -Output '</table></p>'
             }
