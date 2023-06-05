@@ -15,10 +15,6 @@ resource "azuread_application" "application" {
       type = "Role"
     }
     resource_access {
-      id   = azuread_service_principal.service_principal_graph.app_role_ids["DeviceManagementManagedDevices.Read.All"]
-      type = "Role"
-    }
-    resource_access {
       id   = azuread_service_principal.service_principal_graph.app_role_ids["Mail.Send"]
       type = "Role"
     }
