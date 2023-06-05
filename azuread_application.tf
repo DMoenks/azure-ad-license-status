@@ -27,6 +27,10 @@ resource "azuread_application" "application" {
       type = "Role"
     }
     resource_access {
+      id   = azuread_service_principal.service_principal_graph.app_role_ids["Reports.Read.All"]
+      type = "Role"
+    }
+    resource_access {
       id   = azuread_service_principal.service_principal_graph.app_role_ids["RoleManagement.Read.All"]
       type = "Role"
     }
@@ -56,6 +60,12 @@ resource "azuread_app_role_assignment" "app_role_assignment_graph_policy_read_al
   principal_object_id = azuread_service_principal.service_principal_azure_ad_license_status.object_id
   resource_object_id  = azuread_service_principal.service_principal_graph.object_id
   app_role_id         = azuread_service_principal.service_principal_graph.app_role_ids["Policy.Read.All"]
+}
+
+resource "azuread_app_role_assignment" "app_role_assignment_graph_policy_read_all" {
+  principal_object_id = azuread_service_principal.service_principal_azure_ad_license_status.object_id
+  resource_object_id  = azuread_service_principal.service_principal_graph.object_id
+  app_role_id         = azuread_service_principal.service_principal_graph.app_role_ids["Reports.Read.All"]
 }
 
 resource "azuread_app_role_assignment" "app_role_assignment_graph_rolemanagement_read_all" {
