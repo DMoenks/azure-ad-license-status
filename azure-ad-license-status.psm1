@@ -117,15 +117,22 @@ function Add-Result {
         [Parameter(Mandatory = $true, ParameterSetName = 'SKU_Basic')]
         [ValidateNotNullOrEmpty()]
         [UInt32]$MinimumCount,
-        [Parameter(Mandatory = $true, ParameterSetName = 'User')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'User_Basic')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'User_Advanced')]
         [ValidateNotNullOrEmpty()]
         [string]$UserPrincipalName,
-        [Parameter(Mandatory = $true, ParameterSetName = 'User')]
-        [ValidateSet('Interchangeable', 'Optimizable', 'Removable', 'Preferred')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'User_Basic')]
+        [ValidateSet('Interchangeable', 'Optimizable', 'Removable')]
         [string]$ConflictType,
-        [Parameter(Mandatory = $true, ParameterSetName = 'User')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'User_Basic')]
         [ValidateNotNullOrEmpty()]
         [guid[]]$ConflictSKUs,
+        [Parameter(Mandatory = $true, ParameterSetName = 'User_Advanced')]
+        [ValidateNotNullOrEmpty()]
+        [guid]$PreferableSKU,
+        [Parameter(Mandatory = $true, ParameterSetName = 'User_Advanced')]
+        [AllowEmptyCollection()]
+        [guid[]]$OpposingSKUs,
         [Parameter(Mandatory = $true, ParameterSetName = 'SKU_Advanced')]
         [ValidateNotNullOrEmpty()]
         [string]$PlanName,
@@ -141,49 +148,43 @@ function Add-Result {
     $nestingLevel++
     Write-Message 'Add-Result' -Type Verbose
     # Processing
+    if (-not $results.ContainsKey($PSCmdlet.ParameterSetName)) {
+        $results.Add($PSCmdlet.ParameterSetName, @{})
+    }
     switch ($PSCmdlet.ParameterSetName) {
         'SKU_Advanced' {
-            $resultType = 'SKU_Advanced'
-            if (-not $results.ContainsKey($resultType)) {
-                $results.Add($resultType, @{})
-            }
-            if (-not $results[$resultType].ContainsKey($PlanName)) {
-                $results[$resultType].Add($PlanName, @{
+            if (-not $results[$PSCmdlet.ParameterSetName].ContainsKey($PlanName)) {
+                $results[$PSCmdlet.ParameterSetName].Add($PlanName, @{
                     'enabledCount' = $EnabledCount;
                     'neededCount' = $NeededCount
                 })
             }
         }
         'SKU_Basic' {
-            $resultType = 'SKU_Basic'
-            if (-not $results.ContainsKey($resultType)) {
-                $results.Add($resultType, @{})
-            }
-            if (-not $results[$resultType].ContainsKey($SKUID)) {
-                $results[$resultType].Add($SKUID, @{
+            if (-not $results[$PSCmdlet.ParameterSetName].ContainsKey($SKUID)) {
+                $results[$PSCmdlet.ParameterSetName].Add($SKUID, @{
                     'availableCount' = $AvailableCount;
                     'minimumCount' = $MinimumCount
                 })
             }
         }
-        'User' {
-            switch ($ConflictType) {
-                'Preferred' {
-                    $resultType = 'User_Advanced'
-                }
-                Default {
-                    $resultType = 'User_Basic'
-                    
-                }
+        'User_Advanced' {
+            if (-not $results[$PSCmdlet.ParameterSetName].ContainsKey($UserPrincipalName)) {
+                $results[$PSCmdlet.ParameterSetName].Add($UserPrincipalName, @{})
             }
-            if (-not $results.ContainsKey($resultType)) {
-                $results.Add($resultType, @{})
+            if (-not $results[$PSCmdlet.ParameterSetName][$UserPrincipalName].ContainsKey('Preferable')) {
+                $results[$PSCmdlet.ParameterSetName][$UserPrincipalName].Add('Preferable', @{
+                    'preferableSKU' = $PreferableSKU;
+                    'opposingSKUs' = $OpposingSKUs
+                })
             }
-            if (-not $results[$resultType].ContainsKey($UserPrincipalName)) {
-                $results[$resultType].Add($UserPrincipalName, @{})
+        }
+        'User_Basic' {
+            if (-not $results[$PSCmdlet.ParameterSetName].ContainsKey($UserPrincipalName)) {
+                $results[$PSCmdlet.ParameterSetName].Add($UserPrincipalName, @{})
             }
-            if (-not $results[$resultType][$UserPrincipalName].ContainsKey($ConflictType)) {
-                $results[$resultType][$UserPrincipalName].Add($ConflictType, $ConflictSKUs)
+            if (-not $results[$PSCmdlet.ParameterSetName][$UserPrincipalName].ContainsKey($ConflictType)) {
+                $results[$PSCmdlet.ParameterSetName][$UserPrincipalName].Add($ConflictType, $ConflictSKUs)
             }
         }
     }
@@ -402,7 +403,7 @@ function Get-SKUName {
 }
 #endregion
 
-class PreferredSKURule {
+class PreferableSKURule {
     [UInt16]$OneDriveStorageMaxGB = [UInt16]::MaxValue
     [UInt16]$MailboxStorageMaxGB = [UInt16]::MaxValue
     [ValidateSet('True', 'False', 'Skip')]
@@ -468,6 +469,8 @@ function Get-AzureADLicenseStatus {
     Specifies the SKUs which are deemed important, so different thresholds are used for calculation
     .PARAMETER InterchangeableSKUs
     Specifies a list of SKUs which are deemed interchangeable, e.g Office 365 E1 and Office 365 E3
+    .PARAMETER PreferableSKUs
+    Specifies a list of SKUs which are deemed preferable based on their provided ruleset
     .PARAMETER LicensingURL
     Specifies a licensing portal URL to be linked in the report, refers to Microsoft's Volume Licensing Service Center by default
     .PARAMETER AdvancedCheckups
@@ -482,7 +485,7 @@ function Get-AzureADLicenseStatus {
 
     Prepares a status report with customized thresholds for larger organizations and additional recipients for when license counts reach critical levels
     .EXAMPLE
-    Get-AzureADLicenseStatus -DirectoryID '00000000-0000-0000-0000-000000000000' -ApplicationID '00000000-0000-0000-0000-000000000000' -SubscriptionID '00000000-0000-0000-0000-000000000000' -KeyVaultName 'MyKeyVault' -CertificateName 'MyCertificate' -SenderAddress 'sender@example.com' -RecipientAddresses_normal @('recipient_1@example.com', 'recipient_2@example.com') -RecipientAddresses_critical @('recipient_3@example.com', 'recipient_4@example.com') -SKUPercentageThreshold_normal 1 -SKUTotalThreshold_normal 100 -SKUPercentageThreshold_important 1 -SKUTotalThreshold_important 500 -ImportantSKUs @('18181a46-0d4e-45cd-891e-60aabd171b4e', '6fd2c87f-b296-42f0-b197-1e91e994b900') -InterchangeableSKUs @('4b585984-651b-448a-9e53-3b10f069cf7f', '18181a46-0d4e-45cd-891e-60aabd171b4e', '6fd2c87f-b296-42f0-b197-1e91e994b900', 'c7df2760-2c81-4ef7-b578-5b5392b571df') -AdvancedCheckups
+    Get-AzureADLicenseStatus -DirectoryID '00000000-0000-0000-0000-000000000000' -ApplicationID '00000000-0000-0000-0000-000000000000' -SubscriptionID '00000000-0000-0000-0000-000000000000' -KeyVaultName 'MyKeyVault' -CertificateName 'MyCertificate' -SenderAddress 'sender@example.com' -RecipientAddresses_normal @('recipient_1@example.com', 'recipient_2@example.com') -RecipientAddresses_critical @('recipient_3@example.com', 'recipient_4@example.com') -SKUPercentageThreshold_normal 1 -SKUTotalThreshold_normal 100 -SKUPercentageThreshold_important 1 -SKUTotalThreshold_important 500 -ImportantSKUs @('18181a46-0d4e-45cd-891e-60aabd171b4e', '6fd2c87f-b296-42f0-b197-1e91e994b900') -InterchangeableSKUs @('4b585984-651b-448a-9e53-3b10f069cf7f', '18181a46-0d4e-45cd-891e-60aabd171b4e', '6fd2c87f-b296-42f0-b197-1e91e994b900', 'c7df2760-2c81-4ef7-b578-5b5392b571df') -PreferableSKUs @([PreferableSKURule]@{OneDriveStorageMaxGB = 1; MailboxStorageMaxGB = 1; MailboxArchive = 'False'; SKUID = '4b585984-651b-448a-9e53-3b10f069cf7f'}) -AdvancedCheckups
 
     Prepares a status report by using an Azure certificate for automation purposes, specifying both important and interchangeable SKUs and activating advanced checkups
     #>
@@ -541,7 +544,7 @@ function Get-AzureADLicenseStatus {
         [ValidateNotNullOrEmpty()]
         [guid[]]$InterchangeableSKUs,
         [ValidateNotNullOrEmpty()]
-        [PreferredSKURule[]]$PreferredSKUs,
+        [PreferableSKURule[]]$PreferableSKUs,
         [ValidateNotNullOrEmpty()]
         [string]$LicensingURL = 'https://www.microsoft.com/licensing/servicecenter',
         [switch]$AdvancedCheckups
@@ -661,7 +664,8 @@ function Get-AzureADLicenseStatus {
                     }
                     # Identify interchangeable SKUs, based on specifications
                     $userSKUs_interchangeable = @()
-                    if ($null -ne $userSKUs -and $null -ne $InterchangeableSKUs) {
+                    if ($null -ne $userSKUs -and
+                    $null -ne $InterchangeableSKUs) {
                         if ($null -ne ($comparison_interchangeable = Compare-Object -ReferenceObject $userSKUs -DifferenceObject $InterchangeableSKUs -ExcludeDifferent -IncludeEqual)) {
                             $userSKUs_interchangeable = @($comparison_interchangeable.InputObject)
                         }
@@ -705,7 +709,7 @@ function Get-AzureADLicenseStatus {
                     else {
                         $userSKUs_removable = $null
                     }
-                    # Identify preferred SKUs, based on user-level calculations
+                    # Identify preferable SKUs, based on user-level calculations
                     $hashCalculator = [System.Security.Cryptography.MD5]::Create()
                     if ($AdvancedCheckups.IsPresent) {
                         if ($hashedReports) {
@@ -760,17 +764,17 @@ function Get-AzureADLicenseStatus {
                             $userMobileAppUsed = $false
                             $userWebAppUsed = $false
                         }
-                        $userSKUs_preferred = $null
-                        foreach ($preferredSKU in $PreferredSKUs) {
-                            if ($null -eq $userSKUs_preferred) {
-                                if ($userOneDriveStorageGB -le $preferredSKU.OneDriveStorageMaxGB -and
-                                    $userMailboxStorageGB -le $preferredSKU.MailboxStorageMaxGB -and
-                                    ($userMailboxArchive.ToString() -eq $preferredSKU.MailboxArchive -or $preferredSKU.MailboxArchive -eq 'Skip') -and
-                                    ($userWindowsAppUsed.ToString() -eq $preferredSKU.WindowsAppUsed -or $preferredSKU.WindowsAppUsed -eq 'Skip') -and
-                                    ($userMacAppUsed.ToString() -eq $preferredSKU.MacAppUsed -or $preferredSKU.MacAppUsed -eq 'Skip') -and
-                                    ($userMobileAppUsed.ToString() -eq $preferredSKU.MobileAppUsed -or $preferredSKU.MobileAppUsed -eq 'Skip') -and
-                                    ($userWebAppUsed.ToString() -eq $preferredSKU.WebAppUsed -or $preferredSKU.WebAppUsed -eq 'Skip')) {
-                                    $userSKUs_preferred = $preferredSKU.SKUID
+                        $userSKUs_preferable = $null
+                        foreach ($preferableSKU in $PreferableSKUs) {
+                            if ($null -eq $userSKUs_preferable) {
+                                if ($userOneDriveStorageGB -le $preferableSKU.OneDriveStorageMaxGB -and
+                                $userMailboxStorageGB -le $preferableSKU.MailboxStorageMaxGB -and
+                                ($userMailboxArchive.ToString() -eq $preferableSKU.MailboxArchive -or $preferableSKU.MailboxArchive -eq 'Skip') -and
+                                ($userWindowsAppUsed.ToString() -eq $preferableSKU.WindowsAppUsed -or $preferableSKU.WindowsAppUsed -eq 'Skip') -and
+                                ($userMacAppUsed.ToString() -eq $preferableSKU.MacAppUsed -or $preferableSKU.MacAppUsed -eq 'Skip') -and
+                                ($userMobileAppUsed.ToString() -eq $preferableSKU.MobileAppUsed -or $preferableSKU.MobileAppUsed -eq 'Skip') -and
+                                ($userWebAppUsed.ToString() -eq $preferableSKU.WebAppUsed -or $preferableSKU.WebAppUsed -eq 'Skip')) {
+                                    $userSKUs_preferable = $preferableSKU.SKUID
                                 }
                             }
                         }
@@ -788,10 +792,16 @@ function Get-AzureADLicenseStatus {
                         Write-Message "Found $(@($userSKUs_removable).Count) removable SKUs for user $($user.userPrincipalName)"
                         Add-Result -UserPrincipalName $user.userPrincipalName -ConflictType Removable -ConflictSKUs $userSKUs_removable
                     }
-                    if ($null -ne $userSKUs_preferred) {
-                        if ($userSKUs -notcontains $userSKUs_preferred) {
-                            Write-Message "Found preferred SKU for user $($user.userPrincipalName)"
-                            Add-Result -UserPrincipalName $user.userPrincipalName -ConflictType Preferred -ConflictSKUs $userSKUs_preferred
+                    if ($null -ne $userSKUs_preferable) {
+                        if ($userSKUs -notcontains $userSKUs_preferable) {
+                            Write-Message "Found preferable SKU for user $($user.userPrincipalName)"
+                            if ($InterchangeableSKUs -contains $userSKUs_preferable -and
+                            $null -ne $userSKUs_interchangeable) {
+                                Add-Result -UserPrincipalName $user.userPrincipalName -PreferableSKU $userSKUs_preferable -OpposingSKUs $userSKUs_interchangeable
+                            }
+                            else {
+                                Add-Result -UserPrincipalName $user.userPrincipalName -PreferableSKU $userSKUs_preferable -OpposingSKUs @()
+                            }
                         }
                     }
                 }
@@ -1209,11 +1219,16 @@ function Get-AzureADLicenseStatus {
                 Add-Output -Output '<p>Please check license assignments for the following user accounts and mitigate impact:</p>
                                     <p><table><tr>
                                     <th>Account</th>
-                                    <th>Preferred</th></tr>'
+                                    <th>Preferable</th>
+                                    <th>Removable</th></tr>'
                 foreach ($user in $results['User_Advanced'].Keys | Sort-Object) {
                     Add-Output -Output "<tr> `
                                         <td>$user</td> `
-                                        <td>$(($results['User_Advanced'][$user]['Preferred'] |
+                                        <td>$(($results['User_Advanced'][$user]['Preferable']['preferableSKU'] |
+                                            Where-Object{$null -ne $_} |
+                                            ForEach-Object{Get-SKUName -SKUID $_} |
+                                            Sort-Object) -join '<br>')</td>
+                                        <td>$(($results['User_Advanced'][$user]['Preferable']['opposingSKUs'] |
                                             Where-Object{$null -ne $_} |
                                             ForEach-Object{Get-SKUName -SKUID $_} |
                                             Sort-Object) -join '<br>')</td></tr>"
@@ -1229,16 +1244,16 @@ function Get-AzureADLicenseStatus {
                                     <th>Mac app</th>
                                     <th>Mobile app</th>
                                     <th>Web app</th></tr>'
-                foreach ($preferredSKU in $PreferredSKUs) {
+                foreach ($preferableSKU in $PreferableSKUs) {
                     Add-Output -Output "<tr> `
-                                        <td>$(Get-SKUName -SKUID $preferredSKU.SKUID)</td> `
-                                        <td>$($preferredSKU.OneDriveStorageMaxGB) GB</td> `
-                                        <td>$($preferredSKU.MailboxStorageMaxGB) GB</td> `
-                                        <td>$($preferredSKU.MailboxArchive)</td> `
-                                        <td>$($preferredSKU.WindowsAppUsed)</td> `
-                                        <td>$($preferredSKU.MacAppUsed)</td> `
-                                        <td>$($preferredSKU.MobileAppUsed)</td> `
-                                        <td>$($preferredSKU.WebAppUsed)</td></tr>"
+                                        <td>$(Get-SKUName -SKUID $preferableSKU.SKUID)</td> `
+                                        <td>$($preferableSKU.OneDriveStorageMaxGB) GB</td> `
+                                        <td>$($preferableSKU.MailboxStorageMaxGB) GB</td> `
+                                        <td>$($preferableSKU.MailboxArchive)</td> `
+                                        <td>$($preferableSKU.WindowsAppUsed)</td> `
+                                        <td>$($preferableSKU.MacAppUsed)</td> `
+                                        <td>$($preferableSKU.MobileAppUsed)</td> `
+                                        <td>$($preferableSKU.WebAppUsed)</td></tr>"
                 }
                 Add-Output -Output '</table></p>'
             }

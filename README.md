@@ -59,7 +59,7 @@ Check for license need based on Azure AD and Office feature information:
 
 #### 2.2.2 Advanced
 
-:heavy_check_mark: Check for organization's preferred licenses
+:heavy_check_mark: Check for organization's preferable licenses
 
 ## 3 Requirements
 

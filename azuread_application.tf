@@ -9,32 +9,36 @@ data "azuread_client_config" "client_config_azuread_application" {}
 resource "azuread_application" "application" {
   display_name = var.solution_name
   required_resource_access {
-    resource_app_id = azuread_service_principal.service_principal_graph.application_id
+    resource_app_id = data.azuread_service_principal.service_principal_graph.application_id
     resource_access {
-      id   = azuread_service_principal.service_principal_graph.app_role_ids["AuditLog.Read.All"]
+      id   = data.azuread_service_principal.service_principal_graph.app_role_ids["AuditLog.Read.All"]
       type = "Role"
     }
     resource_access {
-      id   = azuread_service_principal.service_principal_graph.app_role_ids["Mail.Send"]
+      id   = data.azuread_service_principal.service_principal_graph.app_role_ids["DeviceManagementManagedDevices.Read.All"]
       type = "Role"
     }
     resource_access {
-      id   = azuread_service_principal.service_principal_graph.app_role_ids["Policy.Read.All"]
+      id   = data.azuread_service_principal.service_principal_graph.app_role_ids["Mail.Send"]
       type = "Role"
     }
     resource_access {
-      id   = azuread_service_principal.service_principal_graph.app_role_ids["Reports.Read.All"]
+      id   = data.azuread_service_principal.service_principal_graph.app_role_ids["Policy.Read.All"]
       type = "Role"
     }
     resource_access {
-      id   = azuread_service_principal.service_principal_graph.app_role_ids["RoleManagement.Read.All"]
+      id   = data.azuread_service_principal.service_principal_graph.app_role_ids["Reports.Read.All"]
+      type = "Role"
+    }
+    resource_access {
+      id   = data.azuread_service_principal.service_principal_graph.app_role_ids["RoleManagement.Read.All"]
       type = "Role"
     }
   }
   required_resource_access {
-    resource_app_id = azuread_service_principal.service_principal_exchange_online.application_id
+    resource_app_id = data.azuread_service_principal.service_principal_exchange_online.application_id
     resource_access {
-      id   = azuread_service_principal.service_principal_exchange_online.app_role_ids["Exchange.ManageAsApp"]
+      id   = data.azuread_service_principal.service_principal_exchange_online.app_role_ids["Exchange.ManageAsApp"]
       type = "Role"
     }
   }
@@ -42,38 +46,44 @@ resource "azuread_application" "application" {
 
 resource "azuread_app_role_assignment" "app_role_assignment_graph_auditlog_read_all" {
   principal_object_id = azuread_service_principal.service_principal_azure_ad_license_status.object_id
-  resource_object_id  = azuread_service_principal.service_principal_graph.object_id
-  app_role_id         = azuread_service_principal.service_principal_graph.app_role_ids["AuditLog.Read.All"]
+  resource_object_id  = data.azuread_service_principal.service_principal_graph.object_id
+  app_role_id         = data.azuread_service_principal.service_principal_graph.app_role_ids["AuditLog.Read.All"]
+}
+
+resource "azuread_app_role_assignment" "app_role_assignment_graph_devicemanagementmanageddevices_read_all" {
+  principal_object_id = azuread_service_principal.service_principal_azure_ad_license_status.object_id
+  resource_object_id  = data.azuread_service_principal.service_principal_graph.object_id
+  app_role_id         = data.azuread_service_principal.service_principal_graph.app_role_ids["DeviceManagementManagedDevices.Read.All"]
 }
 
 resource "azuread_app_role_assignment" "app_role_assignment_graph_mail_send" {
   principal_object_id = azuread_service_principal.service_principal_azure_ad_license_status.object_id
-  resource_object_id  = azuread_service_principal.service_principal_graph.object_id
-  app_role_id         = azuread_service_principal.service_principal_graph.app_role_ids["Mail.Send"]
+  resource_object_id  = data.azuread_service_principal.service_principal_graph.object_id
+  app_role_id         = data.azuread_service_principal.service_principal_graph.app_role_ids["Mail.Send"]
 }
 
 resource "azuread_app_role_assignment" "app_role_assignment_graph_policy_read_all" {
   principal_object_id = azuread_service_principal.service_principal_azure_ad_license_status.object_id
-  resource_object_id  = azuread_service_principal.service_principal_graph.object_id
-  app_role_id         = azuread_service_principal.service_principal_graph.app_role_ids["Policy.Read.All"]
+  resource_object_id  = data.azuread_service_principal.service_principal_graph.object_id
+  app_role_id         = data.azuread_service_principal.service_principal_graph.app_role_ids["Policy.Read.All"]
 }
 
-resource "azuread_app_role_assignment" "app_role_assignment_graph_policy_read_all" {
+resource "azuread_app_role_assignment" "app_role_assignment_graph_reports_read_all" {
   principal_object_id = azuread_service_principal.service_principal_azure_ad_license_status.object_id
-  resource_object_id  = azuread_service_principal.service_principal_graph.object_id
-  app_role_id         = azuread_service_principal.service_principal_graph.app_role_ids["Reports.Read.All"]
+  resource_object_id  = data.azuread_service_principal.service_principal_graph.object_id
+  app_role_id         = data.azuread_service_principal.service_principal_graph.app_role_ids["Reports.Read.All"]
 }
 
 resource "azuread_app_role_assignment" "app_role_assignment_graph_rolemanagement_read_all" {
   principal_object_id = azuread_service_principal.service_principal_azure_ad_license_status.object_id
-  resource_object_id  = azuread_service_principal.service_principal_graph.object_id
-  app_role_id         = azuread_service_principal.service_principal_graph.app_role_ids["RoleManagement.Read.All"]
+  resource_object_id  = data.azuread_service_principal.service_principal_graph.object_id
+  app_role_id         = data.azuread_service_principal.service_principal_graph.app_role_ids["RoleManagement.Read.All"]
 }
 
 resource "azuread_app_role_assignment" "app_role_assignment_exchange_online_exchange_manageasapp" {
   principal_object_id = azuread_service_principal.service_principal_azure_ad_license_status.object_id
-  resource_object_id  = azuread_service_principal.service_principal_exchange_online.object_id
-  app_role_id         = azuread_service_principal.service_principal_exchange_online.app_role_ids["Exchange.ManageAsApp"]
+  resource_object_id  = data.azuread_service_principal.service_principal_exchange_online.object_id
+  app_role_id         = data.azuread_service_principal.service_principal_exchange_online.app_role_ids["Exchange.ManageAsApp"]
 }
 
 resource "azuread_application_certificate" "application_certificate" {
@@ -85,16 +95,14 @@ resource "azuread_application_certificate" "application_certificate" {
   end_date              = azurerm_key_vault_certificate.key_vault_certificate.certificate_attribute[0].expires
 }
 
-resource "azuread_service_principal" "service_principal_graph" {
+data "azuread_service_principal" "service_principal_graph" {
   # Provider: Microsoft Graph
   application_id = "00000003-0000-0000-c000-000000000000"
-  use_existing   = true
 }
 
-resource "azuread_service_principal" "service_principal_exchange_online" {
+data "azuread_service_principal" "service_principal_exchange_online" {
   # Provider: Office 365 Exchange Online
   application_id = "00000002-0000-0ff1-ce00-000000000000"
-  use_existing   = true
 }
 
 resource "azuread_service_principal" "service_principal_azure_ad_license_status" {
