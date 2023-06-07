@@ -649,7 +649,7 @@ function Get-AzureADLicenseStatus {
         while ($null -ne $URI) {
             # Retrieve users
             $data = Invoke-MgGraphRequest -Method GET -Uri $URI
-            $users = [System.Collections.Generic.List[hashtable]]::new([hashtable[]]($data.value))
+            $users = [hashtable[]]($data.value)
             $userCount += $users.Count
             $URI = $data['@odata.nextLink']
             # Analyze users
@@ -834,7 +834,7 @@ function Get-AzureADLicenseStatus {
             while ($null -ne $URI) {
                 # Retrieve dynamic groups
                 $data = Invoke-MgGraphRequest -Method GET -Uri $URI
-                $dynamicGroups = [System.Collections.Generic.List[hashtable]]::new([hashtable[]]($data.value))
+                $dynamicGroups = [hashtable[]]($data.value)
                 $dynamicGroupCount += $dynamicGroups.Count
                 $URI = $data['@odata.nextLink']
                 # Analyze dynamic groups
@@ -849,7 +849,7 @@ function Get-AzureADLicenseStatus {
             while ($null -ne $URI) {
                 # Retrieve applications
                 $data = Invoke-MgGraphRequest -Method GET -Uri $URI -Headers @{'ConsistencyLevel'='eventual'}
-                $applications = [System.Collections.Generic.List[hashtable]]::new([hashtable[]]($data.value))
+                $applications = [hashtable[]]($data.value)
                 $applicationCount += $applications.Count
                 $URI = $data['@odata.nextLink']
                 # Analyze applications
@@ -869,7 +869,7 @@ function Get-AzureADLicenseStatus {
             while ($null -ne $URI) {
                 # Retrieve Conditional Access policies
                 $data = Invoke-MgGraphRequest -Method GET -Uri $URI
-                $conditionalAccessPolicies = [System.Collections.Generic.List[hashtable]]::new([hashtable[]]($data.value))
+                $conditionalAccessPolicies = [hashtable[]]($data.value)
                 $conditionalAccessPolicyCount += $conditionalAccessPolicies.Count
                 $URI = $data['@odata.nextLink']
                 # Analyze Conditional Access policies
@@ -899,7 +899,7 @@ function Get-AzureADLicenseStatus {
             while ($null -ne $URI) {
                 # Retrieve Conditional Access sign-ins
                 $data = Invoke-MgGraphRequest -Method GET -Uri $URI
-                $signIns = [System.Collections.Generic.List[hashtable]]::new([hashtable[]]($data.value))
+                $signIns = [hashtable[]]($data.value)
                 $signInCount += $signIns.Count
                 $URI = $data['@odata.nextLink']
                 # Analyze Conditional Access sign-ins
@@ -1233,7 +1233,7 @@ function Get-AzureADLicenseStatus {
                                     <p><table><tr>
                                     <th>Account</th>
                                     <th>Preferable</th>
-                                    <th>Removable</th></tr>'
+                                    <th>Interchangeable</th></tr>'
                 foreach ($user in $results['User_Advanced'].Keys | Sort-Object) {
                     Add-Output -Output "<tr> `
                                         <td>$user</td> `
