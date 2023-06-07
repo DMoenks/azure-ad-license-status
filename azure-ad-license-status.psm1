@@ -392,7 +392,10 @@ function Get-SKUName {
     $nestingLevel++
     Write-Message 'Get-SKUName' -Type Verbose
     # Processing
-    if ($null -ne ($skuName = ($skuTranslate | Where-Object{$_.GUID -eq $SKUID}).Product_Display_Name | Select-Object -Unique)) {
+    if ($SKUID -eq [guid]::Empty) {
+        $skuName = 'N/A'
+    }
+    elseif ($null -ne ($skuName = ($skuTranslate | Where-Object{$_.GUID -eq $SKUID}).Product_Display_Name | Select-Object -Unique)) {
         $skuName = [cultureinfo]::new('en-US').TextInfo.ToTitleCase($skuName.ToLower())
     }
     else {
@@ -404,10 +407,11 @@ function Get-SKUName {
 #endregion
 
 class PreferableSKURule {
-    [UInt16]$OneDriveStorageMaxGB = [UInt16]::MaxValue
-    [UInt16]$MailboxStorageMaxGB = [UInt16]::MaxValue
+    [datetime]$LastActivityDateEarlierThan = [datetime]::MaxValue
+    [UInt16]$OneDriveStorageUsedMaxGB = [UInt16]::MaxValue
+    [UInt16]$MailboxStorageUsedMaxGB = [UInt16]::MaxValue
     [ValidateSet('True', 'False', 'Skip')]
-    [string]$MailboxArchive = 'Skip'
+    [string]$MailboxHasArchive = 'Skip'
     [ValidateSet('True', 'False', 'Skip')]
     [string]$WindowsAppUsed = 'Skip'
     [ValidateSet('True', 'False', 'Skip')]
@@ -485,7 +489,7 @@ function Get-AzureADLicenseStatus {
 
     Prepares a status report with customized thresholds for larger organizations and additional recipients for when license counts reach critical levels
     .EXAMPLE
-    Get-AzureADLicenseStatus -DirectoryID '00000000-0000-0000-0000-000000000000' -ApplicationID '00000000-0000-0000-0000-000000000000' -SubscriptionID '00000000-0000-0000-0000-000000000000' -KeyVaultName 'MyKeyVault' -CertificateName 'MyCertificate' -SenderAddress 'sender@example.com' -RecipientAddresses_normal @('recipient_1@example.com', 'recipient_2@example.com') -RecipientAddresses_critical @('recipient_3@example.com', 'recipient_4@example.com') -SKUPercentageThreshold_normal 1 -SKUTotalThreshold_normal 100 -SKUPercentageThreshold_important 1 -SKUTotalThreshold_important 500 -ImportantSKUs @('18181a46-0d4e-45cd-891e-60aabd171b4e', '6fd2c87f-b296-42f0-b197-1e91e994b900') -InterchangeableSKUs @('4b585984-651b-448a-9e53-3b10f069cf7f', '18181a46-0d4e-45cd-891e-60aabd171b4e', '6fd2c87f-b296-42f0-b197-1e91e994b900', 'c7df2760-2c81-4ef7-b578-5b5392b571df') -PreferableSKUs @([PreferableSKURule]@{OneDriveStorageMaxGB = 1; MailboxStorageMaxGB = 1; MailboxArchive = 'False'; SKUID = '4b585984-651b-448a-9e53-3b10f069cf7f'}) -AdvancedCheckups
+    Get-AzureADLicenseStatus -DirectoryID '00000000-0000-0000-0000-000000000000' -ApplicationID '00000000-0000-0000-0000-000000000000' -SubscriptionID '00000000-0000-0000-0000-000000000000' -KeyVaultName 'MyKeyVault' -CertificateName 'MyCertificate' -SenderAddress 'sender@example.com' -RecipientAddresses_normal @('recipient_1@example.com', 'recipient_2@example.com') -RecipientAddresses_critical @('recipient_3@example.com', 'recipient_4@example.com') -SKUPercentageThreshold_normal 1 -SKUTotalThreshold_normal 100 -SKUPercentageThreshold_important 1 -SKUTotalThreshold_important 500 -ImportantSKUs @('18181a46-0d4e-45cd-891e-60aabd171b4e', '6fd2c87f-b296-42f0-b197-1e91e994b900') -InterchangeableSKUs @('4b585984-651b-448a-9e53-3b10f069cf7f', '18181a46-0d4e-45cd-891e-60aabd171b4e', '6fd2c87f-b296-42f0-b197-1e91e994b900', 'c7df2760-2c81-4ef7-b578-5b5392b571df') -PreferableSKUs @([PreferableSKURule]@{OneDriveStorageUsedMaxGB = 1; MailboxStorageUsedMaxGB = 1; MailboxHasArchive = 'False'; SKUID = '4b585984-651b-448a-9e53-3b10f069cf7f'}) -AdvancedCheckups
 
     Prepares a status report by using an Azure certificate for automation purposes, specifying both important and interchangeable SKUs and activating advanced checkups
     #>
@@ -623,11 +627,11 @@ function Get-AzureADLicenseStatus {
         #region: Reports
         if ($AdvancedCheckups.IsPresent) {
             Invoke-MgGraphRequest -Method GET -Uri ('https://graph.microsoft.com/v1.0/reports/getM365AppUserDetail(period=''D{0}'')?$format=text/csv' -f $reportDays) -OutputFilePath "$env:TEMP\M365AppUserDetail.csv"
-            $M365AppUserDetail = Import-Csv "$env:TEMP\M365AppUserDetail.csv" | Select-Object 'User Principal Name','Windows','Mac','Mobile','Web'
+            $M365AppUserDetail = Import-Csv "$env:TEMP\M365AppUserDetail.csv" | Select-Object -Property 'User Principal Name', 'Last Activity Date', 'Windows', 'Mac', 'Mobile', 'Web'
             Invoke-MgGraphRequest -Method GET -Uri ('https://graph.microsoft.com/v1.0/reports/getMailboxUsageDetail(period=''D{0}'')' -f $reportDays) -OutputFilePath "$env:TEMP\MailboxUsageDetail.csv"
-            $MailboxUsageDetail = Import-Csv "$env:TEMP\MailboxUsageDetail.csv" | Select-Object 'User Principal Name','Storage Used (Byte)','Has Archive'
+            $MailboxUsageDetail = Import-Csv "$env:TEMP\MailboxUsageDetail.csv" | Select-Object -Property 'User Principal Name', 'Last Activity Date', 'Storage Used (Byte)', 'Has Archive'
             Invoke-MgGraphRequest -Method GET -Uri ('https://graph.microsoft.com/v1.0/reports/getOneDriveUsageAccountDetail(period=''D{0}'')' -f $reportDays) -OutputFilePath "$env:TEMP\OneDriveUsageAccountDetail.csv"
-            $OneDriveUsageAccountDetail = Import-Csv "$env:TEMP\OneDriveUsageAccountDetail.csv" | Select-Object 'Owner Principal Name','Storage Used (Byte)'
+            $OneDriveUsageAccountDetail = Import-Csv "$env:TEMP\OneDriveUsageAccountDetail.csv" | Select-Object -Property 'Owner Principal Name', 'Last Activity Date', 'Storage Used (Byte)'
             if ($M365AppUserDetail.'User Principal Name' -like '*@*' -or
                 $MailboxUsageDetail.'User Principal Name' -like '*@*' -or
                 $OneDriveUsageAccountDetail.'Owner Principal Name' -like '*@*') {
@@ -718,21 +722,27 @@ function Get-AzureADLicenseStatus {
                         else {
                             $userName = $user.userPrincipalName
                         }
+                        $userOneDriveLastActivityDate = [datetime]::MinValue
                         if ($null -ne ($userOneDrive = $OneDriveUsageAccountDetail | Where-Object{$_.'Owner Principal Name' -eq $userName})) {
-                            $userOneDriveStorageGB = $userOneDrive.'Storage Used (Byte)' / [System.Math]::Pow(1000, 3)
+                            [datetime]::TryParse($userOneDrive.'Last Activity Date', [ref]$userOneDriveLastActivityDate) | Out-Null
+                            $userOneDriveStorageUsedGB = $userOneDrive.'Storage Used (Byte)' / [System.Math]::Pow(1000, 3)
                         }
                         else {
-                            $userOneDriveStorageGB = 0
+                            $userOneDriveStorageUsedGB = 0
                         }
+                        $userMailboxLastActivityDate = [datetime]::MinValue
                         if ($null -ne ($userMailbox = $MailboxUsageDetail | Where-Object{$_.'User Principal Name' -eq $userName})) {
-                            $userMailboxStorageGB = $userMailbox.'Storage Used (Byte)' / [System.Math]::Pow(1000, 3)
-                            $userMailboxArchive = $userMailbox.'Has Archive'
+                            [datetime]::TryParse($userMailbox.'Last Activity Date', [ref]$userMailboxLastActivityDate) | Out-Null
+                            $userMailboxStorageUsedGB = $userMailbox.'Storage Used (Byte)' / [System.Math]::Pow(1000, 3)
+                            $userMailboxHasArchive = $userMailbox.'Has Archive'
                         }
                         else {
-                            $userMailboxStorageGB = 0
-                            $userMailboxArchive = $false
+                            $userMailboxStorageUsedGB = 0
+                            $userMailboxHasArchive = $false
                         }
+                        $userAppsUsedLastActivityDate = [datetime]::MinValue
                         if ($null -ne ($userAppsUsed = $M365AppUserDetail | Where-Object{$_.'User Principal Name' -eq $userName})) {
+                            [datetime]::TryParse($userAppsUsed.'Last Activity Date', [ref]$userAppsUsedLastActivityDate) | Out-Null
                             if ($userAppsUsed.'Windows' -eq 'Yes') {
                                 $userWindowsAppUsed = $true
                             }
@@ -767,9 +777,12 @@ function Get-AzureADLicenseStatus {
                         $userSKUs_preferable = $null
                         foreach ($preferableSKU in $PreferableSKUs) {
                             if ($null -eq $userSKUs_preferable) {
-                                if ($userOneDriveStorageGB -le $preferableSKU.OneDriveStorageMaxGB -and
-                                $userMailboxStorageGB -le $preferableSKU.MailboxStorageMaxGB -and
-                                ($userMailboxArchive.ToString() -eq $preferableSKU.MailboxArchive -or $preferableSKU.MailboxArchive -eq 'Skip') -and
+                                if ($userOneDriveLastActivityDate -le $preferableSKU.LastActivityDateEarlierThan.Date -and
+                                $userMailboxLastActivityDate -le $preferableSKU.LastActivityDateEarlierThan.Date -and
+                                $userAppsUsedLastActivityDate -le $preferableSKU.LastActivityDateEarlierThan.Date -and
+                                $userOneDriveStorageUsedGB -le $preferableSKU.OneDriveStorageUsedMaxGB -and
+                                $userMailboxStorageUsedGB -le $preferableSKU.MailboxStorageUsedMaxGB -and
+                                ($userMailboxHasArchive.ToString() -eq $preferableSKU.MailboxHasArchive -or $preferableSKU.MailboxHasArchive -eq 'Skip') -and
                                 ($userWindowsAppUsed.ToString() -eq $preferableSKU.WindowsAppUsed -or $preferableSKU.WindowsAppUsed -eq 'Skip') -and
                                 ($userMacAppUsed.ToString() -eq $preferableSKU.MacAppUsed -or $preferableSKU.MacAppUsed -eq 'Skip') -and
                                 ($userMobileAppUsed.ToString() -eq $preferableSKU.MobileAppUsed -or $preferableSKU.MobileAppUsed -eq 'Skip') -and
@@ -1237,6 +1250,7 @@ function Get-AzureADLicenseStatus {
                                     <p>The following criteria were used during the checkup, in order:</p>
                                     <p><table><tr>
                                     <th>License type</th>
+                                    <th>Last activity by</th>
                                     <th>OneDrive limit</th>
                                     <th>Mailbox limit</th>
                                     <th>Mailbox archive</th>
@@ -1247,9 +1261,10 @@ function Get-AzureADLicenseStatus {
                 foreach ($preferableSKU in $PreferableSKUs) {
                     Add-Output -Output "<tr> `
                                         <td>$(Get-SKUName -SKUID $preferableSKU.SKUID)</td> `
-                                        <td>$($preferableSKU.OneDriveStorageMaxGB) GB</td> `
-                                        <td>$($preferableSKU.MailboxStorageMaxGB) GB</td> `
-                                        <td>$($preferableSKU.MailboxArchive)</td> `
+                                        <td>$($preferableSKU.LastActivityDateEarlierThan.ToString('yyyy-MM-dd'))</td> `
+                                        <td>$($preferableSKU.OneDriveStorageUsedMaxGB) GB</td> `
+                                        <td>$($preferableSKU.MailboxStorageUsedMaxGB) GB</td> `
+                                        <td>$($preferableSKU.MailboxHasArchive)</td> `
                                         <td>$($preferableSKU.WindowsAppUsed)</td> `
                                         <td>$($preferableSKU.MacAppUsed)</td> `
                                         <td>$($preferableSKU.MobileAppUsed)</td> `
