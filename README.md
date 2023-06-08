@@ -130,81 +130,48 @@ Check for license need based on Azure AD and Office feature information:
 
 An example report might look like follows:
 
+<p style = "border-left: 4pt solid darkslategray; padding-left: 4pt; background-color: lightslategray">Basic checkup - Products</p>
+<p>Please check license counts for the following product SKUs and reserve additional licenses:</p>
 <p>
-    <style>
-        table, th, td {
-            border: none;
-            border-collapse: collapse;
-        }
-        th, td {
-            padding: 5px;
-            text-align: left;
-            vertical-align: top;
-        }
-        .gray {
-            border-left: 4pt solid darkslategray;
-            padding-left: 4pt;
-            background-color: lightslategray
-        }
-        .green {
-            border-left: 4pt solid darkgreen;
-            padding-left: 4pt;
-            background-color: lightgreen
-        }
-        .yellow {
-            border-left: 4pt solid darkgoldenrod;
-            padding-left: 4pt;
-            background-color: lightgoldenrodyellow
-        }
-        .red {
-            border-left: 4pt solid darkred;
-            padding-left: 4pt;
-            background-color: lightcoral
-        }
-    </style>
-    <p class=gray>Basic checkup - Products</p>
-    <p>Please check license counts for the following product SKUs and reserve additional licenses:</p>
-    <p>
-        <table>
-            <tr>
-                <th>License type</th>
-                <th>Available count</th>
-                <th>Minimum count</th>
-                <th>Difference</th>
-            </tr>
-            <tr>
-                <td>Office 365 F3</td>
-                <td>9</td>
-                <td>10</td>
-                <td class=green>10</td>
-            </tr>
-            <tr>
-                <td>Office 365 E1</td>
-                <td>40</td>
-                <td>50</td>
-                <td class=green>10</td>
-            </tr>
-            <tr>
-                <td>Office 365 E3</td>
-                <td>30</td>
-                <td>50</td>
-                <td class=yellow>10</td>
-            </tr>
-            <tr>
-                <td>Office 365 E5</td>
-                <td>1</td>
-                <td>10</td>
-                <td class=red>10</td>
-            </tr>
-        </table>
-    </p>
-    <p>The following criteria were used during the checkup:
-        <ul>
-            <li>Check products with >$SKUIgnoreThreshold total licenses</li>
-            <li>Report normal products having both &lt10 licenses and &lt90% of their total licenses available</li>
-            <li>Report important products having both &lt50 licenses and &lt90% of their total licenses available</li>
-        </ul>
-    </p>
+<table>
+<tr>
+<th>License type</th>
+<th>Available count</th>
+<th>Minimum count</th>
+<th>Difference</th>
+</tr>
+<tr>
+<td>Office 365 F3</td>
+<td>9</td>
+<td>10</td>
+<td style = "border-left: 4pt solid darkgreen; padding-left: 4pt; background-color: lightgreen">10</td>
+</tr>
+<tr>
+<td>Office 365 E1</td>
+<td>40</td>
+<td>50</td>
+<td style = "border-left: 4pt solid darkgreen; padding-left: 4pt; background-color: lightgreen">10</td>
+</tr>
+<tr>
+<td>Office 365 E3</td>
+<td>30</td>
+<td>50</td>
+<td style = "border-left: 4pt solid darkgoldenrod; padding-left: 4pt; background-color: lightgoldenrodyellow">10</td>
+</tr>
+<tr>
+<td>Office 365 E5</td>
+<td>1</td>
+<td>10</td>
+<td style = "border-left: 4pt solid darkred; padding-left: 4pt; background-color: lightcoral">10</td>
+</tr>
+</table>
+</p>
+<p>The following criteria were used during the checkup:
+<ul>
+<li>Check products with &gt10 total licenses</li>
+<li>Report normal products having both &lt10 licenses and &lt90% of their total licenses available</li>
+<li>Report important products having both &lt50 licenses and &lt90% of their total licenses available</li>
+</ul>
 </p>
 
 ## 6 Links
