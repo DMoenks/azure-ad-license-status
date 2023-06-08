@@ -1234,15 +1234,15 @@ function Get-AzureADLicenseStatus {
                                                 ForEach-Object{Get-SKUName -SKUID $_} |
                                                 Sort-Object) -join '<br>')</td></tr>"
                 }
-                Add-Output -Output '</table></p>'
-                if ($possibleSavings -gt 0) {
-                    Add-Output -Output "<p>Possible savings: $possibleSavings$([cultureinfo]::CurrentCulture.NumberFormat.CurrencySymbol)"
-                }
-                Add-Output -Output '<p>The following criteria were used during the checkup:<ul>
+                Add-Output -Output '</table></p>
+                                    <p>The following criteria were used during the checkup:<ul>
                                     <li>Check accounts with any number of assigned licenses</li>
                                     <li>Report theoretically exclusive licenses as <strong>interchangeable</strong>, based on specified SKUs</li>
                                     <li>Report practically inclusive licenses as <strong>optimizable</strong>, based on available SKU features</li>
                                     <li>Report actually inclusive licenses as <strong>removable</strong>, based on enabled SKU features</li></ul></p>'
+                if ($possibleSavings -gt 0) {
+                    Add-Output -Output "<p>Possible savings: $possibleSavings$([cultureinfo]::CurrentCulture.NumberFormat.CurrencySymbol)"
+                }
             }
             else {
                 Add-Output -Output 'Nothing to report'
@@ -1270,11 +1270,8 @@ function Get-AzureADLicenseStatus {
                                                 ForEach-Object{Get-SKUName -SKUID $_} |
                                                 Sort-Object) -join '<br>')</td></tr>"
                 }
-                Add-Output -Output '</table></p>'
-                if ($possibleSavings -gt 0) {
-                    Add-Output -Output "<p>Possible savings: $possibleSavings$([cultureinfo]::CurrentCulture.NumberFormat.CurrencySymbol)"
-                }
-                Add-Output -Output '<p>The following criteria were used during the checkup, in order:</p>
+                Add-Output -Output '</table></p>
+                                    <p>The following criteria were used during the checkup, in order:</p>
                                     <p><table><tr>
                                     <th>License type</th>
                                     <th>Activity limit</th>
@@ -1298,6 +1295,9 @@ function Get-AzureADLicenseStatus {
                                         <td>$($preferableSKU.WebAppUsed)</td></tr>"
                 }
                 Add-Output -Output '</table></p>'
+                if ($possibleSavings -gt 0) {
+                    Add-Output -Output "<p>Possible savings: $possibleSavings$([cultureinfo]::CurrentCulture.NumberFormat.CurrencySymbol)"
+                }
             }
             else {
                 Add-Output -Output 'Nothing to report'
