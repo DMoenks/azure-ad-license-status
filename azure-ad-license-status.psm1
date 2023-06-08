@@ -43,26 +43,30 @@ function Initialize-Module {
     $script:results = @{}
     $script:skuTranslate = [string]::new([char[]]((Invoke-WebRequest -Uri 'https://download.microsoft.com/download/e/3/e/e3e9faf2-f28b-490a-9ada-c6089a1fc5b0/Product%20names%20and%20service%20plan%20identifiers%20for%20licensing.csv' -UseBasicParsing).Content)) | ConvertFrom-Csv
     # Exchange Online
-    $script:EXOCmdlets = @('Get-Recipient',
-                            'Get-DistributionGroupMember',
-                            'Get-UnifiedGroupLinks',
-                            'Get-ATPBuiltInProtectionRule',
-                            'Get-ATPProtectionPolicyRule',
-                            'Get-AntiPhishRule',
-                            'Get-AntiPhishPolicy',
-                            'Get-SafeAttachmentRule',
-                            'Get-SafeAttachmentPolicy',
-                            'Get-SafeLinksRule',
-                            'Get-SafeLinksPolicy')
-    $script:EXOProperties = @('ExchangeObjectId',
-                            'ExternalDirectoryObjectId',
-                            'PrimarySmtpAddress',
-                            'RecipientTypeDetails')
-    $script:EXOTypes_group = @('GroupMailbox',
-                            'MailUniversalDistributionGroup',
-                            'MailUniversalSecurityGroup')
-    $script:EXOTypes_user = @('SharedMailbox',
-                            'UserMailbox')
+    $script:EXOCmdlets = @(
+        'Get-Recipient',
+        'Get-DistributionGroupMember',
+        'Get-UnifiedGroupLinks',
+        'Get-ATPBuiltInProtectionRule',
+        'Get-ATPProtectionPolicyRule',
+        'Get-AntiPhishRule',
+        'Get-AntiPhishPolicy',
+        'Get-SafeAttachmentRule',
+        'Get-SafeAttachmentPolicy',
+        'Get-SafeLinksRule',
+        'Get-SafeLinksPolicy')
+    $script:EXOProperties = @(
+        'ExchangeObjectId',
+        'ExternalDirectoryObjectId',
+        'PrimarySmtpAddress',
+        'RecipientTypeDetails')
+    $script:EXOTypes_group = @(
+        'GroupMailbox',
+        'MailUniversalDistributionGroup',
+        'MailUniversalSecurityGroup')
+    $script:EXOTypes_user = @(
+        'SharedMailbox',
+        'UserMailbox')
     # Graph
     $script:pageSize = 500
     $script:reportDays = 180
@@ -641,8 +645,8 @@ function Get-AzureADLicenseStatus {
             Invoke-MgGraphRequest -Method GET -Uri ('https://graph.microsoft.com/v1.0/reports/getOneDriveUsageAccountDetail(period=''D{0}'')' -f $reportDays) -OutputFilePath "$env:TEMP\OneDriveUsageAccountDetail.csv"
             $OneDriveUsageAccountDetail = Import-Csv "$env:TEMP\OneDriveUsageAccountDetail.csv" | Select-Object -Property 'Owner Principal Name', 'Last Activity Date', 'Storage Used (Byte)'
             if ($M365AppUserDetail.'User Principal Name' -like '*@*' -or
-                $MailboxUsageDetail.'User Principal Name' -like '*@*' -or
-                $OneDriveUsageAccountDetail.'Owner Principal Name' -like '*@*') {
+            $MailboxUsageDetail.'User Principal Name' -like '*@*' -or
+            $OneDriveUsageAccountDetail.'Owner Principal Name' -like '*@*') {
                 $hashedReports = $false
             }
             else {
@@ -856,7 +860,7 @@ function Get-AzureADLicenseStatus {
             $URI = 'https://graph.microsoft.com/v1.0/servicePrincipals?$filter=accountEnabled eq true and appRoleAssignmentRequired eq true and servicePrincipalType eq ''Application''&$top={0}&$count=true' -f $pageSize
             while ($null -ne $URI) {
                 # Retrieve applications
-                $data = Invoke-MgGraphRequest -Method GET -Uri $URI -Headers @{'ConsistencyLevel'='eventual'}
+                $data = Invoke-MgGraphRequest -Method GET -Uri $URI -Headers @{'ConsistencyLevel' = 'eventual'}
                 $applications = [hashtable[]]($data.value)
                 $applicationCount += $applications.Count
                 $URI = $data['@odata.nextLink']
