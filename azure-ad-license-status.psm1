@@ -407,9 +407,9 @@ function Get-SKUName {
 #endregion
 
 class PreferableSKURule {
-    [datetime]$LastActivityDateEarlierThan = [datetime]::MaxValue
-    [UInt16]$OneDriveStorageUsedMaxGB = [UInt16]::MaxValue
-    [UInt16]$MailboxStorageUsedMaxGB = [UInt16]::MaxValue
+    [datetime]$LastActiveEarlierThan = [datetime]::MaxValue
+    [UInt16]$OneDriveGBUsedLessThan = [UInt16]::MaxValue
+    [UInt16]$MailboxGBUsedLessThan = [UInt16]::MaxValue
     [ValidateSet('True', 'False', 'Skip')]
     [string]$MailboxHasArchive = 'Skip'
     [ValidateSet('True', 'False', 'Skip')]
@@ -489,7 +489,7 @@ function Get-AzureADLicenseStatus {
 
     Prepares a status report with customized thresholds for larger organizations and additional recipients for when license counts reach critical levels
     .EXAMPLE
-    Get-AzureADLicenseStatus -DirectoryID '00000000-0000-0000-0000-000000000000' -ApplicationID '00000000-0000-0000-0000-000000000000' -SubscriptionID '00000000-0000-0000-0000-000000000000' -KeyVaultName 'MyKeyVault' -CertificateName 'MyCertificate' -SenderAddress 'sender@example.com' -RecipientAddresses_normal @('recipient_1@example.com', 'recipient_2@example.com') -RecipientAddresses_critical @('recipient_3@example.com', 'recipient_4@example.com') -SKUPercentageThreshold_normal 1 -SKUTotalThreshold_normal 100 -SKUPercentageThreshold_important 1 -SKUTotalThreshold_important 500 -ImportantSKUs @('18181a46-0d4e-45cd-891e-60aabd171b4e', '6fd2c87f-b296-42f0-b197-1e91e994b900') -InterchangeableSKUs @('4b585984-651b-448a-9e53-3b10f069cf7f', '18181a46-0d4e-45cd-891e-60aabd171b4e', '6fd2c87f-b296-42f0-b197-1e91e994b900', 'c7df2760-2c81-4ef7-b578-5b5392b571df') -PreferableSKUs @([PreferableSKURule]@{OneDriveStorageUsedMaxGB = 1; MailboxStorageUsedMaxGB = 1; MailboxHasArchive = 'False'; SKUID = '4b585984-651b-448a-9e53-3b10f069cf7f'}) -AdvancedCheckups
+    Get-AzureADLicenseStatus -DirectoryID '00000000-0000-0000-0000-000000000000' -ApplicationID '00000000-0000-0000-0000-000000000000' -SubscriptionID '00000000-0000-0000-0000-000000000000' -KeyVaultName 'MyKeyVault' -CertificateName 'MyCertificate' -SenderAddress 'sender@example.com' -RecipientAddresses_normal @('recipient_1@example.com', 'recipient_2@example.com') -RecipientAddresses_critical @('recipient_3@example.com', 'recipient_4@example.com') -SKUPercentageThreshold_normal 1 -SKUTotalThreshold_normal 100 -SKUPercentageThreshold_important 1 -SKUTotalThreshold_important 500 -ImportantSKUs @('18181a46-0d4e-45cd-891e-60aabd171b4e', '6fd2c87f-b296-42f0-b197-1e91e994b900') -InterchangeableSKUs @('4b585984-651b-448a-9e53-3b10f069cf7f', '18181a46-0d4e-45cd-891e-60aabd171b4e', '6fd2c87f-b296-42f0-b197-1e91e994b900', 'c7df2760-2c81-4ef7-b578-5b5392b571df') -PreferableSKUs @([PreferableSKURule]@{OneDriveGBUsedLessThan = 1; MailboxGBUsedLessThan = 1; MailboxHasArchive = 'False'; SKUID = '4b585984-651b-448a-9e53-3b10f069cf7f'}) -AdvancedCheckups
 
     Prepares a status report by using an Azure certificate for automation purposes, specifying both important and interchangeable SKUs and activating advanced checkups
     #>
@@ -777,11 +777,11 @@ function Get-AzureADLicenseStatus {
                         $userSKUs_preferable = $null
                         foreach ($preferableSKU in $PreferableSKUs) {
                             if ($null -eq $userSKUs_preferable) {
-                                if ($userOneDriveLastActivityDate -le $preferableSKU.LastActivityDateEarlierThan.Date -and
-                                $userMailboxLastActivityDate -le $preferableSKU.LastActivityDateEarlierThan.Date -and
-                                $userAppsUsedLastActivityDate -le $preferableSKU.LastActivityDateEarlierThan.Date -and
-                                $userOneDriveStorageUsedGB -le $preferableSKU.OneDriveStorageUsedMaxGB -and
-                                $userMailboxStorageUsedGB -le $preferableSKU.MailboxStorageUsedMaxGB -and
+                                if ($userOneDriveLastActivityDate -lt $preferableSKU.LastActiveEarlierThan.Date -and
+                                $userMailboxLastActivityDate -lt $preferableSKU.LastActiveEarlierThan.Date -and
+                                $userAppsUsedLastActivityDate -lt $preferableSKU.LastActiveEarlierThan.Date -and
+                                $userOneDriveStorageUsedGB -lt $preferableSKU.OneDriveGBUsedLessThan -and
+                                $userMailboxStorageUsedGB -lt $preferableSKU.MailboxGBUsedLessThan -and
                                 ($userMailboxHasArchive.ToString() -eq $preferableSKU.MailboxHasArchive -or $preferableSKU.MailboxHasArchive -eq 'Skip') -and
                                 ($userWindowsAppUsed.ToString() -eq $preferableSKU.WindowsAppUsed -or $preferableSKU.WindowsAppUsed -eq 'Skip') -and
                                 ($userMacAppUsed.ToString() -eq $preferableSKU.MacAppUsed -or $preferableSKU.MacAppUsed -eq 'Skip') -and
@@ -1250,7 +1250,7 @@ function Get-AzureADLicenseStatus {
                                     <p>The following criteria were used during the checkup, in order:</p>
                                     <p><table><tr>
                                     <th>License type</th>
-                                    <th>Last activity by</th>
+                                    <th>Activity limit</th>
                                     <th>OneDrive limit</th>
                                     <th>Mailbox limit</th>
                                     <th>Mailbox archive</th>
@@ -1261,9 +1261,9 @@ function Get-AzureADLicenseStatus {
                 foreach ($preferableSKU in $PreferableSKUs) {
                     Add-Output -Output "<tr> `
                                         <td>$(Get-SKUName -SKUID $preferableSKU.SKUID)</td> `
-                                        <td>$($preferableSKU.LastActivityDateEarlierThan.ToString('yyyy-MM-dd'))</td> `
-                                        <td>$($preferableSKU.OneDriveStorageUsedMaxGB) GB</td> `
-                                        <td>$($preferableSKU.MailboxStorageUsedMaxGB) GB</td> `
+                                        <td>$($preferableSKU.LastActiveEarlierThan.ToString('yyyy-MM-dd'))</td> `
+                                        <td>$($preferableSKU.OneDriveGBUsedLessThan) GB</td> `
+                                        <td>$($preferableSKU.MailboxGBUsedLessThan) GB</td> `
                                         <td>$($preferableSKU.MailboxHasArchive)</td> `
                                         <td>$($preferableSKU.WindowsAppUsed)</td> `
                                         <td>$($preferableSKU.MacAppUsed)</td> `
