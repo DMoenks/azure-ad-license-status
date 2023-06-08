@@ -549,6 +549,8 @@ function Get-AzureADLicenseStatus {
         [guid[]]$InterchangeableSKUs,
         [ValidateNotNullOrEmpty()]
         [PreferableSKURule[]]$PreferableSKUs,
+        [ValidateScript({$_.Keys | ForEach-Object{[guid]$_}; $_.Values | ForEach-Object{[decimal]$_}})]
+        [hashtable]$SKUPrices,
         [ValidateNotNullOrEmpty()]
         [string]$LicensingURL = 'https://www.microsoft.com/licensing/servicecenter',
         [switch]$AdvancedCheckups
@@ -1194,6 +1196,7 @@ function Get-AzureADLicenseStatus {
             # Output basic user results
             Add-Output -Output '<p class=gray>Basic checkup - Users</p>'
             if ($results.ContainsKey('User_Basic')) {
+                [decimal]$possibleSavings = 0
                 Add-Output -Output '<p>Please check license assignments for the following user accounts and mitigate impact:</p>
                                     <p><table><tr>
                                     <th>Account</th>
@@ -1201,23 +1204,31 @@ function Get-AzureADLicenseStatus {
                                     <th>Optimizable</th>
                                     <th>Removable</th></tr>'
                 foreach ($user in $results['User_Basic'].Keys | Sort-Object) {
+                    $interchangeableSKUIDs = $results['User_Basic'][$user]['Interchangeable'] | Where-Object{$null -ne $_}
+                    $optimizableSKUIDs = $results['User_Basic'][$user]['Optimizable'] | Where-Object{$null -ne $_}
+                    $removableSKUIDs = $results['User_Basic'][$user]['Removable'] | Where-Object{$null -ne $_}
+                    if ($null -ne $SKUPrices) {
+                        $possibleSavings += ($interchangeableSKUIDs | ForEach-Object{[decimal]$SKUPrices[$_.ToString()]} | Sort-Object | Select-Object -Skip 1 | Measure-Object -Sum).Sum +
+                                            ($optimizableSKUIDs | ForEach-Object{[decimal]$SKUPrices[$_.ToString()]} | Measure-Object -Sum).Sum +
+                                            ($removableSKUIDs | ForEach-Object{[decimal]$SKUPrices[$_.ToString()]} | Measure-Object -Sum).Sum
+                    }
                     Add-Output -Output "<tr> `
                                         <td>$user</td> `
-                                        <td>$(($results['User_Basic'][$user]['Interchangeable'] |
-                                                Where-Object{$null -ne $_} |
+                                        <td>$(($interchangeableSKUIDs |
                                                 ForEach-Object{Get-SKUName -SKUID $_} |
                                                 Sort-Object) -join '<br>')</td> `
-                                        <td>$(($results['User_Basic'][$user]['Optimizable'] |
-                                                Where-Object{$null -ne $_} |
+                                        <td>$(($optimizableSKUIDs |
                                                 ForEach-Object{Get-SKUName -SKUID $_} |
                                                 Sort-Object) -join '<br>')</td> `
-                                        <td>$(($results['User_Basic'][$user]['Removable'] |
-                                                Where-Object{$null -ne $_} |
+                                        <td>$(($removableSKUIDs |
                                                 ForEach-Object{Get-SKUName -SKUID $_} |
                                                 Sort-Object) -join '<br>')</td></tr>"
                 }
-                Add-Output -Output '</table></p>
-                                    <p>The following criteria were used during the checkup:<ul>
+                Add-Output -Output '</table></p>'
+                if ($possibleSavings -gt 0) {
+                    Add-Output -Output "<p>Possible savings: $possibleSavings$([cultureinfo]::CurrentCulture.NumberFormat.CurrencySymbol)"
+                }
+                Add-Output -Output '<p>The following criteria were used during the checkup:<ul>
                                     <li>Check accounts with any number of assigned licenses</li>
                                     <li>Report theoretically exclusive licenses as <strong>interchangeable</strong>, based on specified SKUs</li>
                                     <li>Report practically inclusive licenses as <strong>optimizable</strong>, based on available SKU features</li>
@@ -1229,25 +1240,31 @@ function Get-AzureADLicenseStatus {
             # Output advanced user results
             Add-Output -Output '<p class=gray>Advanced checkup - Users</p>'
             if ($results.ContainsKey('User_Advanced')) {
+                [decimal]$possibleSavings = 0
                 Add-Output -Output '<p>Please check license assignments for the following user accounts and mitigate impact:</p>
                                     <p><table><tr>
                                     <th>Account</th>
                                     <th>Preferable</th>
                                     <th>Interchangeable</th></tr>'
                 foreach ($user in $results['User_Advanced'].Keys | Sort-Object) {
+                    $preferableSKUID = $results['User_Advanced'][$user]['Preferable']['preferableSKU'] | Where-Object{$null -ne $_}
+                    $opposingSKUIDs = $results['User_Advanced'][$user]['Preferable']['opposingSKUs'] | Where-Object{$null -ne $_}
+                    if ($null -ne $SKUPrices) {
+                        $possibleSavings += ($opposingSKUIDs | ForEach-Object{[decimal]$SKUPrices[$_.ToString()]} | Measure-Object -Sum).Sum -
+                                            [decimal]$SKUPrices[$preferableSKUID.ToString()]
+                    }
                     Add-Output -Output "<tr> `
                                         <td>$user</td> `
-                                        <td>$(($results['User_Advanced'][$user]['Preferable']['preferableSKU'] |
-                                            Where-Object{$null -ne $_} |
-                                            ForEach-Object{Get-SKUName -SKUID $_} |
-                                            Sort-Object) -join '<br>')</td>
-                                        <td>$(($results['User_Advanced'][$user]['Preferable']['opposingSKUs'] |
-                                            Where-Object{$null -ne $_} |
-                                            ForEach-Object{Get-SKUName -SKUID $_} |
-                                            Sort-Object) -join '<br>')</td></tr>"
+                                        <td>$(Get-SKUName -SKUID $preferableSKUID)</td>
+                                        <td>$(($opposingSKUIDs |
+                                                ForEach-Object{Get-SKUName -SKUID $_} |
+                                                Sort-Object) -join '<br>')</td></tr>"
                 }
-                Add-Output -Output '</table></p>
-                                    <p>The following criteria were used during the checkup, in order:</p>
+                Add-Output -Output '</table></p>'
+                if ($possibleSavings -gt 0) {
+                    Add-Output -Output "<p>Possible savings: $possibleSavings$([cultureinfo]::CurrentCulture.NumberFormat.CurrencySymbol)"
+                }
+                Add-Output -Output '<p>The following criteria were used during the checkup, in order:</p>
                                     <p><table><tr>
                                     <th>License type</th>
                                     <th>Activity limit</th>
