@@ -475,6 +475,8 @@ function Get-AzureADLicenseStatus {
     Specifies a list of SKUs which are deemed interchangeable, e.g Office 365 E1 and Office 365 E3
     .PARAMETER PreferableSKUs
     Specifies a list of SKUs which are deemed preferable based on their provided ruleset
+    .PARAMETER SKUPrices
+    Specifies a list of SKUs with their prices to calculate possible savings during user checkups
     .PARAMETER LicensingURL
     Specifies a licensing portal URL to be linked in the report, refers to Microsoft's Volume Licensing Service Center by default
     .PARAMETER AdvancedCheckups
