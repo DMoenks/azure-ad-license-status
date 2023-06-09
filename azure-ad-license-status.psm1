@@ -83,7 +83,7 @@ function Write-Message {
         [string]$Type
     )
 
-    $formattedMessage = "[$([datetime]::Now.ToString('yyyy-MM-dd HH:mm:ss'))] $([string]::new('-', $nestingLevel)) $Message"
+    $formattedMessage = ('[{0:yyyy-MM-dd HH:mm:ss}] {1}{2}' -f [datetime]::Now, [string]::new('-', $nestingLevel), $Message)
     if ($Type -eq 'Error') {
         Write-Error -Message $formattedMessage -Category AuthenticationError
     }
@@ -729,7 +729,7 @@ function Get-AzureADLicenseStatus {
                     $hashCalculator = [System.Security.Cryptography.MD5]::Create()
                     if ($AdvancedCheckups.IsPresent) {
                         if ($hashedReports) {
-                            $userName = ($hashCalculator.ComputeHash([Text.Encoding]::ASCII.GetBytes($user.userPrincipalName)) | ForEach-Object{$_.ToString('X2')}) -join ''
+                            $userName = ($hashCalculator.ComputeHash([Text.Encoding]::ASCII.GetBytes($user.userPrincipalName)) | ForEach-Object{'{0:X2}' -f $_}) -join ''
                         }
                         else {
                             $userName = $user.userPrincipalName
@@ -794,11 +794,11 @@ function Get-AzureADLicenseStatus {
                                 $userAppsUsedLastActivityDate -lt $preferableSKU.LastActiveEarlierThan.Date -and
                                 $userOneDriveStorageUsedGB -lt $preferableSKU.OneDriveGBUsedLessThan -and
                                 $userMailboxStorageUsedGB -lt $preferableSKU.MailboxGBUsedLessThan -and
-                                ($userMailboxHasArchive.ToString() -eq $preferableSKU.MailboxHasArchive -or $preferableSKU.MailboxHasArchive -eq 'Skip') -and
-                                ($userWindowsAppUsed.ToString() -eq $preferableSKU.WindowsAppUsed -or $preferableSKU.WindowsAppUsed -eq 'Skip') -and
-                                ($userMacAppUsed.ToString() -eq $preferableSKU.MacAppUsed -or $preferableSKU.MacAppUsed -eq 'Skip') -and
-                                ($userMobileAppUsed.ToString() -eq $preferableSKU.MobileAppUsed -or $preferableSKU.MobileAppUsed -eq 'Skip') -and
-                                ($userWebAppUsed.ToString() -eq $preferableSKU.WebAppUsed -or $preferableSKU.WebAppUsed -eq 'Skip')) {
+                                ("$userMailboxHasArchive" -eq $preferableSKU.MailboxHasArchive -or $preferableSKU.MailboxHasArchive -eq 'Skip') -and
+                                ("$userWindowsAppUsed" -eq $preferableSKU.WindowsAppUsed -or $preferableSKU.WindowsAppUsed -eq 'Skip') -and
+                                ("$userMacAppUsed" -eq $preferableSKU.MacAppUsed -or $preferableSKU.MacAppUsed -eq 'Skip') -and
+                                ("$userMobileAppUsed" -eq $preferableSKU.MobileAppUsed -or $preferableSKU.MobileAppUsed -eq 'Skip') -and
+                                ("$userWebAppUsed" -eq $preferableSKU.WebAppUsed -or $preferableSKU.WebAppUsed -eq 'Skip')) {
                                     $userSKUs_preferable = $preferableSKU.SKUID
                                 }
                             }
@@ -907,7 +907,8 @@ function Get-AzureADLicenseStatus {
             $secondTimespanStart = $secondTimespanEnd.AddDays(-4)
             $firstTimespanEnd = $secondTimespanEnd.AddDays(-14)
             $firstTimespanStart = $secondTimespanEnd.AddDays(-18)
-            $URI = 'https://graph.microsoft.com/v1.0/auditLogs/signIns?$filter=(conditionalAccessStatus eq ''success'' or conditionalAccessStatus eq ''failure'') and ((createdDateTime ge {0} and createdDateTime le {1}) or (createdDateTime ge {2} and createdDateTime le {3}))&$top={4}' -f $firstTimespanStart.ToString('yyyy-MM-ddT00:00:00Z'), $firstTimespanEnd.ToString('yyyy-MM-ddT23:59:59Z'), $secondTimespanStart.ToString('yyyy-MM-ddT00:00:00Z'), $secondTimespanEnd.ToString('yyyy-MM-ddT23:59:59Z'), $pageSize
+            #TODO: Check date formats
+            $URI = 'https://graph.microsoft.com/v1.0/auditLogs/signIns?$filter=(conditionalAccessStatus eq ''success'' or conditionalAccessStatus eq ''failure'') and ((createdDateTime ge {0:yyyy-MM-ddT00:00:00Z} and createdDateTime le {1:yyyy-MM-ddT23:59:59Z}) or (createdDateTime ge {2:yyyy-MM-ddT00:00:00Z} and createdDateTime le {3:yyyy-MM-ddT23:59:59Z}))&$top={4}' -f $firstTimespanStart, $firstTimespanEnd, $secondTimespanStart, $secondTimespanEnd, $pageSize
             while ($null -ne $URI) {
                 # Retrieve Conditional Access sign-ins
                 $data = Invoke-MgGraphRequest -Method GET -Uri $URI
@@ -1163,7 +1164,7 @@ function Get-AzureADLicenseStatus {
                                     <li>Report important products having both <$SKUTotalThreshold_important licenses and <$SKUPercentageThreshold_important% of their total licenses available</li></ul></p>"
             }
             else {
-                Add-Output -Output 'Nothing to report'
+                Add-Output -Output '<p>Nothing to report</p>'
             }
             # Output advanced SKU results
             Add-Output -Output '<p class=gray>Advanced checkup - Products</p>'
@@ -1201,7 +1202,7 @@ function Get-AzureADLicenseStatus {
                                     <li>Check <i>Defender for Office 365 P1/P2</i> based on protected Exchange Online recipients</li></ul></p>'
             }
             else {
-                Add-Output -Output 'Nothing to report'
+                Add-Output -Output '<p>Nothing to report</p>'
             }
             # Output basic user results
             Add-Output -Output '<p class=gray>Basic checkup - Users</p>'
@@ -1218,9 +1219,9 @@ function Get-AzureADLicenseStatus {
                     $optimizableSKUIDs = $results['User_Basic'][$user]['Optimizable'] | Where-Object{$null -ne $_}
                     $removableSKUIDs = $results['User_Basic'][$user]['Removable'] | Where-Object{$null -ne $_}
                     if ($null -ne $SKUPrices) {
-                        $possibleSavings += ($interchangeableSKUIDs | ForEach-Object{[decimal]$SKUPrices[$_.ToString()]} | Sort-Object | Select-Object -Skip 1 | Measure-Object -Sum).Sum +
-                                            ($optimizableSKUIDs | ForEach-Object{[decimal]$SKUPrices[$_.ToString()]} | Measure-Object -Sum).Sum +
-                                            ($removableSKUIDs | ForEach-Object{[decimal]$SKUPrices[$_.ToString()]} | Measure-Object -Sum).Sum
+                        $possibleSavings += ($interchangeableSKUIDs | ForEach-Object{[decimal]$SKUPrices["$_"]} | Sort-Object | Select-Object -Skip 1 | Measure-Object -Sum).Sum +
+                                            ($optimizableSKUIDs | ForEach-Object{[decimal]$SKUPrices["$_"]} | Measure-Object -Sum).Sum +
+                                            ($removableSKUIDs | ForEach-Object{[decimal]$SKUPrices["$_"]} | Measure-Object -Sum).Sum
                     }
                     Add-Output -Output "<tr> `
                                         <td>$user</td> `
@@ -1241,11 +1242,11 @@ function Get-AzureADLicenseStatus {
                                     <li>Report practically inclusive licenses as <strong>optimizable</strong>, based on available SKU features</li>
                                     <li>Report actually inclusive licenses as <strong>removable</strong>, based on enabled SKU features</li></ul></p>'
                 if ($possibleSavings -gt 0) {
-                    Add-Output -Output "<p>Possible savings: $possibleSavings$([cultureinfo]::CurrentCulture.NumberFormat.CurrencySymbol)"
+                    Add-Output -Output ('<p>Possible savings: {0:C}</p>' -f $possibleSavings)
                 }
             }
             else {
-                Add-Output -Output 'Nothing to report'
+                Add-Output -Output '<p>Nothing to report</p>'
             }
             # Output advanced user results
             Add-Output -Output '<p class=gray>Advanced checkup - Users</p>'
@@ -1260,8 +1261,8 @@ function Get-AzureADLicenseStatus {
                     $preferableSKUID = $results['User_Advanced'][$user]['Preferable']['preferableSKU'] | Where-Object{$null -ne $_}
                     $opposingSKUIDs = $results['User_Advanced'][$user]['Preferable']['opposingSKUs'] | Where-Object{$null -ne $_}
                     if ($null -ne $SKUPrices) {
-                        $possibleSavings += ($opposingSKUIDs | ForEach-Object{[decimal]$SKUPrices[$_.ToString()]} | Measure-Object -Sum).Sum -
-                                            [decimal]$SKUPrices[$preferableSKUID.ToString()]
+                        $possibleSavings += ($opposingSKUIDs | ForEach-Object{[decimal]$SKUPrices["$_"]} | Measure-Object -Sum).Sum -
+                                            [decimal]$SKUPrices["$preferableSKUID"]
                     }
                     Add-Output -Output "<tr> `
                                         <td>$user</td> `
@@ -1283,24 +1284,24 @@ function Get-AzureADLicenseStatus {
                                     <th>Mobile app</th>
                                     <th>Web app</th></tr>'
                 foreach ($preferableSKU in $PreferableSKUs) {
-                    Add-Output -Output "<tr> `
-                                        <td>$(Get-SKUName -SKUID $preferableSKU.SKUID)</td> `
-                                        <td>$($preferableSKU.LastActiveEarlierThan.ToString('yyyy-MM-dd'))</td> `
-                                        <td>$($preferableSKU.OneDriveGBUsedLessThan) GB</td> `
-                                        <td>$($preferableSKU.MailboxGBUsedLessThan) GB</td> `
-                                        <td>$($preferableSKU.MailboxHasArchive)</td> `
-                                        <td>$($preferableSKU.WindowsAppUsed)</td> `
-                                        <td>$($preferableSKU.MacAppUsed)</td> `
-                                        <td>$($preferableSKU.MobileAppUsed)</td> `
-                                        <td>$($preferableSKU.WebAppUsed)</td></tr>"
+                    Add-Output -Output ('<tr><td>{0}</td><td>{1:yyyy-MM-dd}</td><td>{2} GB</td><td>{3} GB</td><td>{4}</td><td>{5}</td><td>{6}</td><td>{7}</td><td>{8}</td></tr>' -f
+                                        (Get-SKUName -SKUID $preferableSKU.SKUID),
+                                        $preferableSKU.LastActiveEarlierThan,
+                                        $preferableSKU.OneDriveGBUsedLessThan,
+                                        $preferableSKU.MailboxGBUsedLessThan,
+                                        $preferableSKU.MailboxHasArchive,
+                                        $preferableSKU.WindowsAppUsed,
+                                        $preferableSKU.MacAppUsed,
+                                        $preferableSKU.MobileAppUsed,
+                                        $preferableSKU.WebAppUsed)
                 }
                 Add-Output -Output '</table></p>'
                 if ($possibleSavings -gt 0) {
-                    Add-Output -Output "<p>Possible savings: $possibleSavings$([cultureinfo]::CurrentCulture.NumberFormat.CurrencySymbol)"
+                    Add-Output -Output ('<p>Possible savings: {0:C}</p>' -f $possibleSavings)
                 }
             }
             else {
-                Add-Output -Output 'Nothing to report'
+                Add-Output -Output '<p>Nothing to report</p>'
             }
             # Configure and send email
             $email = @{
