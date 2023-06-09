@@ -70,6 +70,8 @@ function Initialize-Module {
     # Graph
     $script:pageSize = 500
     $script:reportDays = 180
+    $script:timespanStart = [System.DayOfWeek]::Monday
+    $script:timespanEnd = [System.DayOfWeek]::Friday
     # Process
     $script:nestingLevel = 0
 }
@@ -641,9 +643,9 @@ function Get-AzureADLicenseStatus {
             Invoke-MgGraphRequest -Method GET -Uri ('https://graph.microsoft.com/v1.0/reports/getM365AppUserDetail(period=''D{0}'')?$format=text/csv' -f $reportDays) -OutputFilePath "$env:TEMP\M365AppUserDetail.csv"
             $M365AppUserDetail = Import-Csv "$env:TEMP\M365AppUserDetail.csv" | Select-Object -Property 'User Principal Name', 'Last Activity Date', 'Windows', 'Mac', 'Mobile', 'Web'
             Invoke-MgGraphRequest -Method GET -Uri ('https://graph.microsoft.com/v1.0/reports/getMailboxUsageDetail(period=''D{0}'')' -f $reportDays) -OutputFilePath "$env:TEMP\MailboxUsageDetail.csv"
-            $MailboxUsageDetail = Import-Csv "$env:TEMP\MailboxUsageDetail.csv" | Select-Object -Property 'User Principal Name', 'Last Activity Date', 'Storage Used (Byte)', 'Has Archive'
+            $MailboxUsageDetail = Import-Csv "$env:TEMP\MailboxUsageDetail.csv" | Select-Object -Property 'User Principal Name', 'Is Deleted', 'Last Activity Date', 'Storage Used (Byte)', 'Has Archive'
             Invoke-MgGraphRequest -Method GET -Uri ('https://graph.microsoft.com/v1.0/reports/getOneDriveUsageAccountDetail(period=''D{0}'')' -f $reportDays) -OutputFilePath "$env:TEMP\OneDriveUsageAccountDetail.csv"
-            $OneDriveUsageAccountDetail = Import-Csv "$env:TEMP\OneDriveUsageAccountDetail.csv" | Select-Object -Property 'Owner Principal Name', 'Last Activity Date', 'Storage Used (Byte)'
+            $OneDriveUsageAccountDetail = Import-Csv "$env:TEMP\OneDriveUsageAccountDetail.csv" | Select-Object -Property 'Owner Principal Name', 'Is Deleted', 'Last Activity Date', 'Storage Used (Byte)'
             if ($M365AppUserDetail.'User Principal Name' -like '*@*' -or
             $MailboxUsageDetail.'User Principal Name' -like '*@*' -or
             $OneDriveUsageAccountDetail.'Owner Principal Name' -like '*@*') {
@@ -735,7 +737,7 @@ function Get-AzureADLicenseStatus {
                             $userName = $user.userPrincipalName
                         }
                         $userOneDriveLastActivityDate = [datetime]::MinValue
-                        if ($null -ne ($userOneDrive = $OneDriveUsageAccountDetail | Where-Object{$_.'Owner Principal Name' -eq $userName})) {
+                        if ($null -ne ($userOneDrive = $OneDriveUsageAccountDetail | Where-Object{$_.'Owner Principal Name' -eq $userName -and $_.'Is Deleted' -eq $false})) {
                             [datetime]::TryParse($userOneDrive.'Last Activity Date', [ref]$userOneDriveLastActivityDate) | Out-Null
                             $userOneDriveStorageUsedGB = $userOneDrive.'Storage Used (Byte)' / [System.Math]::Pow(1000, 3)
                         }
@@ -743,7 +745,7 @@ function Get-AzureADLicenseStatus {
                             $userOneDriveStorageUsedGB = 0
                         }
                         $userMailboxLastActivityDate = [datetime]::MinValue
-                        if ($null -ne ($userMailbox = $MailboxUsageDetail | Where-Object{$_.'User Principal Name' -eq $userName})) {
+                        if ($null -ne ($userMailbox = $MailboxUsageDetail | Where-Object{$_.'User Principal Name' -eq $userName -and $_.'Is Deleted' -eq $false})) {
                             [datetime]::TryParse($userMailbox.'Last Activity Date', [ref]$userMailboxLastActivityDate) | Out-Null
                             $userMailboxStorageUsedGB = $userMailbox.'Storage Used (Byte)' / [System.Math]::Pow(1000, 3)
                             $userMailboxHasArchive = $userMailbox.'Has Archive'
@@ -897,18 +899,17 @@ function Get-AzureADLicenseStatus {
             $CAAADP1Users = [System.Collections.Generic.List[guid]]::new()
             $CAAADP2Users = [System.Collections.Generic.List[guid]]::new()
             $signInCount = 0
-            $today = [datetime]::Today
-            if (($today.DayOfWeek - [System.DayOfWeek]::Friday) -lt 1) {
-                $secondTimespanEnd = $today.AddDays(-($today.DayOfWeek - [System.DayOfWeek]::Friday + 7))
+            $today = [datetime]::Today.ToUniversalTime()
+            if ($today.DayOfWeek -gt $timespanEnd) {
+                $secondTimespanEnd = $today.AddDays(-($today.DayOfWeek - $timespanEnd - 1))
             }
             else {
-                $secondTimespanEnd = $today.AddDays(-($today.DayOfWeek - [System.DayOfWeek]::Friday))
+                $secondTimespanEnd = $today.AddDays(-($today.DayOfWeek - $timespanEnd + 6))
             }
-            $secondTimespanStart = $secondTimespanEnd.AddDays(-4)
+            $secondTimespanStart = $secondTimespanEnd.AddDays(-($timespanEnd - $timespanStart + 1))
             $firstTimespanEnd = $secondTimespanEnd.AddDays(-14)
-            $firstTimespanStart = $secondTimespanEnd.AddDays(-18)
-            #TODO: Check date formats
-            $URI = 'https://graph.microsoft.com/v1.0/auditLogs/signIns?$filter=(conditionalAccessStatus eq ''success'' or conditionalAccessStatus eq ''failure'') and ((createdDateTime ge {0:yyyy-MM-ddT00:00:00Z} and createdDateTime le {1:yyyy-MM-ddT23:59:59Z}) or (createdDateTime ge {2:yyyy-MM-ddT00:00:00Z} and createdDateTime le {3:yyyy-MM-ddT23:59:59Z}))&$top={4}' -f $firstTimespanStart, $firstTimespanEnd, $secondTimespanStart, $secondTimespanEnd, $pageSize
+            $firstTimespanStart = $firstTimespanEnd.AddDays(-($timespanEnd - $timespanStart + 1))
+            $URI = 'https://graph.microsoft.com/v1.0/auditLogs/signIns?$filter=(conditionalAccessStatus eq ''success'' or conditionalAccessStatus eq ''failure'') and ((createdDateTime ge {0:o} and createdDateTime lt {1:o}) or (createdDateTime ge {2:o} and createdDateTime lt {3:o}))' -f $firstTimespanStart, $firstTimespanEnd, $secondTimespanStart, $secondTimespanEnd, $pageSize
             while ($null -ne $URI) {
                 # Retrieve Conditional Access sign-ins
                 $data = Invoke-MgGraphRequest -Method GET -Uri $URI
