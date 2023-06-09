@@ -898,25 +898,22 @@ function Get-AzureADLicenseStatus {
             $managedDeviceCount = 0
             # Retrieve Intune licensed users
             $intuneUsers = [System.Collections.Generic.List[hashtable]]::new()
-            $URI = 'https://graph.microsoft.com/v1.0/users?$filter=assignedPlans/any(x:x/servicePlanId eq c1ec4a95-1f05-45b3-a911-aa3fa01094f5 and capabilityStatus eq ''Enabled'')&$select=id&top={0}&$count=true' -f $pageSize
+            $URI = 'https://graph.microsoft.com/v1.0/users?$filter=assignedPlans/any(x:x/servicePlanId eq c1ec4a95-1f05-45b3-a911-aa3fa01094f5 and capabilityStatus eq ''Enabled'') or assignedPlans/any(x:x/servicePlanId eq 3e170737-c728-4eae-bbb9-3f3360f7184c and capabilityStatus eq ''Enabled'')&$select=id&top={0}&$count=true' -f $pageSize
             while ($null -ne $URI) {
                 $data = Invoke-MgGraphRequest -Method GET -Uri $URI -Headers @{'ConsistencyLevel'='eventual'}
                 $intuneUsers.AddRange([hashtable[]]($data.value))
                 $URI = $data['@odata.nextLink']
             }
-            $URI = 'https://graph.microsoft.com/v1.0/deviceManagement/managedDevices?$expand=users'
+            $URI = 'https://graph.microsoft.com/v1.0/deviceManagement/managedDevices?$select=id,userId'
             while ($null -ne $URI) {
                 # Retrieve managed devices
                 $data = Invoke-MgGraphRequest -Method GET -Uri $URI
-                $managedDevices = [System.Collections.Generic.List[hashtable]]::new([hashtable[]]($data.value))
+                $managedDevices = [hashtable[]]($data.value)
                 $managedDeviceCount += $managedDevices.Count
                 $URI = $data['@odata.nextLink']
                 # Analyze managed devices
                 foreach ($managedDevice in $managedDevices) {
-                    if ($null -ne $managedDevice.users) {
-                        $IntuneDevices.Add($managedDevice.id)
-                    }
-                    elseif ($null -ne (Compare-Object $managedDevice.users.id $intuneUsers.id | Where-Object{$_.SideIndicator -eq '<='})) {
+                    if ($managedDevice.userId -notin $intuneUsers.id) {
                         $IntuneDevices.Add($managedDevice.id)
                     }
                 }
