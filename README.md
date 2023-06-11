@@ -11,7 +11,7 @@ The main motivation for this report was to conquer side-effects of manual or sem
 
 > DISCLAIMER: The report can merely aid in complying with license terms and agreements. It cannot and never will lower or replace the liability to actually comply with any default or individually negotiated license terms and agreements applying to your organization.
 
-> HINT: Most of the requirements and preparations for Azure execution mentioned below can be deployed by using the provided Terraform module, the exception being an Exchange Online application access policy.
+> HINT: Most of the requirements and preparations for advanced Azure execution mentioned below can be deployed by using the provided Terraform module, the exception being an Exchange Online application access policy.
 
 ## 2 Feature overview
 
@@ -27,21 +27,21 @@ The main motivation for this report was to conquer side-effects of manual or sem
 
 Check for license need based on Azure AD and Office feature information:
 
-:x: Azure Active Directory Premium P1 based on applications using application proxy
+:x: _Azure Active Directory Premium P1_ based on applications using application proxy
 
-:heavy_check_mark: Azure Active Directory Premium P1 based on groups using dynamic user membership
+:heavy_check_mark: _Azure Active Directory Premium P1_ based on groups using dynamic user membership
 
-:heavy_check_mark: Azure Active Directory Premium P1 based on applications using group-based assignment
+:heavy_check_mark: _Azure Active Directory Premium P1_ based on applications using group-based assignment
 
-:heavy_check_mark: Azure Active Directory Premium P1/P2 based on users covered by Conditional Access
+:heavy_check_mark: _Azure Active Directory Premium P1/P2_ based on users covered by Conditional Access
 
 > DISCLAIMER: For performance reasons, Conditional Access coverage calculation only considers two separate 5-day time slots. The first being the most recent full Monday-Friday slot, the second being the same slot two weeks earlier. Although this should result in a mostly accurate coverage calculation, taking at least 4-day time slots into account for each time zone, it will inevitably disregard users with irregular access patterns.
 
-:heavy_check_mark: Azure Active Directory Premium P2 based on users in scope of Privileged Identity Management
+:heavy_check_mark: _Azure Active Directory Premium P2_ based on users in scope of Privileged Identity Management
 
-:heavy_check_mark: Defender for Office 365 P1/P2 based on protected Exchange Online recipients
+:heavy_check_mark: _Defender for Office 365 P1/P2_ based on protected Exchange Online recipients
 
-:x: Intune Device based on devices managed by Intune and used by unlicensed users
+:heavy_check_mark: _Intune Device_ based on devices managed by Intune and used by unlicensed users
 
 ### 2.2 User level
 
@@ -93,6 +93,7 @@ Check for license need based on Azure AD and Office feature information:
 #### 3.2.2 Advanced
 
 - Microsoft Graph permission _AuditLog.Read.All_
+- Microsoft Graph permission _DeviceManagementManagedDevices.Read.All_
 - Microsoft Graph permission _Policy.Read.All_
 - Microsoft Graph permission _Reports.Read.All_
 - Microsoft Graph permission _RoleManagement.Read.All_
@@ -110,20 +111,20 @@ Check for license need based on Azure AD and Office feature information:
    - For local execution
      1. Install required modules
      2. Install this module
-     3. Create self-signed certificate
+     3. Generate or request certificate
    - For Azure execution
      1. Create Azure automation account
         1. Add required modules
         2. Add this module
         3. Enable system-assigned managed identity
      2. Create Azure key vault
-        1. Create self-signed certificate
+        1. Generate, request or import certificate
         2. Grant role _Key Vault Secrets User_ to automation account's managed identity
 2. Prepare authentication
-   1. Create Azure AD application
+   1. Register Azure AD application
    2. Add required permissions
-   3. Add certificate
-3. (optional) Limit permissions
+   3. Upload certificate
+3. (optional, recommended) Limit permissions
    1. Create Exchange Online application access policy to restrict Azure AD application's _Mail.Send_ permission to intended sender mailbox
 
 ## 5 Links
@@ -131,4 +132,5 @@ Check for license need based on Azure AD and Office feature information:
 - [Azure automation account](https://learn.microsoft.com/azure/automation/automation-create-standalone-account)
 - [Azure key vault](https://learn.microsoft.com/azure/key-vault/general/quick-create-portal)
 - [Azure AD application](https://learn.microsoft.com/azure/active-directory/develop/quickstart-register-app)
+- [Graph permissions](https://learn.microsoft.com/graph/permissions-reference)
 - [Exchange Online application access policy](https://learn.microsoft.com/graph/auth-limit-mailbox-access)
