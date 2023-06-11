@@ -318,7 +318,7 @@ function Resolve-ATPRecipient {
         Write-Output ([pscustomobject[]]$resolvedUsers_unique) -NoEnumerate
     }
     else {
-        Write-Message "Found 0 recipients by combination" -Type Verbose
+        Write-Message 'Found 0 recipients by combination' -Type Verbose
         $nestingLevel--
         Write-Output @([pscustomobject[]]::new(0)) -NoEnumerate
     }
@@ -737,7 +737,7 @@ function Get-AzureADLicenseStatus {
                             $userName = $user.userPrincipalName
                         }
                         $userOneDriveLastActivityDate = [datetime]::MinValue
-                        if ($null -ne ($userOneDrive = $OneDriveUsageAccountDetail | Where-Object{$_.'Owner Principal Name' -eq $userName -and $_.'Is Deleted' -eq $false})) {
+                        if ($null -ne ($userOneDrive = $OneDriveUsageAccountDetail | Where-Object{$_.'Owner Principal Name' -eq $userName -and $_.'Is Deleted' -eq 'False'})) {
                             [datetime]::TryParse($userOneDrive.'Last Activity Date', [ref]$userOneDriveLastActivityDate) | Out-Null
                             $userOneDriveStorageUsedGB = $userOneDrive.'Storage Used (Byte)' / [System.Math]::Pow(1000, 3)
                         }
@@ -745,48 +745,48 @@ function Get-AzureADLicenseStatus {
                             $userOneDriveStorageUsedGB = 0
                         }
                         $userMailboxLastActivityDate = [datetime]::MinValue
-                        if ($null -ne ($userMailbox = $MailboxUsageDetail | Where-Object{$_.'User Principal Name' -eq $userName -and $_.'Is Deleted' -eq $false})) {
+                        if ($null -ne ($userMailbox = $MailboxUsageDetail | Where-Object{$_.'User Principal Name' -eq $userName -and $_.'Is Deleted' -eq 'False'})) {
                             [datetime]::TryParse($userMailbox.'Last Activity Date', [ref]$userMailboxLastActivityDate) | Out-Null
                             $userMailboxStorageUsedGB = $userMailbox.'Storage Used (Byte)' / [System.Math]::Pow(1000, 3)
                             $userMailboxHasArchive = $userMailbox.'Has Archive'
                         }
                         else {
                             $userMailboxStorageUsedGB = 0
-                            $userMailboxHasArchive = $false
+                            $userMailboxHasArchive = 'False'
                         }
                         $userAppsUsedLastActivityDate = [datetime]::MinValue
                         if ($null -ne ($userAppsUsed = $M365AppUserDetail | Where-Object{$_.'User Principal Name' -eq $userName})) {
                             [datetime]::TryParse($userAppsUsed.'Last Activity Date', [ref]$userAppsUsedLastActivityDate) | Out-Null
                             if ($userAppsUsed.'Windows' -eq 'Yes') {
-                                $userWindowsAppUsed = $true
+                                $userWindowsAppUsed = 'True'
                             }
                             else {
-                                $userWindowsAppUsed = $false
+                                $userWindowsAppUsed = 'False'
                             }
                             if ($userAppsUsed.'Mac' -eq 'Yes') {
-                                $userMacAppUsed = $true
+                                $userMacAppUsed = 'True'
                             }
                             else {
-                                $userMacAppUsed = $false
+                                $userMacAppUsed = 'False'
                             }
                             if ($userAppsUsed.'Mobile' -eq 'Yes') {
-                                $userMobileAppUsed = $true
+                                $userMobileAppUsed = 'True'
                             }
                             else {
-                                $userMobileAppUsed = $false
+                                $userMobileAppUsed = 'False'
                             }
                             if ($userAppsUsed.'Web' -eq 'Yes') {
-                                $userWebAppUsed = $true
+                                $userWebAppUsed = 'True'
                             }
                             else {
-                                $userWebAppUsed = $false
+                                $userWebAppUsed = 'False'
                             }
                         }
                         else {
-                            $userWindowsAppUsed = $false
-                            $userMacAppUsed = $false
-                            $userMobileAppUsed = $false
-                            $userWebAppUsed = $false
+                            $userWindowsAppUsed = 'False'
+                            $userMacAppUsed = 'False'
+                            $userMobileAppUsed = 'False'
+                            $userWebAppUsed = 'False'
                         }
                         $userSKUs_preferable = $null
                         foreach ($preferableSKU in $PreferableSKUs) {
@@ -796,11 +796,11 @@ function Get-AzureADLicenseStatus {
                                 $userAppsUsedLastActivityDate -lt $preferableSKU.LastActiveEarlierThan.Date -and
                                 $userOneDriveStorageUsedGB -lt $preferableSKU.OneDriveGBUsedLessThan -and
                                 $userMailboxStorageUsedGB -lt $preferableSKU.MailboxGBUsedLessThan -and
-                                ("$userMailboxHasArchive" -eq $preferableSKU.MailboxHasArchive -or $preferableSKU.MailboxHasArchive -eq 'Skip') -and
-                                ("$userWindowsAppUsed" -eq $preferableSKU.WindowsAppUsed -or $preferableSKU.WindowsAppUsed -eq 'Skip') -and
-                                ("$userMacAppUsed" -eq $preferableSKU.MacAppUsed -or $preferableSKU.MacAppUsed -eq 'Skip') -and
-                                ("$userMobileAppUsed" -eq $preferableSKU.MobileAppUsed -or $preferableSKU.MobileAppUsed -eq 'Skip') -and
-                                ("$userWebAppUsed" -eq $preferableSKU.WebAppUsed -or $preferableSKU.WebAppUsed -eq 'Skip')) {
+                                ($userMailboxHasArchive -eq $preferableSKU.MailboxHasArchive -or $preferableSKU.MailboxHasArchive -eq 'Skip') -and
+                                ($userWindowsAppUsed -eq $preferableSKU.WindowsAppUsed -or $preferableSKU.WindowsAppUsed -eq 'Skip') -and
+                                ($userMacAppUsed -eq $preferableSKU.MacAppUsed -or $preferableSKU.MacAppUsed -eq 'Skip') -and
+                                ($userMobileAppUsed -eq $preferableSKU.MobileAppUsed -or $preferableSKU.MobileAppUsed -eq 'Skip') -and
+                                ($userWebAppUsed -eq $preferableSKU.WebAppUsed -or $preferableSKU.WebAppUsed -eq 'Skip')) {
                                     $userSKUs_preferable = $preferableSKU.SKUID
                                 }
                             }
@@ -938,19 +938,20 @@ function Get-AzureADLicenseStatus {
             $AADP2Users.AddRange([guid[]]@($CAAADP2Users | Select-Object -Unique))
             Remove-Variable 'CAAADP1Policies','CAAADP2Policies','CAAADP1Users','CAAADP2Users' -Force
             # Azure AD P2 based on users in scope of Privileged Identity Management
-            $eligibleRoleMembers = [System.Collections.Generic.List[hashtable]]::new()
+            $roleAssignmentCount = 0
             $URI = 'https://graph.microsoft.com/v1.0/roleManagement/directory/roleEligibilitySchedules?$select=principalId,scheduleInfo'
             while ($null -ne $URI) {
+                # Retrieve role assignments
                 $data = Invoke-MgGraphRequest -Method GET -Uri $URI
-                $eligibleRoleMembers.AddRange([hashtable[]]($data.value))
+                $roleAssignments = [hashtable[]]($data.value)
+                $roleAssignmentCount += $roleAssignments.Count
                 $URI = $data['@odata.nextLink']
-            }
-            if ($eligibleRoleMembers.Count -gt 0) {
-                if ($null -ne ($actuallyEligibleRoleMembers = $eligibleRoleMembers | Where-Object{$_.scheduleInfo.startDateTime -le [datetime]::Today -and ($_.scheduleInfo.expiration.endDateTime -ge [datetime]::Today -or $_.scheduleInfo.expiration.type -eq 'noExpiration')})) {
-                    $AADP2Users.AddRange([guid[]]@($actuallyEligibleRoleMembers.principalId))
+                # Analyze role assignments
+                if ($null -ne ($eligibleRoleAssignments = $roleAssignments | Where-Object{$_.scheduleInfo.startDateTime -le [datetime]::Today -and ($_.scheduleInfo.expiration.endDateTime -ge [datetime]::Today -or $_.scheduleInfo.expiration.type -eq 'noExpiration')})) {
+                    $AADP2Users.AddRange([guid[]]@($eligibleRoleAssignments.principalId))
                 }
             }
-            Write-Message "Analyzed $($eligibleRoleMembers.Count) eligible role assignments"
+            Write-Message "Analyzed $roleAssignmentCount role assignments"
             # Defender for Office 365 P1/P2 based on https://learn.microsoft.com/office365/servicedescriptions/office-365-advanced-threat-protection-service-description#licensing-terms
             $orgDomain = (Invoke-MgGraphRequest -Method GET -Uri 'https://graph.microsoft.com/v1.0/organization?$select=verifiedDomains').value.verifiedDomains | Where-Object{$_.isInitial -eq $true}
             try {
@@ -1142,10 +1143,10 @@ function Get-AzureADLicenseStatus {
                                     <th>Difference</th></tr>"
                 foreach ($SKU in $results['SKU_Basic'].Keys) {
                     $differenceCount = $results['SKU_Basic'][$SKU]['availableCount'] - $results['SKU_Basic'][$SKU]['minimumCount']
-                    Add-Output -Output "<tr> `
-                                        <td>$(Get-SKUName -SKUID $SKU)</td> `
-                                        <td>$($results['SKU_Basic'][$SKU]['availableCount'])</td> `
-                                        <td>$($results['SKU_Basic'][$SKU]['minimumCount'])</td>"
+                    Add-Output -Output ('<tr><td>{0}</td><td>{1}</td><td>{2}</td>' -f
+                                        (Get-SKUName -SKUID $SKU),
+                                        $results['SKU_Basic'][$SKU]['availableCount'],
+                                        $results['SKU_Basic'][$SKU]['minimumCount'])
                     if ($results['SKU_Basic'][$SKU]['availableCount'] / $results['SKU_Basic'][$SKU]['minimumCount'] * 100 -ge $SKUWarningThreshold_basic) {
                         Add-Output -Output "<td class=green>$differenceCount</td>"
                     }
@@ -1178,10 +1179,10 @@ function Get-AzureADLicenseStatus {
                                     <th>Difference</th></tr>"
                 foreach ($plan in $results['SKU_Advanced'].Keys) {
                     $differenceCount = $results['SKU_Advanced'][$plan]['enabledCount'] - $results['SKU_Advanced'][$plan]['neededCount']
-                    Add-Output -Output "<tr> `
-                                        <td>$plan</td> `
-                                        <td>$($results['SKU_Advanced'][$plan]['enabledCount'])</td> `
-                                        <td>$($results['SKU_Advanced'][$plan]['neededCount'])</td>"
+                    Add-Output -Output ('<tr><td>{0}</td><td>{1}</td><td>{2}</td>' -f
+                                        $plan,
+                                        $results['SKU_Advanced'][$plan]['enabledCount'],
+                                        $results['SKU_Advanced'][$plan]['neededCount'])
                     if ($results['SKU_Advanced'][$plan]['enabledCount'] / $results['SKU_Advanced'][$plan]['neededCount'] * 100 -ge $SKUWarningThreshold_advanced) {
                         Add-Output -Output "<td class=green>$differenceCount</td>"
                     }
@@ -1224,27 +1225,22 @@ function Get-AzureADLicenseStatus {
                                             ($optimizableSKUIDs | ForEach-Object{[decimal]$SKUPrices["$_"]} | Measure-Object -Sum).Sum +
                                             ($removableSKUIDs | ForEach-Object{[decimal]$SKUPrices["$_"]} | Measure-Object -Sum).Sum
                     }
-                    Add-Output -Output "<tr> `
-                                        <td>$user</td> `
-                                        <td>$(($interchangeableSKUIDs |
-                                                ForEach-Object{Get-SKUName -SKUID $_} |
-                                                Sort-Object) -join '<br>')</td> `
-                                        <td>$(($optimizableSKUIDs |
-                                                ForEach-Object{Get-SKUName -SKUID $_} |
-                                                Sort-Object) -join '<br>')</td> `
-                                        <td>$(($removableSKUIDs |
-                                                ForEach-Object{Get-SKUName -SKUID $_} |
-                                                Sort-Object) -join '<br>')</td></tr>"
+                    Add-Output -Output ('<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td></tr>' -f
+                                        $user,
+                                        ($interchangeableSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>',
+                                        ($optimizableSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>',
+                                        ($removableSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>')
                 }
-                Add-Output -Output '</table></p>
-                                    <p>The following criteria were used during the checkup:<ul>
+                Add-Output -Output '</table></p>'
+                if ($possibleSavings -gt 0) {
+                    Add-Output -Output ('<p>Possible savings when mitigating license assignment impact: {0:C}</p>' -f $possibleSavings)
+                }
+                Add-Output -Output '<p>The following criteria were used during the checkup:<ul>
                                     <li>Check accounts with any number of assigned licenses</li>
                                     <li>Report theoretically exclusive licenses as <strong>interchangeable</strong>, based on specified SKUs</li>
                                     <li>Report practically inclusive licenses as <strong>optimizable</strong>, based on available SKU features</li>
                                     <li>Report actually inclusive licenses as <strong>removable</strong>, based on enabled SKU features</li></ul></p>'
-                if ($possibleSavings -gt 0) {
-                    Add-Output -Output ('<p>Possible savings: {0:C}</p>' -f $possibleSavings)
-                }
+                
             }
             else {
                 Add-Output -Output '<p>Nothing to report</p>'
@@ -1265,15 +1261,16 @@ function Get-AzureADLicenseStatus {
                         $possibleSavings += ($opposingSKUIDs | ForEach-Object{[decimal]$SKUPrices["$_"]} | Measure-Object -Sum).Sum -
                                             [decimal]$SKUPrices["$preferableSKUID"]
                     }
-                    Add-Output -Output "<tr> `
-                                        <td>$user</td> `
-                                        <td>$(Get-SKUName -SKUID $preferableSKUID)</td>
-                                        <td>$(($opposingSKUIDs |
-                                                ForEach-Object{Get-SKUName -SKUID $_} |
-                                                Sort-Object) -join '<br>')</td></tr>"
+                    Add-Output -Output ('<tr><td>{0}</td><td>{1}</td><td>{2}</td></tr>' -f
+                                        $user,
+                                        (Get-SKUName -SKUID $preferableSKUID),
+                                        ($opposingSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>')
                 }
-                Add-Output -Output '</table></p>
-                                    <p>The following criteria were used during the checkup, in order:</p>
+                Add-Output -Output '</table></p>'
+                if ($possibleSavings -gt 0) {
+                    Add-Output -Output ('<p>Possible savings when mitigating license assignment impact: {0:C}</p>' -f $possibleSavings)
+                }
+                Add-Output -Output '<p>The following criteria were used during the checkup, in order:</p>
                                     <p><table><tr>
                                     <th>License type</th>
                                     <th>Activity limit</th>
@@ -1297,9 +1294,6 @@ function Get-AzureADLicenseStatus {
                                         $preferableSKU.WebAppUsed)
                 }
                 Add-Output -Output '</table></p>'
-                if ($possibleSavings -gt 0) {
-                    Add-Output -Output ('<p>Possible savings: {0:C}</p>' -f $possibleSavings)
-                }
             }
             else {
                 Add-Output -Output '<p>Nothing to report</p>'
