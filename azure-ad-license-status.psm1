@@ -482,7 +482,7 @@ function Get-AzureADLicenseStatus {
     .PARAMETER PreferableSKUs
     Specifies a list of SKUs which are deemed preferable based on their provided ruleset
     .PARAMETER SKUPrices
-    Specifies a list of SKUs with their prices to calculate possible savings during user checkups
+    Specifies a list of SKUs with their prices to calculate potential savings during user checkups
     .PARAMETER LicensingURL
     Specifies a licensing portal URL to be linked in the report, refers to Microsoft's Volume Licensing Service Center by default
     .PARAMETER AdvancedCheckups
@@ -1209,7 +1209,7 @@ function Get-AzureADLicenseStatus {
             # Output basic user results
             Add-Output -Output '<p class=gray>Basic checkup - Users</p>'
             if ($results.ContainsKey('User_Basic')) {
-                [decimal]$possibleSavings = 0
+                [decimal]$potentialSavings = 0
                 Add-Output -Output '<p>Please check license assignments for the following user accounts and mitigate impact:</p>
                                     <p><table><tr>
                                     <th>Account</th>
@@ -1221,7 +1221,7 @@ function Get-AzureADLicenseStatus {
                     $optimizableSKUIDs = $results['User_Basic'][$user]['Optimizable'] | Where-Object{$null -ne $_}
                     $removableSKUIDs = $results['User_Basic'][$user]['Removable'] | Where-Object{$null -ne $_}
                     if ($null -ne $SKUPrices) {
-                        $possibleSavings += ($interchangeableSKUIDs | ForEach-Object{[decimal]$SKUPrices["$_"]} | Sort-Object | Select-Object -Skip 1 | Measure-Object -Sum).Sum +
+                        $potentialSavings += ($interchangeableSKUIDs | ForEach-Object{[decimal]$SKUPrices["$_"]} | Sort-Object | Select-Object -Skip 1 | Measure-Object -Sum).Sum +
                                             ($optimizableSKUIDs | ForEach-Object{[decimal]$SKUPrices["$_"]} | Measure-Object -Sum).Sum +
                                             ($removableSKUIDs | ForEach-Object{[decimal]$SKUPrices["$_"]} | Measure-Object -Sum).Sum
                     }
@@ -1232,8 +1232,8 @@ function Get-AzureADLicenseStatus {
                                         ($removableSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>')
                 }
                 Add-Output -Output '</table></p>'
-                if ($possibleSavings -gt 0) {
-                    Add-Output -Output ('<p>Possible savings when mitigating license assignment impact: {0:C}</p>' -f $possibleSavings)
+                if ($potentialSavings -gt 0) {
+                    Add-Output -Output ('<p>Potential savings when mitigating license assignment impact: {0:C}</p>' -f $potentialSavings)
                 }
                 Add-Output -Output '<p>The following criteria were used during the checkup:<ul>
                                     <li>Check accounts with any number of assigned licenses</li>
@@ -1248,7 +1248,7 @@ function Get-AzureADLicenseStatus {
             # Output advanced user results
             Add-Output -Output '<p class=gray>Advanced checkup - Users</p>'
             if ($results.ContainsKey('User_Advanced')) {
-                [decimal]$possibleSavings = 0
+                [decimal]$potentialSavings = 0
                 Add-Output -Output '<p>Please check license assignments for the following user accounts and mitigate impact:</p>
                                     <p><table><tr>
                                     <th>Account</th>
@@ -1258,7 +1258,7 @@ function Get-AzureADLicenseStatus {
                     $preferableSKUID = $results['User_Advanced'][$user]['Preferable']['preferableSKU'] | Where-Object{$null -ne $_}
                     $opposingSKUIDs = $results['User_Advanced'][$user]['Preferable']['opposingSKUs'] | Where-Object{$null -ne $_}
                     if ($null -ne $SKUPrices) {
-                        $possibleSavings += ($opposingSKUIDs | ForEach-Object{[decimal]$SKUPrices["$_"]} | Measure-Object -Sum).Sum -
+                        $potentialSavings += ($opposingSKUIDs | ForEach-Object{[decimal]$SKUPrices["$_"]} | Measure-Object -Sum).Sum -
                                             [decimal]$SKUPrices["$preferableSKUID"]
                     }
                     Add-Output -Output ('<tr><td>{0}</td><td>{1}</td><td>{2}</td></tr>' -f
@@ -1267,8 +1267,8 @@ function Get-AzureADLicenseStatus {
                                         ($opposingSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>')
                 }
                 Add-Output -Output '</table></p>'
-                if ($possibleSavings -gt 0) {
-                    Add-Output -Output ('<p>Possible savings when mitigating license assignment impact: {0:C}</p>' -f $possibleSavings)
+                if ($potentialSavings -gt 0) {
+                    Add-Output -Output ('<p>Potential savings when mitigating license assignment impact: {0:C}</p>' -f $potentialSavings)
                 }
                 Add-Output -Output '<p>The following criteria were used during the checkup, in order:</p>
                                     <p><table><tr>
