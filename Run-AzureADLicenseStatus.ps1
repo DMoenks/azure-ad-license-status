@@ -1,5 +1,3 @@
-using module 'azure-ad-license-status'
-
 param (
     [Parameter(Mandatory = $true)]
     [string]$DirectoryID,

@@ -436,7 +436,7 @@ function Get-AzureADLicenseStatus {
     .DESCRIPTION
     This function is meant to conquer side-effects of semi-automatic license assignments for Microsoft services in Azure AD, i.e. the combination of group-based licensing with manual group membership management, by regularly reporting both on the amount of available licenses per SKU and any conflicting license assignments per user account. This allows for somewhat easier license management without either implementing a full-fledged software asset management solution or hiring a licensing service provider.
 
-    SKU IDs and names are in accordance with https://learn.microsoft.com/azure/active-directory/enterprise-users/licensing-service-plan-reference
+    SKU IDs and names are in accordance with https://learn.microsoft.com/en-us/azure/active-directory/enterprise-users/licensing-service-plan-reference
     .PARAMETER DirectoryID
     Specifies the directory to connect to
     .PARAMETER ApplicationID
@@ -687,7 +687,7 @@ function Get-AzureADLicenseStatus {
                     }
                     if ($null -ne ($countViolations = $user.licenseAssignmentStates | Where-Object{$_.error -eq 'CountViolation'})) {
                         foreach ($countViolation in $countViolations.skuId | Select-Object -Unique) {
-                            $results['SKU_Basic'][$countViolation]['availableCount'] -= 1
+                            $results['SKU'][$countViolation]['availableCount'] -= 1
                         }
                     }
                     # Identify interchangeable SKUs, based on specifications
@@ -849,7 +849,7 @@ function Get-AzureADLicenseStatus {
         #endregion
 
         #region: Advanced
-        if ($AdvancedCheckups.IsPresent) {
+        if ($AdvancedCheckups) {
             $AADP1Users = [System.Collections.Generic.List[guid]]::new()
             $AADP2Users = [System.Collections.Generic.List[guid]]::new()
             $ATPUsers = [System.Collections.Generic.List[guid]]::new()
