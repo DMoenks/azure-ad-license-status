@@ -1,79 +1,30 @@
 Set-StrictMode -Version 3.0
 
-#region: CSS configuration
-$style = @"
-<style>
-table, th, td {
-    border: none;
-    border-collapse: collapse;
+#region: Classes
+class PreferableSKURule {
+    [datetime]$LastActiveEarlierThan = [datetime]::MaxValue
+    [UInt16]$OneDriveGBUsedLessThan = [UInt16]::MaxValue
+    [UInt16]$MailboxGBUsedLessThan = [UInt16]::MaxValue
+    [ValidateSet('True', 'False', 'Skip')]
+    [string]$MailboxHasArchive = 'Skip'
+    [ValidateSet('True', 'False', 'Skip')]
+    [string]$WindowsAppUsed = 'Skip'
+    [ValidateSet('True', 'False', 'Skip')]
+    [string]$MacAppUsed = 'Skip'
+    [ValidateSet('True', 'False', 'Skip')]
+    [string]$MobileAppUsed = 'Skip'
+    [ValidateSet('True', 'False', 'Skip')]
+    [string]$WebAppUsed = 'Skip'
+    [guid]$SKUID
 }
-th, td {
-    padding: 5px;
-    text-align: left;
-    vertical-align: top;
-}
-.gray {
-    border-left: 4pt solid darkslategray;
-    padding-left: 4pt;
-    background-color: lightslategray
-}
-.green {
-    border-left: 4pt solid darkgreen;
-    padding-left: 4pt;
-    background-color: lightgreen
-}
-.yellow {
-    border-left: 4pt solid darkgoldenrod;
-    padding-left: 4pt;
-    background-color: lightgoldenrodyellow
-}
-.red {
-    border-left: 4pt solid darkred;
-    padding-left: 4pt;
-    background-color: lightcoral
-}
-</style>
-"@
 #endregion
 
-#region: Helper functions
+#region: Functions
 function Initialize-Module {
-    # Common
+    $script:nestingLevel = 0
     $script:outputs = [System.Text.StringBuilder]::new()
     $script:results = @{}
     $script:skuTranslate = [string]::new([char[]]((Invoke-WebRequest -Uri 'https://download.microsoft.com/download/e/3/e/e3e9faf2-f28b-490a-9ada-c6089a1fc5b0/Product%20names%20and%20service%20plan%20identifiers%20for%20licensing.csv' -UseBasicParsing).Content)) | ConvertFrom-Csv
-    # Exchange Online
-    $script:EXOCmdlets = @(
-        'Get-Recipient',
-        'Get-DistributionGroupMember',
-        'Get-UnifiedGroupLinks',
-        'Get-ATPBuiltInProtectionRule',
-        'Get-ATPProtectionPolicyRule',
-        'Get-AntiPhishRule',
-        'Get-AntiPhishPolicy',
-        'Get-SafeAttachmentRule',
-        'Get-SafeAttachmentPolicy',
-        'Get-SafeLinksRule',
-        'Get-SafeLinksPolicy')
-    $script:EXOProperties = @(
-        'ExchangeObjectId',
-        'ExternalDirectoryObjectId',
-        'PrimarySmtpAddress',
-        'RecipientTypeDetails')
-    $script:EXOTypes_group = @(
-        'GroupMailbox',
-        'MailUniversalDistributionGroup',
-        'MailUniversalSecurityGroup')
-    $script:EXOTypes_user = @(
-        'SharedMailbox',
-        'UserMailbox')
-    # Graph
-    $script:pageSize = 500
-    $script:reportDays = 180
-    $script:timespanStart = [System.DayOfWeek]::Monday
-    $script:timespanEnd = [System.DayOfWeek]::Friday
-    # Process
-    $script:nestingLevel = 0
 }
 
 function Write-Message {
@@ -412,22 +363,72 @@ function Get-SKUName {
 }
 #endregion
 
-class PreferableSKURule {
-    [datetime]$LastActiveEarlierThan = [datetime]::MaxValue
-    [UInt16]$OneDriveGBUsedLessThan = [UInt16]::MaxValue
-    [UInt16]$MailboxGBUsedLessThan = [UInt16]::MaxValue
-    [ValidateSet('True', 'False', 'Skip')]
-    [string]$MailboxHasArchive = 'Skip'
-    [ValidateSet('True', 'False', 'Skip')]
-    [string]$WindowsAppUsed = 'Skip'
-    [ValidateSet('True', 'False', 'Skip')]
-    [string]$MacAppUsed = 'Skip'
-    [ValidateSet('True', 'False', 'Skip')]
-    [string]$MobileAppUsed = 'Skip'
-    [ValidateSet('True', 'False', 'Skip')]
-    [string]$WebAppUsed = 'Skip'
-    [guid]$SKUID
+#region: Variables
+# Exchange Online
+$EXOCmdlets = @(
+    'Get-Recipient',
+    'Get-DistributionGroupMember',
+    'Get-UnifiedGroupLinks',
+    'Get-ATPBuiltInProtectionRule',
+    'Get-ATPProtectionPolicyRule',
+    'Get-AntiPhishRule',
+    'Get-AntiPhishPolicy',
+    'Get-SafeAttachmentRule',
+    'Get-SafeAttachmentPolicy',
+    'Get-SafeLinksRule',
+    'Get-SafeLinksPolicy')
+$EXOProperties = @(
+    'ExchangeObjectId',
+    'ExternalDirectoryObjectId',
+    'PrimarySmtpAddress',
+    'RecipientTypeDetails')
+$EXOTypes_group = @(
+    'GroupMailbox',
+    'MailUniversalDistributionGroup',
+    'MailUniversalSecurityGroup')
+$EXOTypes_user = @(
+    'SharedMailbox',
+    'UserMailbox')
+# Graph
+$pageSize = 500
+$reportDays = 180
+$timespanStart = [System.DayOfWeek]::Monday
+$timespanEnd = [System.DayOfWeek]::Friday
+# Report
+$style = @"
+<style>
+table, th, td {
+    border: none;
+    border-collapse: collapse;
 }
+th, td {
+    padding: 5px;
+    text-align: left;
+    vertical-align: top;
+}
+.gray {
+    border-left: 4pt solid darkslategray;
+    padding-left: 4pt;
+    background-color: lightslategray
+}
+.green {
+    border-left: 4pt solid darkgreen;
+    padding-left: 4pt;
+    background-color: lightgreen
+}
+.yellow {
+    border-left: 4pt solid darkgoldenrod;
+    padding-left: 4pt;
+    background-color: lightgoldenrodyellow
+}
+.red {
+    border-left: 4pt solid darkred;
+    padding-left: 4pt;
+    background-color: lightcoral
+}
+</style>
+"@
+#endregion
 
 function Get-AzureADLicenseStatus {
     <#
