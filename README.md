@@ -25,7 +25,7 @@ The main motivation for this report was to conquer side-effects of manual or sem
 
 #### 2.1.2 Advanced
 
-Check for license need based on Azure AD and Office feature information:
+Check for license need based on Azure AD, Defender and Intune feature information:
 
 :x: _Azure Active Directory Premium P1_ based on applications using application proxy
 
