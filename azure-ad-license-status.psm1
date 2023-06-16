@@ -172,7 +172,12 @@ function Get-AADGroupMember {
             $URI = $data['@odata.nextLink']
         }
     }
-    $groupMembers_unique = @($groupMembers.id | Select-Object -Unique)
+    if ($groupMembers.Count -gt 0) {
+        $groupMembers_unique = @($groupMembers.id | Select-Object -Unique)
+    }
+    else {
+        $groupMembers_unique = @()
+    }
     Write-Message "Found $($groupMembers_unique.Count) members" -Type Verbose
     $nestingLevel--
     Write-Output ([guid[]]$groupMembers_unique) -NoEnumerate
@@ -1316,9 +1321,9 @@ function Get-AzureADLicenseStatus {
                     }
                     Add-Output -Output ('<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td></tr>' -f
                                         $user,
-                                        ($interchangeableSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>',
-                                        ($optimizableSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>',
-                                        ($removableSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>')
+                                        (($interchangeableSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>'),
+                                        (($optimizableSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>'),
+                                        (($removableSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>'))
                 }
                 Add-Output -Output '</table></p>'
                 if ($potentialSavings -gt 0) {
@@ -1352,7 +1357,7 @@ function Get-AzureADLicenseStatus {
                     Add-Output -Output ('<tr><td>{0}</td><td>{1}</td><td>{2}</td></tr>' -f
                                         $user,
                                         (Get-SKUName -SKUID $preferableSKUID),
-                                        ($opposingSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>')
+                                        (($opposingSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>'))
                 }
                 Add-Output -Output '</table></p>'
                 if ($potentialSavings -gt 0) {
