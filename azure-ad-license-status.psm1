@@ -25,6 +25,9 @@ function Initialize-Module {
     $script:outputs = [System.Text.StringBuilder]::new()
     $script:results = @{}
     $script:skuTranslate = [string]::new([char[]]((Invoke-WebRequest -Uri 'https://download.microsoft.com/download/e/3/e/e3e9faf2-f28b-490a-9ada-c6089a1fc5b0/Product%20names%20and%20service%20plan%20identifiers%20for%20licensing.csv' -UseBasicParsing).Content)) | ConvertFrom-Csv
+    $script:appUsage = @{}
+    $script:mailboxUsage = @{}
+    $script:driveUsage = @{}
 }
 
 function Write-Message {
@@ -641,18 +644,85 @@ function Get-AzureADLicenseStatus {
 
         #region: Reports
         if ($AdvancedCheckups.IsPresent) {
-            Invoke-MgGraphRequest -Method GET -Uri ('https://graph.microsoft.com/v1.0/reports/getM365AppUserDetail(period=''D{0}'')?$format=text/csv' -f $reportDays) -OutputFilePath "$env:TEMP\M365AppUserDetail.csv"
-            $M365AppUserDetail = Import-Csv "$env:TEMP\M365AppUserDetail.csv" | Select-Object -Property 'User Principal Name', 'Last Activity Date', 'Windows', 'Mac', 'Mobile', 'Web'
-            Invoke-MgGraphRequest -Method GET -Uri ('https://graph.microsoft.com/v1.0/reports/getMailboxUsageDetail(period=''D{0}'')' -f $reportDays) -OutputFilePath "$env:TEMP\MailboxUsageDetail.csv"
-            $MailboxUsageDetail = Import-Csv "$env:TEMP\MailboxUsageDetail.csv" | Select-Object -Property 'User Principal Name', 'Is Deleted', 'Last Activity Date', 'Storage Used (Byte)', 'Has Archive'
-            Invoke-MgGraphRequest -Method GET -Uri ('https://graph.microsoft.com/v1.0/reports/getOneDriveUsageAccountDetail(period=''D{0}'')' -f $reportDays) -OutputFilePath "$env:TEMP\OneDriveUsageAccountDetail.csv"
-            $OneDriveUsageAccountDetail = Import-Csv "$env:TEMP\OneDriveUsageAccountDetail.csv" | Select-Object -Property 'Owner Principal Name', 'Is Deleted', 'Last Activity Date', 'Storage Used (Byte)'
-            if ($null -ne $M365AppUserDetail -and
-            $null -ne $MailboxUsageDetail -and
-            $null -ne $OneDriveUsageAccountDetail) {
-                if ($M365AppUserDetail.'User Principal Name' -like '*@*' -or
-                $MailboxUsageDetail.'User Principal Name' -like '*@*' -or
-                $OneDriveUsageAccountDetail.'Owner Principal Name' -like '*@*') {
+            Invoke-MgGraphRequest -Method GET -Uri ('https://graph.microsoft.com/v1.0/reports/getM365AppUserDetail(period=''D{0}'')?$format=text/csv' -f $reportDays) -OutputFilePath "$env:TEMP\appUsage.csv"
+            foreach ($entry in Import-Csv "$env:TEMP\appUsage.csv" | Select-Object -Property 'User Principal Name', 'Last Activity Date', 'Windows', 'Mac', 'Mobile', 'Web') {
+                if (-not $appUsage.ContainsKey($entry.'User Principal Name')) {
+                    $lastActivityDate = [datetime]::MinValue
+                    [datetime]::TryParse($entry.'Last Activity Date', [ref]$lastActivityDate) | Out-Null
+                    if ($entry.'Windows' -eq 'Yes') {
+                        $windowsApp = $true
+                    }
+                    else {
+                        $windowsApp = $false
+                    }
+                    if ($entry.'Mac' -eq 'Yes') {
+                        $macApp = $true
+                    }
+                    else {
+                        $macApp = $false
+                    }
+                    if ($entry.'Mobile' -eq 'Yes') {
+                        $mobileApp = $true
+                    }
+                    else {
+                        $mobileApp = $false
+                    }
+                    if ($entry.'Web' -eq 'Yes') {
+                        $webApp = $true
+                    }
+                    else {
+                        $webApp = $false
+                    }
+                    $appUsage.Add($entry.'User Principal Name', @{
+                        'LastActivityDate' = $lastActivityDate;
+                        'WindowsApp' = $windowsApp;
+                        'MacApp' = $macApp;
+                        'MobileApp' = $mobileApp;
+                        'WebApp' = $webApp
+                    })
+                }
+                else {
+                    Write-Message -Message "Found duplicate user name $($entry.'User Principal Name') in app usage reports" -Type Error
+                }
+            }
+            Invoke-MgGraphRequest -Method GET -Uri ('https://graph.microsoft.com/v1.0/reports/getMailboxUsageDetail(period=''D{0}'')' -f $reportDays) -OutputFilePath "$env:TEMP\mailboxUsage.csv"
+            foreach ($entry in Import-Csv "$env:TEMP\mailboxUsage.csv" | Select-Object -Property 'User Principal Name', 'Is Deleted', 'Last Activity Date', 'Storage Used (Byte)', 'Has Archive' | Where-Object{$_.'Is Deleted' -eq 'False'}) {
+                if (-not $mailboxUsage.ContainsKey($entry.'User Principal Name')) {
+                    $lastActivityDate = [datetime]::MinValue
+                    [datetime]::TryParse($entry.'Last Activity Date', [ref]$lastActivityDate) | Out-Null
+                    $storageUsed = [decimal]($entry.'Storage Used (Byte)' / [System.Math]::Pow(1000, 3))
+                    $hasArchive = [bool]::Parse($entry.'Has Archive')
+                    $mailboxUsage.Add($entry.'User Principal Name', @{
+                        'LastActivityDate' = $lastActivityDate;
+                        'StorageUsed' = $storageUsed
+                        'HasArchive' = $hasArchive
+                    })
+                }
+                else {
+                    Write-Message -Message "Found duplicate user name $($entry.'User Principal Name') in mailbox usage reports" -Type Error
+                }
+            }
+            Invoke-MgGraphRequest -Method GET -Uri ('https://graph.microsoft.com/v1.0/reports/getOneDriveUsageAccountDetail(period=''D{0}'')' -f $reportDays) -OutputFilePath "$env:TEMP\driveUsage.csv"
+            foreach ($entry in Import-Csv "$env:TEMP\driveUsage.csv" | Select-Object -Property 'Owner Principal Name', 'Is Deleted', 'Last Activity Date', 'Storage Used (Byte)' | Where-Object{$_.'Is Deleted' -eq 'False'}) {
+                if (-not $driveUsage.ContainsKey($entry.'Owner Principal Name')) {
+                    $lastActivityDate = [datetime]::MinValue
+                    [datetime]::TryParse($entry.'Last Activity Date', [ref]$lastActivityDate) | Out-Null
+                    $storageUsed = [decimal]($entry.'Storage Used (Byte)' / [System.Math]::Pow(1000, 3))
+                    $driveUsage.Add($entry.'Owner Principal Name', @{
+                        'LastActivityDate' = $lastActivityDate;
+                        'StorageUsed' = $storageUsed
+                    })
+                }
+                else {
+                    Write-Message -Message "Found duplicate user name $($entry.'User Principal Name') in OneDrive usage reports" -Type Error
+                }
+            }
+            if ($appUsage.Keys.Count -gt 0 -and
+            $mailboxUsage.Keys.Count -gt 0 -and
+            $driveUsage.Keys.Count -gt 0) {
+                if ($appUsage.Keys -like '*@*' -or
+                $mailboxUsage.Keys -like '*@*' -or
+                $driveUsage.Keys -like '*@*') {
                     $hashedReports = $false
                 }
                 else {
@@ -748,57 +818,37 @@ function Get-AzureADLicenseStatus {
                         else {
                             $userName = $user.userPrincipalName
                         }
-                        $userOneDriveLastActivityDate = [datetime]::MinValue
-                        if ($null -ne ($userOneDrive = $OneDriveUsageAccountDetail | Where-Object{$_.'Owner Principal Name' -eq $userName -and $_.'Is Deleted' -eq 'False'})) {
-                            [datetime]::TryParse($userOneDrive.'Last Activity Date', [ref]$userOneDriveLastActivityDate) | Out-Null
-                            $userOneDriveStorageUsedGB = $userOneDrive.'Storage Used (Byte)' / [System.Math]::Pow(1000, 3)
+                        if ($appUsage.ContainsKey($userName)) {
+                            $userAppsUsedLastActivityDate = $appUsage[$userName]['LastActivityDate']
+                            $userWindowsAppUsed = $appUsage[$userName]['WindowsApp']
+                            $userMacAppUsed = $appUsage[$userName]['MacApp']
+                            $userMobileAppUsed = $appUsage[$userName]['MobileApp']
+                            $userWebAppUsed = $appUsage[$userName]['WebApp']
                         }
                         else {
-                            $userOneDriveStorageUsedGB = 0
+                            $userAppsUsedLastActivityDate = [datetime]::MinValue
+                            $userWindowsAppUsed = $false
+                            $userMacAppUsed = $false
+                            $userMobileAppUsed = $false
+                            $userWebAppUsed = $false
                         }
-                        $userMailboxLastActivityDate = [datetime]::MinValue
-                        if ($null -ne ($userMailbox = $MailboxUsageDetail | Where-Object{$_.'User Principal Name' -eq $userName -and $_.'Is Deleted' -eq 'False'})) {
-                            [datetime]::TryParse($userMailbox.'Last Activity Date', [ref]$userMailboxLastActivityDate) | Out-Null
-                            $userMailboxStorageUsedGB = $userMailbox.'Storage Used (Byte)' / [System.Math]::Pow(1000, 3)
-                            $userMailboxHasArchive = $userMailbox.'Has Archive'
+                        if ($mailboxUsage.ContainsKey($userName)) {
+                            $userMailboxLastActivityDate = $mailboxUsage[$userName]['LastActivityDate']
+                            $userMailboxStorageUsedGB = $mailboxUsage[$userName]['StorageUsed']
+                            $userMailboxHasArchive = $mailboxUsage[$userName]['HasArchive']
                         }
                         else {
+                            $userMailboxLastActivityDate = [datetime]::MinValue
                             $userMailboxStorageUsedGB = 0
-                            $userMailboxHasArchive = 'False'
+                            $userMailboxHasArchive = $false
                         }
-                        $userAppsUsedLastActivityDate = [datetime]::MinValue
-                        if ($null -ne ($userAppsUsed = $M365AppUserDetail | Where-Object{$_.'User Principal Name' -eq $userName})) {
-                            [datetime]::TryParse($userAppsUsed.'Last Activity Date', [ref]$userAppsUsedLastActivityDate) | Out-Null
-                            if ($userAppsUsed.'Windows' -eq 'Yes') {
-                                $userWindowsAppUsed = 'True'
-                            }
-                            else {
-                                $userWindowsAppUsed = 'False'
-                            }
-                            if ($userAppsUsed.'Mac' -eq 'Yes') {
-                                $userMacAppUsed = 'True'
-                            }
-                            else {
-                                $userMacAppUsed = 'False'
-                            }
-                            if ($userAppsUsed.'Mobile' -eq 'Yes') {
-                                $userMobileAppUsed = 'True'
-                            }
-                            else {
-                                $userMobileAppUsed = 'False'
-                            }
-                            if ($userAppsUsed.'Web' -eq 'Yes') {
-                                $userWebAppUsed = 'True'
-                            }
-                            else {
-                                $userWebAppUsed = 'False'
-                            }
+                        if ($driveUsage.ContainsKey($userName)) {
+                            $userOneDriveLastActivityDate = $driveUsage[$userName]['LastActivityDate']
+                            $userOneDriveStorageUsedGB = $driveUsage[$userName]['StorageUsed']
                         }
                         else {
-                            $userWindowsAppUsed = 'False'
-                            $userMacAppUsed = 'False'
-                            $userMobileAppUsed = 'False'
-                            $userWebAppUsed = 'False'
+                            $userOneDriveLastActivityDate = [datetime]::MinValue
+                            $userOneDriveStorageUsedGB = 0
                         }
                         $userSKUs_preferable = $null
                         foreach ($preferableSKU in $PreferableSKUs) {
@@ -808,11 +858,11 @@ function Get-AzureADLicenseStatus {
                                 $userAppsUsedLastActivityDate -lt $preferableSKU.LastActiveEarlierThan.Date -and
                                 $userOneDriveStorageUsedGB -lt $preferableSKU.OneDriveGBUsedLessThan -and
                                 $userMailboxStorageUsedGB -lt $preferableSKU.MailboxGBUsedLessThan -and
-                                ($userMailboxHasArchive -eq $preferableSKU.MailboxHasArchive -or $preferableSKU.MailboxHasArchive -eq 'Skip') -and
-                                ($userWindowsAppUsed -eq $preferableSKU.WindowsAppUsed -or $preferableSKU.WindowsAppUsed -eq 'Skip') -and
-                                ($userMacAppUsed -eq $preferableSKU.MacAppUsed -or $preferableSKU.MacAppUsed -eq 'Skip') -and
-                                ($userMobileAppUsed -eq $preferableSKU.MobileAppUsed -or $preferableSKU.MobileAppUsed -eq 'Skip') -and
-                                ($userWebAppUsed -eq $preferableSKU.WebAppUsed -or $preferableSKU.WebAppUsed -eq 'Skip')) {
+                                ($userMailboxHasArchive.ToString() -eq $preferableSKU.MailboxHasArchive -or $preferableSKU.MailboxHasArchive -eq 'Skip') -and
+                                ($userWindowsAppUsed.ToString() -eq $preferableSKU.WindowsAppUsed -or $preferableSKU.WindowsAppUsed -eq 'Skip') -and
+                                ($userMacAppUsed.ToString() -eq $preferableSKU.MacAppUsed -or $preferableSKU.MacAppUsed -eq 'Skip') -and
+                                ($userMobileAppUsed.ToString() -eq $preferableSKU.MobileAppUsed -or $preferableSKU.MobileAppUsed -eq 'Skip') -and
+                                ($userWebAppUsed.ToString() -eq $preferableSKU.WebAppUsed -or $preferableSKU.WebAppUsed -eq 'Skip')) {
                                     $userSKUs_preferable = $preferableSKU.SKUID
                                 }
                             }
