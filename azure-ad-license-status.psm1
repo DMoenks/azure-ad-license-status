@@ -886,8 +886,9 @@ function Get-AzureADLicenseStatus {
                         Add-Result -UserPrincipalName $user.userPrincipalName -ConflictType Removable -ConflictSKUs $userSKUs_removable
                     }
                     if ($null -ne $userSKUs_preferable) {
-                        if ($InterchangeableSKUs -contains $userSKUs_preferable -and
-                        $userSKUs -notcontains $userSKUs_preferable -and
+                        if (([guid]::Empty -eq $userSKUs_preferable -or
+                        ($InterchangeableSKUs -contains $userSKUs_preferable -and
+                        $userSKUs -notcontains $userSKUs_preferable)) -and
                         $userSKUs_interchangeable.Count -gt 0) {
                             Write-Message "Found preferable SKU for user $($user.userPrincipalName)"
                             Add-Result -UserPrincipalName $user.userPrincipalName -PreferableSKU $userSKUs_preferable -ReplaceableSKUs $userSKUs_interchangeable
