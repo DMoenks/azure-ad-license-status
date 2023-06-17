@@ -92,7 +92,7 @@ function Add-Result {
         [guid]$PreferableSKU,
         [Parameter(Mandatory = $true, ParameterSetName = 'User_Advanced')]
         [AllowEmptyCollection()]
-        [guid[]]$OpposingSKUs,
+        [guid[]]$ReplaceableSKUs,
         [Parameter(Mandatory = $true, ParameterSetName = 'SKU_Advanced')]
         [ValidateNotNullOrEmpty()]
         [string]$PlanName,
@@ -135,7 +135,7 @@ function Add-Result {
             if (-not $results[$PSCmdlet.ParameterSetName][$UserPrincipalName].ContainsKey('Preferable')) {
                 $results[$PSCmdlet.ParameterSetName][$UserPrincipalName].Add('Preferable', @{
                     'preferableSKU' = $PreferableSKU;
-                    'opposingSKUs' = $OpposingSKUs
+                    'replaceableSKUs' = $ReplaceableSKUs
                 })
             }
         }
@@ -489,7 +489,7 @@ function Get-AzureADLicenseStatus {
     .PARAMETER InterchangeableSKUs
     Specifies a list of SKUs which are deemed interchangeable, e.g Office 365 E1 and Office 365 E3
     .PARAMETER PreferableSKUs
-    Specifies a list of SKUs which are deemed preferable based on their provided ruleset
+    Specifies a list of SKUs which are deemed preferable based on their provided ruleset, relies on the paramater InterchangeableSKUs to calculate replaceable SKUs
     .PARAMETER SKUPrices
     Specifies a list of SKUs with their prices to calculate potential savings during user checkups
     .PARAMETER LicensingURL
@@ -754,7 +754,7 @@ function Get-AzureADLicenseStatus {
             $URI = $data['@odata.nextLink']
             # Analyze users
             foreach ($user in $users) {
-                if ($user.licenseAssignmentStates.count -gt 0) {
+                if ($user.licenseAssignmentStates.Count -gt 0) {
                     if ($null -ne ($userSKUAssignments = $user.licenseAssignmentStates | Where-Object{$_.state -eq 'Active' -or $_.error -in @('CountViolation', 'MutuallyExclusiveViolation')})) {
                         $userSKUs = $userSKUAssignments.skuId
                     }
@@ -814,9 +814,10 @@ function Get-AzureADLicenseStatus {
                         $userSKUs_removable = $null
                     }
                     # Identify preferable SKUs, based on user-level calculations
-                    $hashCalculator = [System.Security.Cryptography.MD5]::Create()
+                    $userSKUs_preferable = $null
                     if ($AdvancedCheckups.IsPresent -and
                     $reportsRetrieved) {
+                        $hashCalculator = [System.Security.Cryptography.MD5]::Create()
                         if ($hashedReports) {
                             $userName = ($hashCalculator.ComputeHash([Text.Encoding]::ASCII.GetBytes($user.userPrincipalName)) | ForEach-Object{'{0:X2}' -f $_}) -join ''
                         }
@@ -855,26 +856,21 @@ function Get-AzureADLicenseStatus {
                             $userOneDriveLastActivityDate = [datetime]::MinValue
                             $userOneDriveStorageUsedGB = 0
                         }
-                        $userSKUs_preferable = $null
                         foreach ($preferableSKU in $PreferableSKUs) {
-                            if ($null -eq $userSKUs_preferable) {
-                                if ($userOneDriveLastActivityDate -lt $preferableSKU.LastActiveEarlierThan.Date -and
-                                $userMailboxLastActivityDate -lt $preferableSKU.LastActiveEarlierThan.Date -and
-                                $userAppsUsedLastActivityDate -lt $preferableSKU.LastActiveEarlierThan.Date -and
-                                $userOneDriveStorageUsedGB -lt $preferableSKU.OneDriveGBUsedLessThan -and
-                                $userMailboxStorageUsedGB -lt $preferableSKU.MailboxGBUsedLessThan -and
-                                ($userMailboxHasArchive.ToString() -eq $preferableSKU.MailboxHasArchive -or $preferableSKU.MailboxHasArchive -eq 'Skip') -and
-                                ($userWindowsAppUsed.ToString() -eq $preferableSKU.WindowsAppUsed -or $preferableSKU.WindowsAppUsed -eq 'Skip') -and
-                                ($userMacAppUsed.ToString() -eq $preferableSKU.MacAppUsed -or $preferableSKU.MacAppUsed -eq 'Skip') -and
-                                ($userMobileAppUsed.ToString() -eq $preferableSKU.MobileAppUsed -or $preferableSKU.MobileAppUsed -eq 'Skip') -and
-                                ($userWebAppUsed.ToString() -eq $preferableSKU.WebAppUsed -or $preferableSKU.WebAppUsed -eq 'Skip')) {
-                                    $userSKUs_preferable = $preferableSKU.SKUID
-                                }
+                            if ($userOneDriveLastActivityDate -lt $preferableSKU.LastActiveEarlierThan.Date -and
+                            $userMailboxLastActivityDate -lt $preferableSKU.LastActiveEarlierThan.Date -and
+                            $userAppsUsedLastActivityDate -lt $preferableSKU.LastActiveEarlierThan.Date -and
+                            $userOneDriveStorageUsedGB -lt $preferableSKU.OneDriveGBUsedLessThan -and
+                            $userMailboxStorageUsedGB -lt $preferableSKU.MailboxGBUsedLessThan -and
+                            ($userMailboxHasArchive.ToString() -eq $preferableSKU.MailboxHasArchive -or $preferableSKU.MailboxHasArchive -eq 'Skip') -and
+                            ($userWindowsAppUsed.ToString() -eq $preferableSKU.WindowsAppUsed -or $preferableSKU.WindowsAppUsed -eq 'Skip') -and
+                            ($userMacAppUsed.ToString() -eq $preferableSKU.MacAppUsed -or $preferableSKU.MacAppUsed -eq 'Skip') -and
+                            ($userMobileAppUsed.ToString() -eq $preferableSKU.MobileAppUsed -or $preferableSKU.MobileAppUsed -eq 'Skip') -and
+                            ($userWebAppUsed.ToString() -eq $preferableSKU.WebAppUsed -or $preferableSKU.WebAppUsed -eq 'Skip')) {
+                                $userSKUs_preferable = $preferableSKU.SKUID
+                                break
                             }
                         }
-                    }
-                    else {
-                        $userSKUs_preferable = $null
                     }
                     # Add results
                     if ($userSKUs_interchangeable.Count -gt 1) {
@@ -890,15 +886,11 @@ function Get-AzureADLicenseStatus {
                         Add-Result -UserPrincipalName $user.userPrincipalName -ConflictType Removable -ConflictSKUs $userSKUs_removable
                     }
                     if ($null -ne $userSKUs_preferable) {
-                        if ($userSKUs -notcontains $userSKUs_preferable) {
+                        if ($InterchangeableSKUs -contains $userSKUs_preferable -and
+                        $userSKUs -notcontains $userSKUs_preferable -and
+                        $userSKUs_interchangeable.Count -gt 0) {
                             Write-Message "Found preferable SKU for user $($user.userPrincipalName)"
-                            if ($InterchangeableSKUs -contains $userSKUs_preferable -and
-                            $null -ne $userSKUs_interchangeable) {
-                                Add-Result -UserPrincipalName $user.userPrincipalName -PreferableSKU $userSKUs_preferable -OpposingSKUs $userSKUs_interchangeable
-                            }
-                            else {
-                                Add-Result -UserPrincipalName $user.userPrincipalName -PreferableSKU $userSKUs_preferable -OpposingSKUs @()
-                            }
+                            Add-Result -UserPrincipalName $user.userPrincipalName -PreferableSKU $userSKUs_preferable -ReplaceableSKUs $userSKUs_interchangeable
                         }
                     }
                 }
@@ -1346,10 +1338,10 @@ function Get-AzureADLicenseStatus {
                                     <p><table><tr>
                                     <th>Account</th>
                                     <th>Preferable</th>
-                                    <th>Interchangeable</th></tr>'
+                                    <th>Replaceable</th></tr>'
                 foreach ($user in $results['User_Advanced'].Keys | Sort-Object) {
                     $preferableSKUID = $results['User_Advanced'][$user]['Preferable']['preferableSKU'] | Where-Object{$null -ne $_}
-                    $opposingSKUIDs = $results['User_Advanced'][$user]['Preferable']['opposingSKUs'] | Where-Object{$null -ne $_}
+                    $opposingSKUIDs = $results['User_Advanced'][$user]['Preferable']['replaceableSKUs'] | Where-Object{$null -ne $_}
                     if ($null -ne $SKUPrices) {
                         $potentialSavings += ($opposingSKUIDs | ForEach-Object{[decimal]$SKUPrices["$_"]} | Measure-Object -Sum).Sum -
                                             [decimal]$SKUPrices["$preferableSKUID"]
