@@ -745,10 +745,10 @@ function Get-AzureADLicenseStatus {
 
         #region: Users
         $userCount = 0
-        $URI = 'https://graph.microsoft.com/v1.0/users?$select=id,licenseAssignmentStates,userPrincipalName&$top={0}' -f $pageSize
+        $URI = 'https://graph.microsoft.com/v1.0/users?$select=id,licenseAssignmentStates,userPrincipalName&$filter=assignedLicenses/$count ne 0&$count=true&$top={0}' -f $pageSize
         while ($null -ne $URI) {
             # Retrieve users
-            $data = Invoke-MgGraphRequest -Method GET -Uri $URI
+            $data = Invoke-MgGraphRequest -Method GET -Uri $URI -Headers @{'ConsistencyLevel' = 'eventual'}
             $users = [hashtable[]]($data.value)
             $userCount += $users.Count
             $URI = $data['@odata.nextLink']
@@ -867,7 +867,12 @@ function Get-AzureADLicenseStatus {
                             ($userMacAppUsed.ToString() -eq $preferableSKU.MacAppUsed -or $preferableSKU.MacAppUsed -eq 'Skip') -and
                             ($userMobileAppUsed.ToString() -eq $preferableSKU.MobileAppUsed -or $preferableSKU.MobileAppUsed -eq 'Skip') -and
                             ($userWebAppUsed.ToString() -eq $preferableSKU.WebAppUsed -or $preferableSKU.WebAppUsed -eq 'Skip')) {
-                                $userSKUs_preferable = $preferableSKU.SKUID
+                                if ((($InterchangeableSKUs -contains $preferableSKU.SKUID -and
+                                $userSKUs -notcontains $preferableSKU.SKUID) -or
+                                [guid]::Empty -eq $preferableSKU.SKUID) -and
+                                $userSKUs_interchangeable.Count -gt 0) {
+                                    $userSKUs_preferable = $preferableSKU.SKUID
+                                }
                                 break
                             }
                         }
@@ -886,13 +891,8 @@ function Get-AzureADLicenseStatus {
                         Add-Result -UserPrincipalName $user.userPrincipalName -ConflictType Removable -ConflictSKUs $userSKUs_removable
                     }
                     if ($null -ne $userSKUs_preferable) {
-                        if (([guid]::Empty -eq $userSKUs_preferable -or
-                        ($InterchangeableSKUs -contains $userSKUs_preferable -and
-                        $userSKUs -notcontains $userSKUs_preferable)) -and
-                        $userSKUs_interchangeable.Count -gt 0) {
-                            Write-Message "Found preferable SKU for user $($user.userPrincipalName)"
-                            Add-Result -UserPrincipalName $user.userPrincipalName -PreferableSKU $userSKUs_preferable -ReplaceableSKUs $userSKUs_interchangeable
-                        }
+                        Write-Message "Found preferable SKU for user $($user.userPrincipalName)"
+                        Add-Result -UserPrincipalName $user.userPrincipalName -PreferableSKU $userSKUs_preferable -ReplaceableSKUs $userSKUs_interchangeable
                     }
                 }
             }
@@ -1132,7 +1132,7 @@ function Get-AzureADLicenseStatus {
             $intuneUsers = [System.Collections.Generic.List[hashtable]]::new()
             $URI = 'https://graph.microsoft.com/v1.0/users?$filter=assignedPlans/any(x:x/servicePlanId eq c1ec4a95-1f05-45b3-a911-aa3fa01094f5 and capabilityStatus eq ''Enabled'') or assignedPlans/any(x:x/servicePlanId eq 3e170737-c728-4eae-bbb9-3f3360f7184c and capabilityStatus eq ''Enabled'')&$select=id&top={0}&$count=true' -f $pageSize
             while ($null -ne $URI) {
-                $data = Invoke-MgGraphRequest -Method GET -Uri $URI -Headers @{'ConsistencyLevel'='eventual'}
+                $data = Invoke-MgGraphRequest -Method GET -Uri $URI -Headers @{'ConsistencyLevel' = 'eventual'}
                 $intuneUsers.AddRange([hashtable[]]($data.value))
                 $URI = $data['@odata.nextLink']
             }
