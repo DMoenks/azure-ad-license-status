@@ -3,9 +3,11 @@ layout: default
 permalink: /preparations
 ---
 
-[1 Introduction](/azure-ad-license-status/) | [2 Features](/azure-ad-license-status/features) | [3 Requirements](/azure-ad-license-status/requirements) | [4 Preparations](/azure-ad-license-status/preparations) | [5 Examples](/azure-ad-license-status/examples)
+[1 Introduction](/azure-ad-license-status/) \| [2 Features](/azure-ad-license-status/features) \| [3 Requirements](/azure-ad-license-status/requirements) \| [4 Preparations](/azure-ad-license-status/preparations) \| [5 Examples](/azure-ad-license-status/examples)
 
 # 4 Preparations
+
+# 4.1 Configuration step-by-step
 
 1. Prepare execution
    - For local execution
@@ -26,6 +28,8 @@ permalink: /preparations
    3. Upload certificate
 3. (optional, recommended) Limit permissions
    1. Create Exchange Online application access policy to restrict Azure AD application's _Mail.Send_ permission to intended sender mailbox
+
+## 4.2 Links
 
 - [Azure automation account](https://learn.microsoft.com/azure/automation/automation-create-standalone-account)
 - [Azure key vault](https://learn.microsoft.com/azure/key-vault/general/quick-create-portal)

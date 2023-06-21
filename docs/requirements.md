@@ -3,7 +3,7 @@ layout: default
 permalink: /requirements
 ---
 
-[1 Introduction](/azure-ad-license-status/) | [2 Features](/azure-ad-license-status/features) | [3 Requirements](/azure-ad-license-status/requirements) | [4 Preparations](/azure-ad-license-status/preparations) | [5 Examples](/azure-ad-license-status/examples)
+[1 Introduction](/azure-ad-license-status/) \| [2 Features](/azure-ad-license-status/features) \| [3 Requirements](/azure-ad-license-status/requirements) \| [4 Preparations](/azure-ad-license-status/preparations) \| [5 Examples](/azure-ad-license-status/examples)
 
 # 3 Requirements
 
@@ -11,20 +11,21 @@ permalink: /requirements
 
 ### 3.1.1 Basic
 
-- _Microsoft.Graph.Authentication_  
-  [![PowerShell Gallery Version](https://img.shields.io/powershellgallery/v/Microsoft.Graph.Authentication?label=PowerShell%20Gallery&logo=powershell&style=flat)](https://www.powershellgallery.com/packages/Microsoft.Graph.Authentication)
+_Microsoft.Graph.Authentication_  
+[![PowerShell Gallery Version](https://img.shields.io/powershellgallery/v/Microsoft.Graph.Authentication?label=PowerShell%20Gallery&logo=powershell&style=flat)](https://www.powershellgallery.com/packages/Microsoft.Graph.Authentication)
 
 ### 3.1.2 Advanced
 
-- _ExchangeOnlineManagement_  
-  [![PowerShell Gallery Version](https://img.shields.io/powershellgallery/v/ExchangeOnlineManagement?label=PowerShell%20Gallery&logo=powershell&style=flat)](https://www.powershellgallery.com/packages/ExchangeOnlineManagement)
+_ExchangeOnlineManagement_  
+[![PowerShell Gallery Version](https://img.shields.io/powershellgallery/v/ExchangeOnlineManagement?label=PowerShell%20Gallery&logo=powershell&style=flat)](https://www.powershellgallery.com/packages/ExchangeOnlineManagement)
 
 ### 3.1.3 For Azure execution
 
-- _Az.Accounts_  
-  [![PowerShell Gallery Version](https://img.shields.io/powershellgallery/v/Az.Accounts?label=PowerShell%20Gallery&logo=powershell&style=flat)](https://www.powershellgallery.com/packages/Az.Accounts)
-- _Az.KeyVault_  
-  [![PowerShell Gallery Version](https://img.shields.io/powershellgallery/v/Az.KeyVault?label=PowerShell%20Gallery&logo=powershell&style=flat)](https://www.powershellgallery.com/packages/Az.KeyVault)
+_Az.Accounts_  
+[![PowerShell Gallery Version](https://img.shields.io/powershellgallery/v/Az.Accounts?label=PowerShell%20Gallery&logo=powershell&style=flat)](https://www.powershellgallery.com/packages/Az.Accounts)
+
+_Az.KeyVault_  
+[![PowerShell Gallery Version](https://img.shields.io/powershellgallery/v/Az.KeyVault?label=PowerShell%20Gallery&logo=powershell&style=flat)](https://www.powershellgallery.com/packages/Az.KeyVault)
 
 ## 3.2 Permissions
 
