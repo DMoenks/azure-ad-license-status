@@ -2,6 +2,9 @@ Set-StrictMode -Version 3.0
 
 #region: Classes
 class PreferableSKURule {
+    [ValidateSet('True', 'False', 'Skip')]
+    [string]$AccountEnabled = 'Skip'
+    [datetime]$CreatedEarlierThan = [datetime]::MaxValue
     [datetime]$LastActiveEarlierThan = [datetime]::MaxValue
     [UInt16]$OneDriveGBUsedLessThan = [UInt16]::MaxValue
     [UInt16]$MailboxGBUsedLessThan = [UInt16]::MaxValue
@@ -745,7 +748,7 @@ function Get-AzureADLicenseStatus {
 
         #region: Users
         $userCount = 0
-        $URI = 'https://graph.microsoft.com/v1.0/users?$select=id,licenseAssignmentStates,userPrincipalName&$filter=assignedLicenses/$count ne 0&$count=true&$top={0}' -f $pageSize
+        $URI = 'https://graph.microsoft.com/v1.0/users?$select=id,accountEnabled,createdDateTime,licenseAssignmentStates,userPrincipalName&$filter=assignedLicenses/$count ne 0&$count=true&$top={0}' -f $pageSize
         while ($null -ne $URI) {
             # Retrieve users
             $data = Invoke-MgGraphRequest -Method GET -Uri $URI -Headers @{'ConsistencyLevel' = 'eventual'}
@@ -857,16 +860,18 @@ function Get-AzureADLicenseStatus {
                             $userOneDriveStorageUsedGB = 0
                         }
                         foreach ($preferableSKU in $PreferableSKUs) {
-                            if ($userOneDriveLastActivityDate -lt $preferableSKU.LastActiveEarlierThan.Date -and
-                            $userMailboxLastActivityDate -lt $preferableSKU.LastActiveEarlierThan.Date -and
+                            if (($user.accountEnabled.ToString() -eq $preferableSKU.AccountEnabled -or $preferableSKU.AccountEnabled -eq 'Skip') -and
+                            $user.createdDateTime -lt $preferableSKU.CreatedEarlierThan -and
                             $userAppsUsedLastActivityDate -lt $preferableSKU.LastActiveEarlierThan.Date -and
-                            $userOneDriveStorageUsedGB -lt $preferableSKU.OneDriveGBUsedLessThan -and
-                            $userMailboxStorageUsedGB -lt $preferableSKU.MailboxGBUsedLessThan -and
-                            ($userMailboxHasArchive.ToString() -eq $preferableSKU.MailboxHasArchive -or $preferableSKU.MailboxHasArchive -eq 'Skip') -and
                             ($userWindowsAppUsed.ToString() -eq $preferableSKU.WindowsAppUsed -or $preferableSKU.WindowsAppUsed -eq 'Skip') -and
                             ($userMacAppUsed.ToString() -eq $preferableSKU.MacAppUsed -or $preferableSKU.MacAppUsed -eq 'Skip') -and
                             ($userMobileAppUsed.ToString() -eq $preferableSKU.MobileAppUsed -or $preferableSKU.MobileAppUsed -eq 'Skip') -and
-                            ($userWebAppUsed.ToString() -eq $preferableSKU.WebAppUsed -or $preferableSKU.WebAppUsed -eq 'Skip')) {
+                            ($userWebAppUsed.ToString() -eq $preferableSKU.WebAppUsed -or $preferableSKU.WebAppUsed -eq 'Skip') -and
+                            $userMailboxLastActivityDate -lt $preferableSKU.LastActiveEarlierThan.Date -and
+                            $userMailboxStorageUsedGB -lt $preferableSKU.MailboxGBUsedLessThan -and
+                            ($userMailboxHasArchive.ToString() -eq $preferableSKU.MailboxHasArchive -or $preferableSKU.MailboxHasArchive -eq 'Skip') -and
+                            $userOneDriveLastActivityDate -lt $preferableSKU.LastActiveEarlierThan.Date -and
+                            $userOneDriveStorageUsedGB -lt $preferableSKU.OneDriveGBUsedLessThan) {
                                 if ((($InterchangeableSKUs -contains $preferableSKU.SKUID -and
                                 $userSKUs -notcontains $preferableSKU.SKUID) -or
                                 [guid]::Empty -eq $preferableSKU.SKUID) -and
@@ -1359,6 +1364,8 @@ function Get-AzureADLicenseStatus {
                 Add-Output -Output '<p>The following criteria were used during the checkup, in order:</p>
                                     <p><table><tr>
                                     <th>License type</th>
+                                    <th>Enabled</th>
+                                    <th>Creation limit</th>
                                     <th>Activity limit</th>
                                     <th>OneDrive limit</th>
                                     <th>Mailbox limit</th>
@@ -1368,16 +1375,18 @@ function Get-AzureADLicenseStatus {
                                     <th>Mobile app</th>
                                     <th>Web app</th></tr>'
                 foreach ($preferableSKU in $PreferableSKUs) {
-                    Add-Output -Output ('<tr><td>{0}</td><td>{1:yyyy-MM-dd}</td><td>{2} GB</td><td>{3} GB</td><td>{4}</td><td>{5}</td><td>{6}</td><td>{7}</td><td>{8}</td></tr>' -f
+                    Add-Output -Output ('<tr><td>{0}</td><td>{1}</td><td>{2:yyyy-MM-dd}</td><td>{3:yyyy-MM-dd}</td><td>{4} GB</td><td>{5} GB</td><td>{6}</td><td>{7}</td><td>{8}</td><td>{9}</td><td>{10}</td></tr>' -f
                                         (Get-SKUName -SKUID $preferableSKU.SKUID),
+                                        $preferableSKU.AccountEnabled.ToUpper(),
+                                        $preferableSKU.CreatedEarlierThan,
                                         $preferableSKU.LastActiveEarlierThan,
                                         $preferableSKU.OneDriveGBUsedLessThan,
                                         $preferableSKU.MailboxGBUsedLessThan,
-                                        $preferableSKU.MailboxHasArchive,
-                                        $preferableSKU.WindowsAppUsed,
-                                        $preferableSKU.MacAppUsed,
-                                        $preferableSKU.MobileAppUsed,
-                                        $preferableSKU.WebAppUsed)
+                                        $preferableSKU.MailboxHasArchive.ToUpper(),
+                                        $preferableSKU.WindowsAppUsed.ToUpper(),
+                                        $preferableSKU.MacAppUsed.ToUpper(),
+                                        $preferableSKU.MobileAppUsed.ToUpper(),
+                                        $preferableSKU.WebAppUsed.ToUpper())
                 }
                 Add-Output -Output '</table></p>'
             }
