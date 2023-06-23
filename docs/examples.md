@@ -9,7 +9,7 @@ permalink: /examples
 
 ## 5.1 Example calls
 
-### 5.1.1
+### 5.1.1 Basic example with default settings
 
 ```powershell
 $directoryID = '00000000-0000-0000-0000-000000000000'
@@ -26,7 +26,7 @@ Get-AzureADLicenseStatus -DirectoryID $directoryID -ApplicationID $applicationID
 
 Prepares a status report with default values by using only necessary parameters for authentication and report delivery
 
-### 5.1.2
+### 5.1.2 Basic example with modified thresholds
 
 ```powershell
 $directoryID = '00000000-0000-0000-0000-000000000000'
@@ -51,7 +51,7 @@ Get-AzureADLicenseStatus -DirectoryID $directoryID -ApplicationID $applicationID
 
 Prepares a status report with customized thresholds for larger organizations and additional recipients for when license counts reach critical levels
 
-### 5.1.3
+### 5.1.3 Advanced example
 
 ```powershell
 $directoryID = '00000000-0000-0000-0000-000000000000'
@@ -88,7 +88,7 @@ Get-AzureADLicenseStatus -DirectoryID $directoryID -ApplicationID $applicationID
 
 Prepares a status report by using an Azure certificate for automation purposes, specifying both important and interchangeable SKUs and activating advanced checkups
 
-### 5.1.4
+### 5.1.4 Complete example
 
 ```powershell
 $directoryID = '00000000-0000-0000-0000-000000000000'
@@ -176,7 +176,48 @@ Prepares a status report by using an Azure certificate for automation purposes, 
     }
     </style>
     <p class=gray>Basic checkup - Products</p>
-    <p>Nothing to report</p>
+    <p>Please check license counts for the following product SKUs and <a href="https://www.microsoft.com/licensing/servicecenter">reserve</a> additional licenses:</p>
+    <p>
+        <table>
+            <tr>
+                <th>License type</th>
+                <th>Available count</th>
+                <th>Minimum count</th>
+                <th>Difference</th>
+            </tr>
+            <tr>
+                <td>Office 365 F3</td>
+                <td>96</td>
+                <td>100</td>
+                <td class=green>-4</td>
+            </tr>
+            <tr>
+                <td>Office 365 E1</td>
+                <td>63</td>
+                <td>100</td>
+                <td class=yellow>-37</td>
+            </tr>
+            <tr>
+                <td>Office 365 E3</td>
+                <td>21</td>
+                <td>100</td>
+                <td class=red>-79</td>
+            </tr>
+            <tr>
+                <td>Office 365 E5</td>
+                <td>-13</td>
+                <td>100</td>
+                <td class=red>-113</td>
+            </tr>
+        </table>
+    </p>
+    <p>The following criteria were used during the checkup:
+        <ul>
+            <li>Check products with &gt;10 total licenses</li>
+            <li>Report normal products having both &lt;10 licenses and &lt;90% of their total licenses available</li>
+            <li>Report important products having both &lt;100 licenses and &lt;90% of their total licenses available</li>
+        </ul>
+    </p>
     <p class=gray>Advanced checkup - Products</p>
     <p>Please check license counts for the following product SKUs and <a href="https://www.microsoft.com/licensing/servicecenter">reserve</a> additional licenses:</p>
     <p>
@@ -189,23 +230,78 @@ Prepares a status report by using an Azure certificate for automation purposes, 
             </tr>
             <tr>
                 <td>Azure Active Directory Premium P1</td>
-                <td>25</td>
-                <td>32</td>
-                <td class=red>-7</td>
+                <td>200</td>
+                <td>670</td>
+                <td class=red>-470</td>
+            </tr>
+            <tr>
+                <td>Azure Active Directory Premium P2</td>
+                <td>100</td>
+                <td>170</td>
+                <td class=yellow>-70</td>
+            </tr>
+            <tr>
+                <td>Defender for Office 365 P2</td>
+                <td>250</td>
+                <td>260</td>
+                <td class=green>-10</td>
+            </tr>
+            <tr>
+                <td>Intune Device</td>
+                <td>50</td>
+                <td>80</td>
+                <td class=yellow>-30</td>
             </tr>
         </table>
     </p>
     <p>The following criteria were used during the checkup:
         <ul>
-            <li>Check <i>Azure AD P1</i> based on groups using dynamic user membership</li>
-            <li>Check <i>Azure AD P1</i> based on applications using group-based assignment</li>
-            <li>Check <i>Azure AD P1</i> based on users covered by Conditional Access</li>
-            <li>Check <i>Azure AD P2</i> based on users in scope of Privileged Identity Management</li>
-            <li>Check <i>Defender for Office 365 P1/P2</i> based on protected Exchange Online recipients</li>
+            <li>Check <em>Azure AD P1</em> based on groups using dynamic user membership</li>
+            <li>Check <em>Azure AD P1</em> based on applications using group-based assignment</li>
+            <li>Check <em>Azure AD P1/P2</em> based on users covered by Conditional Access</li>
+            <li>Check <em>Azure AD P2</em> based on users in scope of Privileged Identity Management</li>
+            <li>Check <em>Defender for Office 365 P1/P2</em> based on protected Exchange Online recipients</li>
         </ul>
     </p>
     <p class=gray>Basic checkup - Users</p>
-    <p>Nothing to report</p>
+    <p>Please check license assignments for the following user accounts and mitigate impact:</p>
+    <p>
+        <table>
+            <tr>
+                <th>Account</th>
+                <th>Interchangeable</th>
+                <th>Optimizable</th>
+                <th>Removable</th>
+            </tr>
+            <tr>
+                <td>user_1@example.com</td>
+                <td></td>
+                <td>Office 365 E3</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>user_2@example.com</td>
+                <td>Office 365 E3<br>Office 365 E5</td>
+                <td></td>
+                <td>Office 365 E3</td>
+            </tr>
+            <tr>
+                <td>user_3@example.com</td>
+                <td>Office 365 F3<br>Office 365 E3</td>
+                <td></td>
+                <td></td>
+            </tr>
+        </table>
+    </p>
+    <p>Potential savings when mitigating license assignment impact: 52,30 €</p>
+    <p>The following criteria were used during the checkup:
+        <ul>
+            <li>Check accounts with any number of assigned licenses</li>
+            <li>Report theoretically exclusive licenses as <strong>interchangeable</strong>, based on specified SKUs</li>
+            <li>Report practically inclusive licenses as <strong>optimizable</strong>, based on available SKU features</li>
+            <li>Report actually inclusive licenses as <strong>removable</strong>, based on enabled SKU features</li>
+        </ul>
+    </p>
     <p class=gray>Advanced checkup - Users</p>
     <p>Please check license assignments for the following user accounts and mitigate impact:</p>
     <p>
@@ -216,13 +312,23 @@ Prepares a status report by using an Azure certificate for automation purposes, 
                 <th>Replaceable</th>
             </tr>
             <tr>
-                <td>user_1@example.com</td>
+                <td>user_4@example.com</td>
+                <td>N/A</td>
                 <td>Office 365 E3</td>
-                <td>Microsoft 365 E5 Developer (Without Windows And Audio Conferencing)</td>
+            </tr>
+            <tr>
+                <td>user_2@example.com</td>
+                <td>Office 365 E1</td>
+                <td>Office 365 E3<br>Office 365 E5</td>
+            </tr>
+            <tr>
+                <td>user_5@example.com</td>
+                <td>Office 365 F3</td>
+                <td>Office 365 E1</td>
             </tr>
         </table>
     </p>
-    <p>Potential savings when mitigating license assignment impact: 1.262,40 €</p>
+    <p>Potential savings when mitigating license assignment impact: 73,40 €</p>
     <p>The following criteria were used during the checkup, in order:</p>
     <p>
         <table>

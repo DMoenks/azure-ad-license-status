@@ -1289,11 +1289,11 @@ function Get-AzureADLicenseStatus {
                 }
                 Add-Output -Output '</table></p>
                                     <p>The following criteria were used during the checkup:<ul>
-                                    <li>Check <i>Azure AD P1</i> based on groups using dynamic user membership</li>
-                                    <li>Check <i>Azure AD P1</i> based on applications using group-based assignment</li>
-                                    <li>Check <i>Azure AD P1</i> based on users covered by Conditional Access</li>
-                                    <li>Check <i>Azure AD P2</i> based on users in scope of Privileged Identity Management</li>
-                                    <li>Check <i>Defender for Office 365 P1/P2</i> based on protected Exchange Online recipients</li></ul></p>'
+                                    <li>Check <em>Azure AD P1</em> based on groups using dynamic user membership</li>
+                                    <li>Check <em>Azure AD P1</em> based on applications using group-based assignment</li>
+                                    <li>Check <em>Azure AD P1/P2</em> based on users covered by Conditional Access</li>
+                                    <li>Check <em>Azure AD P2</em> based on users in scope of Privileged Identity Management</li>
+                                    <li>Check <em>Defender for Office 365 P1/P2</em> based on protected Exchange Online recipients</li></ul></p>'
             }
             else {
                 Add-Output -Output '<p>Nothing to report</p>'
