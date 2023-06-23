@@ -7,19 +7,21 @@ assignees: ''
 ---
 
 **Describe the bug**
-A clear and concise description of what happened
+Provide a clear and concise description of what happened
 
 **Describe the expected behavior**
-A clear and concise description of what you expected to happen
+Provide a clear and concise description of what you expected to happen
 
 **Describe the steps to reproduce the bug**
-Steps to reproduce the behavior:
+Provide the steps to reproduce the behavior
+
 1. Go to '...'
 2. Click on '....'
 3. Scroll down to '....'
 4. See error
 
 **Describe the execution parameters**
+Provide information on how/where the module was used
 
 - Environment: [Azure/local]
 - Report type: [Basic/Advanced]

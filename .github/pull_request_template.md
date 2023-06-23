@@ -1,3 +1,3 @@
-Reference to affected issues, if applicable:
+Description of implemented changes:
 
-Description of changes:
+Reference to affected issues, if applicable:

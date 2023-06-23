@@ -48,3 +48,14 @@ Check for license need based on Azure AD and Office feature information:
 &#x2714; Calculate optimizable licenses based on available features
 
 &#x2714; Calculate removable licenses based on enabled features
+
+### 2.2.2 Advanced
+
+&#x2714; Check for organization's preferable licenses, based on multiple criteria:
+
+- Whether a user is enabled
+- When a user was created
+- When a user was last active
+- How much OneDrive storage a user has used
+- How much mailbox storage a user has used and whether the mailbox has an archive
+- Whether a user has used Windows/Mac/mobile/web versions of Office applications
