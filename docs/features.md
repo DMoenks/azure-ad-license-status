@@ -51,11 +51,18 @@ Check for license need based on Azure AD and Office feature information:
 
 ### 2.2.2 Advanced
 
-&#x2714; Check for organization's preferable licenses, based on multiple criteria:
+Check for organization's preferable licenses, based on multiple criteria:
 
-- Whether a user is enabled
-- When a user was created
-- When a user was last active
-- How much OneDrive storage a user has used
-- How much mailbox storage a user has used and whether the mailbox has an archive
-- Whether a user has used Windows/Mac/mobile/web versions of Office applications
+&#x2714;  Whether a user is enabled
+
+&#x2714; When a user was created
+
+&#x2714; When a user was last active
+
+&#x2714; How much OneDrive storage a user has used
+
+&#x2714; How much mailbox storage a user has used and whether the mailbox has an archive
+
+&#x2714; Whether a user has used Windows/Mac/mobile/web versions of Office applications
+
+&#x2716; Whether a user has enrolled a device in Intune

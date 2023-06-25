@@ -11,6 +11,8 @@ permalink: /examples
 
 ### 5.1.1 Basic example with default settings
 
+Prepares a status report with default values by using only necessary parameters for authentication and report delivery
+
 ```powershell
 $directoryID = '00000000-0000-0000-0000-000000000000'
 $applicationID = '00000000-0000-0000-0000-000000000000'
@@ -24,9 +26,9 @@ $recipientAddresses_normal = @(
 Get-AzureADLicenseStatus -DirectoryID $directoryID -ApplicationID $applicationID -CertificateThumbprint $certificateThumbprint -SenderAddress $senderAddress -RecipientAddresses_normal $recipientAddresses_normal
 ```
 
-Prepares a status report with default values by using only necessary parameters for authentication and report delivery
-
 ### 5.1.2 Basic example with modified thresholds
+
+Prepares a status report with customized thresholds for larger organizations and additional recipients for when license counts reach critical levels
 
 ```powershell
 $directoryID = '00000000-0000-0000-0000-000000000000'
@@ -49,9 +51,9 @@ $skuTotalThreshold_important = 500
 Get-AzureADLicenseStatus -DirectoryID $directoryID -ApplicationID $applicationID -CertificateThumbprint $certificateThumbprint -SenderAddress $senderAddress -RecipientAddresses_normal $recipientAddresses_normal -RecipientAddresses_critical $recipientAddresses_critical -SKUPercentageThreshold_normal $skuPercentageThreshold_normal -SKUTotalThreshold_normal $skuTotalThreshold_normal -SKUPercentageThreshold_important $skuPercentageThreshold_important -SKUTotalThreshold_important $skuTotalThreshold_important
 ```
 
-Prepares a status report with customized thresholds for larger organizations and additional recipients for when license counts reach critical levels
-
 ### 5.1.3 Advanced example
+
+Prepares a status report by using an Azure certificate for automation purposes, specifying both important and interchangeable SKUs and activating advanced checkups
 
 ```powershell
 $directoryID = '00000000-0000-0000-0000-000000000000'
@@ -86,9 +88,9 @@ $interchangeableSKUs = @(
 Get-AzureADLicenseStatus -DirectoryID $directoryID -ApplicationID $applicationID -SubscriptionID $subscriptionID -KeyVaultName $keyVaultName -CertificateName $certificateName -SenderAddress $senderAddress -RecipientAddresses_normal $recipientAddresses_normal -RecipientAddresses_critical $recipientAddresses_critical -SKUPercentageThreshold_normal $skuPercentageThreshold_normal -SKUTotalThreshold_normal $skuTotalThreshold_normal -SKUPercentageThreshold_important $skuPercentageThreshold_important -SKUTotalThreshold_important $skuTotalThreshold_important -ImportantSKUs $importantSKUs -InterchangeableSKUs $interchangeableSKUs -AdvancedCheckups
 ```
 
-Prepares a status report by using an Azure certificate for automation purposes, specifying both important and interchangeable SKUs and activating advanced checkups
-
 ### 5.1.4 Complete example
+
+Prepares a status report by using an Azure certificate for automation purposes, specifying important, interchangeable and preferable SKUs with their prices and activating advanced checkups
 
 ```powershell
 $directoryID = '00000000-0000-0000-0000-000000000000'
@@ -139,9 +141,9 @@ $skuPrices = @{
 Get-AzureADLicenseStatus -DirectoryID $directoryID -ApplicationID $applicationID -SubscriptionID $subscriptionID -KeyVaultName $keyVaultName -CertificateName $certificateName -SenderAddress $senderAddress -RecipientAddresses_normal $recipientAddresses_normal -RecipientAddresses_critical $recipientAddresses_critical -SKUPercentageThreshold_normal $skuPercentageThreshold_normal -SKUTotalThreshold_normal $skuTotalThreshold_normal -SKUPercentageThreshold_important $skuPercentageThreshold_important -SKUTotalThreshold_important $skuTotalThreshold_important -ImportantSKUs $importantSKUs -InterchangeableSKUs $interchangeableSKUs -PreferableSKUs $preferableSKUs -SKUPrices $skuPrices -AdvancedCheckups
 ```
 
-Prepares a status report by using an Azure certificate for automation purposes, specifying important, interchangeable and preferable SKUs with their prices and activating advanced checkups
-
 ## 5.2 Example report
+
+Below example shows how a report might look like, although the example might differ from the actual result due to the manual's style settings
 
 <div>
     <style>
