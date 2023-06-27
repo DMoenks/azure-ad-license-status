@@ -4,6 +4,8 @@ Set-StrictMode -Version 3.0
 class PreferableSKURule {
     [ValidateSet('True', 'False', 'Skip')]
     [string]$AccountEnabled = 'Skip'
+    [ValidateSet('True', 'False', 'Skip')]
+    [string]$AccountGuest = 'Skip'
     [datetime]$CreatedEarlierThan = [datetime]::MaxValue
     [datetime]$LastActiveEarlierThan = [datetime]::MaxValue
     [UInt16]$OneDriveGBUsedLessThan = [UInt16]::MaxValue
@@ -575,6 +577,8 @@ function Get-AzureADLicenseStatus {
         [PreferableSKURule[]]$PreferableSKUs,
         [ValidateScript({$_.Keys | ForEach-Object{[guid]$_}; $_.Values | ForEach-Object{[decimal]$_}})]
         [hashtable]$SKUPrices,
+        [ValidateSet('Email', 'JSON')]
+        [string]$OutputFormat = 'Email',
         [ValidateNotNullOrEmpty()]
         [string]$LicensingURL = 'https://www.microsoft.com/licensing/servicecenter',
         [switch]$AdvancedCheckups
@@ -651,7 +655,7 @@ function Get-AzureADLicenseStatus {
         #endregion
 
         #region: Reports
-        if ($AdvancedCheckups.IsPresent) {
+        if ($AdvancedCheckups) {
             Invoke-MgGraphRequest -Method GET -Uri ('https://graph.microsoft.com/v1.0/reports/getM365AppUserDetail(period=''D{0}'')?$format=text/csv' -f $reportDays) -OutputFilePath "$env:TEMP\appUsage.csv"
             foreach ($entry in Import-Csv "$env:TEMP\appUsage.csv" | Select-Object -Property 'User Principal Name', 'Last Activity Date', 'Windows', 'Mac', 'Mobile', 'Web') {
                 if (-not $appUsage.ContainsKey($entry.'User Principal Name')) {
@@ -748,7 +752,7 @@ function Get-AzureADLicenseStatus {
 
         #region: Users
         $userCount = 0
-        $URI = 'https://graph.microsoft.com/v1.0/users?$select=id,accountEnabled,createdDateTime,licenseAssignmentStates,userPrincipalName&$filter=assignedLicenses/$count ne 0&$count=true&$top={0}' -f $pageSize
+        $URI = 'https://graph.microsoft.com/v1.0/users?$select=id,accountEnabled,createdDateTime,licenseAssignmentStates,userPrincipalName,userType&$filter=assignedLicenses/$count ne 0&$count=true&$top={0}' -f $pageSize
         while ($null -ne $URI) {
             # Retrieve users
             $data = Invoke-MgGraphRequest -Method GET -Uri $URI -Headers @{'ConsistencyLevel' = 'eventual'}
@@ -818,7 +822,7 @@ function Get-AzureADLicenseStatus {
                     }
                     # Identify preferable SKUs, based on user-level calculations
                     $userSKUs_preferable = $null
-                    if ($AdvancedCheckups.IsPresent -and
+                    if ($AdvancedCheckups -and
                     $reportsRetrieved) {
                         $hashCalculator = [System.Security.Cryptography.MD5]::Create()
                         if ($hashedReports) {
@@ -861,6 +865,7 @@ function Get-AzureADLicenseStatus {
                         }
                         foreach ($preferableSKU in $PreferableSKUs) {
                             if (($user.accountEnabled.ToString() -eq $preferableSKU.AccountEnabled -or $preferableSKU.AccountEnabled -eq 'Skip') -and
+                            (($user.userType -eq 'Guest').ToString() -eq $preferableSKU.AccountGuest -or $preferableSKU.AccountGuest -eq 'Skip') -and
                             $user.createdDateTime -lt $preferableSKU.CreatedEarlierThan -and
                             $userAppsUsedLastActivityDate -lt $preferableSKU.LastActiveEarlierThan.Date -and
                             ($userWindowsAppUsed.ToString() -eq $preferableSKU.WindowsAppUsed -or $preferableSKU.WindowsAppUsed -eq 'Skip') -and
@@ -902,7 +907,7 @@ function Get-AzureADLicenseStatus {
                 }
             }
         }
-        Write-Message "Analyzed $userCount users"
+        Write-Message "Analyzed $userCount licensed users"
         #endregion
 
         #region: Advanced
@@ -1222,209 +1227,218 @@ function Get-AzureADLicenseStatus {
 
         #region: Report
         if ($results.Values.Count -gt 0) {
-            Add-Output -Output $style
-            $critical = $false
-            # Output basic SKU results
-            Add-Output -Output '<p class=gray>Basic checkup - Products</p>'
-            if ($results.ContainsKey('SKU_Basic')) {
-                Add-Output -Output "<p>Please check license counts for the following product SKUs and <a href=""$LicensingURL"">reserve</a> additional licenses:</p> `
-                                    <p><table><tr>
-                                    <th>License type</th>
-                                    <th>Available count</th>
-                                    <th>Minimum count</th>
-                                    <th>Difference</th></tr>"
-                foreach ($SKU in $results['SKU_Basic'].Keys) {
-                    $differenceCount = $results['SKU_Basic'][$SKU]['availableCount'] - $results['SKU_Basic'][$SKU]['minimumCount']
-                    Add-Output -Output ('<tr><td>{0}</td><td>{1}</td><td>{2}</td>' -f
-                                        (Get-SKUName -SKUID $SKU),
-                                        $results['SKU_Basic'][$SKU]['availableCount'],
-                                        $results['SKU_Basic'][$SKU]['minimumCount'])
-                    if ($results['SKU_Basic'][$SKU]['availableCount'] / $results['SKU_Basic'][$SKU]['minimumCount'] * 100 -ge $SKUWarningThreshold_basic) {
-                        Add-Output -Output "<td class=green>$differenceCount</td>"
-                    }
-                    elseif ($results['SKU_Basic'][$SKU]['availableCount'] / $results['SKU_Basic'][$SKU]['minimumCount'] * 100 -le $SKUCriticalThreshold_basic) {
-                        $critical = $true
-                        Add-Output -Output "<td class=red>$differenceCount</td>"
-                    }
-                    else {
-                        Add-Output -Output "<td class=yellow>$differenceCount</td>"
-                    }
-                    Add-Output -Output '</tr>'
-                }
-                Add-Output -Output "</table></p> `
-                                    <p>The following criteria were used during the checkup:<ul> `
-                                    <li>Check products with >$SKUIgnoreThreshold total licenses</li> `
-                                    <li>Report normal products having both <$SKUTotalThreshold_normal licenses and <$SKUPercentageThreshold_normal% of their total licenses available</li> `
-                                    <li>Report important products having both <$SKUTotalThreshold_important licenses and <$SKUPercentageThreshold_important% of their total licenses available</li></ul></p>"
-            }
-            else {
-                Add-Output -Output '<p>Nothing to report</p>'
-            }
-            # Output advanced SKU results
-            Add-Output -Output '<p class=gray>Advanced checkup - Products</p>'
-            if ($results.ContainsKey('SKU_Advanced')) {
-                Add-Output -Output "<p>Please check license counts for the following product SKUs and <a href=""$LicensingURL"">reserve</a> additional licenses:</p> `
-                                    <p><table><tr>
-                                    <th>License type</th>
-                                    <th>Enabled count</th>
-                                    <th>Needed count</th>
-                                    <th>Difference</th></tr>"
-                foreach ($plan in $results['SKU_Advanced'].Keys) {
-                    $differenceCount = $results['SKU_Advanced'][$plan]['enabledCount'] - $results['SKU_Advanced'][$plan]['neededCount']
-                    Add-Output -Output ('<tr><td>{0}</td><td>{1}</td><td>{2}</td>' -f
-                                        $plan,
-                                        $results['SKU_Advanced'][$plan]['enabledCount'],
-                                        $results['SKU_Advanced'][$plan]['neededCount'])
-                    if ($results['SKU_Advanced'][$plan]['enabledCount'] / $results['SKU_Advanced'][$plan]['neededCount'] * 100 -ge $SKUWarningThreshold_advanced) {
-                        Add-Output -Output "<td class=green>$differenceCount</td>"
-                    }
-                    elseif ($results['SKU_Advanced'][$plan]['enabledCount'] / $results['SKU_Advanced'][$plan]['neededCount'] * 100 -le $SKUCriticalThreshold_advanced) {
-                        $critical = $true
-                        Add-Output -Output "<td class=red>$differenceCount</td>"
-                    }
-                    else {
-                        Add-Output -Output "<td class=yellow>$differenceCount</td>"
-                    }
-                    Add-Output -Output '</tr>'
-                }
-                Add-Output -Output '</table></p>
-                                    <p>The following criteria were used during the checkup:<ul>
-                                    <li>Check <em>Azure AD P1</em> based on groups using dynamic user membership</li>
-                                    <li>Check <em>Azure AD P1</em> based on applications using group-based assignment</li>
-                                    <li>Check <em>Azure AD P1/P2</em> based on users covered by Conditional Access</li>
-                                    <li>Check <em>Azure AD P2</em> based on users in scope of Privileged Identity Management</li>
-                                    <li>Check <em>Defender for Office 365 P1/P2</em> based on protected Exchange Online recipients</li></ul></p>'
-            }
-            else {
-                Add-Output -Output '<p>Nothing to report</p>'
-            }
-            # Output basic user results
-            Add-Output -Output '<p class=gray>Basic checkup - Users</p>'
-            if ($results.ContainsKey('User_Basic')) {
-                [decimal]$potentialSavings = 0
-                Add-Output -Output '<p>Please check license assignments for the following user accounts and mitigate impact:</p>
-                                    <p><table><tr>
-                                    <th>Account</th>
-                                    <th>Interchangeable</th>
-                                    <th>Optimizable</th>
-                                    <th>Removable</th></tr>'
-                foreach ($user in $results['User_Basic'].Keys | Sort-Object) {
-                    $interchangeableSKUIDs = $results['User_Basic'][$user]['Interchangeable'] | Where-Object{$null -ne $_}
-                    $optimizableSKUIDs = $results['User_Basic'][$user]['Optimizable'] | Where-Object{$null -ne $_}
-                    $removableSKUIDs = $results['User_Basic'][$user]['Removable'] | Where-Object{$null -ne $_}
-                    if ($null -ne $SKUPrices) {
-                        $potentialSavings += ($interchangeableSKUIDs | ForEach-Object{[decimal]$SKUPrices["$_"]} | Sort-Object | Select-Object -Skip 1 | Measure-Object -Sum).Sum +
-                                            ($optimizableSKUIDs | ForEach-Object{[decimal]$SKUPrices["$_"]} | Measure-Object -Sum).Sum +
-                                            ($removableSKUIDs | ForEach-Object{[decimal]$SKUPrices["$_"]} | Measure-Object -Sum).Sum
-                    }
-                    Add-Output -Output ('<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td></tr>' -f
-                                        $user,
-                                        (($interchangeableSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>'),
-                                        (($optimizableSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>'),
-                                        (($removableSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>'))
-                }
-                Add-Output -Output '</table></p>'
-                if ($potentialSavings -gt 0) {
-                    Add-Output -Output ('<p>Potential savings when mitigating license assignment impact: {0:C}</p>' -f $potentialSavings)
-                }
-                Add-Output -Output '<p>The following criteria were used during the checkup:<ul>
-                                    <li>Check accounts with any number of assigned licenses</li>
-                                    <li>Report theoretically exclusive licenses as <strong>interchangeable</strong>, based on specified SKUs</li>
-                                    <li>Report practically inclusive licenses as <strong>optimizable</strong>, based on available SKU features</li>
-                                    <li>Report actually inclusive licenses as <strong>removable</strong>, based on enabled SKU features</li></ul></p>'
-            }
-            else {
-                Add-Output -Output '<p>Nothing to report</p>'
-            }
-            # Output advanced user results
-            Add-Output -Output '<p class=gray>Advanced checkup - Users</p>'
-            if ($results.ContainsKey('User_Advanced')) {
-                [decimal]$potentialSavings = 0
-                Add-Output -Output '<p>Please check license assignments for the following user accounts and mitigate impact:</p>
-                                    <p><table><tr>
-                                    <th>Account</th>
-                                    <th>Preferable</th>
-                                    <th>Replaceable</th></tr>'
-                foreach ($user in $results['User_Advanced'].Keys | Sort-Object) {
-                    $preferableSKUID = $results['User_Advanced'][$user]['Preferable']['preferableSKU'] | Where-Object{$null -ne $_}
-                    $opposingSKUIDs = $results['User_Advanced'][$user]['Preferable']['replaceableSKUs'] | Where-Object{$null -ne $_}
-                    if ($null -ne $SKUPrices) {
-                        $potentialSavings += ($opposingSKUIDs | ForEach-Object{[decimal]$SKUPrices["$_"]} | Measure-Object -Sum).Sum -
-                                            [decimal]$SKUPrices["$preferableSKUID"]
-                    }
-                    Add-Output -Output ('<tr><td>{0}</td><td>{1}</td><td>{2}</td></tr>' -f
-                                        $user,
-                                        (Get-SKUName -SKUID $preferableSKUID),
-                                        (($opposingSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>'))
-                }
-                Add-Output -Output '</table></p>'
-                if ($potentialSavings -gt 0) {
-                    Add-Output -Output ('<p>Potential savings when mitigating license assignment impact: {0:C}</p>' -f $potentialSavings)
-                }
-                Add-Output -Output '<p>The following criteria were used during the checkup, in order:</p>
-                                    <p><table><tr>
-                                    <th>License type</th>
-                                    <th>Enabled</th>
-                                    <th>Creation limit</th>
-                                    <th>Activity limit</th>
-                                    <th>OneDrive limit</th>
-                                    <th>Mailbox limit</th>
-                                    <th>Mailbox archive</th>
-                                    <th>Windows app</th>
-                                    <th>Mac app</th>
-                                    <th>Mobile app</th>
-                                    <th>Web app</th></tr>'
-                foreach ($preferableSKU in $PreferableSKUs) {
-                    Add-Output -Output ('<tr><td>{0}</td><td>{1}</td><td>{2:yyyy-MM-dd}</td><td>{3:yyyy-MM-dd}</td><td>{4} GB</td><td>{5} GB</td><td>{6}</td><td>{7}</td><td>{8}</td><td>{9}</td><td>{10}</td></tr>' -f
-                                        (Get-SKUName -SKUID $preferableSKU.SKUID),
-                                        $preferableSKU.AccountEnabled.ToUpper(),
-                                        $preferableSKU.CreatedEarlierThan,
-                                        $preferableSKU.LastActiveEarlierThan,
-                                        $preferableSKU.OneDriveGBUsedLessThan,
-                                        $preferableSKU.MailboxGBUsedLessThan,
-                                        $preferableSKU.MailboxHasArchive.ToUpper(),
-                                        $preferableSKU.WindowsAppUsed.ToUpper(),
-                                        $preferableSKU.MacAppUsed.ToUpper(),
-                                        $preferableSKU.MobileAppUsed.ToUpper(),
-                                        $preferableSKU.WebAppUsed.ToUpper())
-                }
-                Add-Output -Output '</table></p>'
-            }
-            else {
-                Add-Output -Output '<p>Nothing to report</p>'
-            }
-            # Configure and send email
-            $email = @{
-                'message' = @{
-                    'subject' = 'Azure AD licenses need attention';
-                    'importance' = 'normal';
-                    'body' = @{
-                        'contentType' = 'HTML';
-                        'content' = $outputs.ToString()
-                    };
-                }
-            }
-            $email['message'].Add('toRecipients', [System.Collections.Generic.List[hashtable]]::new())
-            foreach ($recipientAddress in $RecipientAddresses_normal) {
-                $email['message']['toRecipients'].Add(@{
-                    'emailAddress' = @{
-                        'address' = $recipientAddress
-                    }
-                })
-            }
-            if ($critical) {
-                $email['message']['subject'] = 'Azure AD licenses need urgent attention'
-                $email['message']['importance'] = 'high'
-                $email['message'].Add('ccRecipients', [System.Collections.Generic.List[hashtable]]::new())
-                foreach ($recipientAddress in $RecipientAddresses_critical) {
-                    $email['message']['ccRecipients'].Add(@{
-                        'emailAddress' = @{
-                            'address' = $recipientAddress
+            switch ($OutputFormat) {
+                'Email' {
+                    Add-Output -Output $style
+                    $critical = $false
+                    # Output basic SKU results
+                    Add-Output -Output '<p class=gray>Basic checkup - Products</p>'
+                    if ($results.ContainsKey('SKU_Basic')) {
+                        Add-Output -Output "<p>Please check license counts for the following product SKUs and <a href=""$LicensingURL"">reserve</a> additional licenses:</p> `
+                                            <p><table><tr>
+                                            <th>License type</th>
+                                            <th>Available count</th>
+                                            <th>Minimum count</th>
+                                            <th>Difference</th></tr>"
+                        foreach ($SKU in $results['SKU_Basic'].Keys) {
+                            $differenceCount = $results['SKU_Basic'][$SKU]['availableCount'] - $results['SKU_Basic'][$SKU]['minimumCount']
+                            Add-Output -Output ('<tr><td>{0}</td><td>{1}</td><td>{2}</td>' -f
+                                                (Get-SKUName -SKUID $SKU),
+                                                $results['SKU_Basic'][$SKU]['availableCount'],
+                                                $results['SKU_Basic'][$SKU]['minimumCount'])
+                            if ($results['SKU_Basic'][$SKU]['availableCount'] / $results['SKU_Basic'][$SKU]['minimumCount'] * 100 -ge $SKUWarningThreshold_basic) {
+                                Add-Output -Output "<td class=green>$differenceCount</td>"
+                            }
+                            elseif ($results['SKU_Basic'][$SKU]['availableCount'] / $results['SKU_Basic'][$SKU]['minimumCount'] * 100 -le $SKUCriticalThreshold_basic) {
+                                $critical = $true
+                                Add-Output -Output "<td class=red>$differenceCount</td>"
+                            }
+                            else {
+                                Add-Output -Output "<td class=yellow>$differenceCount</td>"
+                            }
+                            Add-Output -Output '</tr>'
                         }
-                    })
+                        Add-Output -Output "</table></p> `
+                                            <p>The following criteria were used during the checkup:<ul> `
+                                            <li>Check products with >$SKUIgnoreThreshold total licenses</li> `
+                                            <li>Report normal products having both <$SKUTotalThreshold_normal licenses and <$SKUPercentageThreshold_normal% of their total licenses available</li> `
+                                            <li>Report important products having both <$SKUTotalThreshold_important licenses and <$SKUPercentageThreshold_important% of their total licenses available</li></ul></p>"
+                    }
+                    else {
+                        Add-Output -Output '<p>Nothing to report</p>'
+                    }
+                    # Output advanced SKU results
+                    Add-Output -Output '<p class=gray>Advanced checkup - Products</p>'
+                    if ($results.ContainsKey('SKU_Advanced')) {
+                        Add-Output -Output "<p>Please check license counts for the following product SKUs and <a href=""$LicensingURL"">reserve</a> additional licenses:</p> `
+                                            <p><table><tr>
+                                            <th>License type</th>
+                                            <th>Enabled count</th>
+                                            <th>Needed count</th>
+                                            <th>Difference</th></tr>"
+                        foreach ($plan in $results['SKU_Advanced'].Keys) {
+                            $differenceCount = $results['SKU_Advanced'][$plan]['enabledCount'] - $results['SKU_Advanced'][$plan]['neededCount']
+                            Add-Output -Output ('<tr><td>{0}</td><td>{1}</td><td>{2}</td>' -f
+                                                $plan,
+                                                $results['SKU_Advanced'][$plan]['enabledCount'],
+                                                $results['SKU_Advanced'][$plan]['neededCount'])
+                            if ($results['SKU_Advanced'][$plan]['enabledCount'] / $results['SKU_Advanced'][$plan]['neededCount'] * 100 -ge $SKUWarningThreshold_advanced) {
+                                Add-Output -Output "<td class=green>$differenceCount</td>"
+                            }
+                            elseif ($results['SKU_Advanced'][$plan]['enabledCount'] / $results['SKU_Advanced'][$plan]['neededCount'] * 100 -le $SKUCriticalThreshold_advanced) {
+                                $critical = $true
+                                Add-Output -Output "<td class=red>$differenceCount</td>"
+                            }
+                            else {
+                                Add-Output -Output "<td class=yellow>$differenceCount</td>"
+                            }
+                            Add-Output -Output '</tr>'
+                        }
+                        Add-Output -Output '</table></p>
+                                            <p>The following criteria were used during the checkup:<ul>
+                                            <li>Check <em>Azure AD P1</em> based on groups using dynamic user membership</li>
+                                            <li>Check <em>Azure AD P1</em> based on applications using group-based assignment</li>
+                                            <li>Check <em>Azure AD P1/P2</em> based on users covered by Conditional Access</li>
+                                            <li>Check <em>Azure AD P2</em> based on users in scope of Privileged Identity Management</li>
+                                            <li>Check <em>Defender for Office 365 P1/P2</em> based on protected Exchange Online recipients</li></ul></p>'
+                    }
+                    else {
+                        Add-Output -Output '<p>Nothing to report</p>'
+                    }
+                    # Output basic user results
+                    Add-Output -Output '<p class=gray>Basic checkup - Users</p>'
+                    if ($results.ContainsKey('User_Basic')) {
+                        [decimal]$potentialSavings = 0
+                        Add-Output -Output '<p>Please check license assignments for the following user accounts and mitigate impact:</p>
+                                            <p><table><tr>
+                                            <th>Account</th>
+                                            <th>Interchangeable</th>
+                                            <th>Optimizable</th>
+                                            <th>Removable</th></tr>'
+                        foreach ($user in $results['User_Basic'].Keys | Sort-Object) {
+                            $interchangeableSKUIDs = $results['User_Basic'][$user]['Interchangeable'] | Where-Object{$null -ne $_}
+                            $optimizableSKUIDs = $results['User_Basic'][$user]['Optimizable'] | Where-Object{$null -ne $_}
+                            $removableSKUIDs = $results['User_Basic'][$user]['Removable'] | Where-Object{$null -ne $_}
+                            if ($null -ne $SKUPrices) {
+                                $potentialSavings += ($interchangeableSKUIDs | ForEach-Object{[decimal]$SKUPrices["$_"]} | Sort-Object | Select-Object -Skip 1 | Measure-Object -Sum).Sum +
+                                                    ($optimizableSKUIDs | ForEach-Object{[decimal]$SKUPrices["$_"]} | Measure-Object -Sum).Sum +
+                                                    ($removableSKUIDs | ForEach-Object{[decimal]$SKUPrices["$_"]} | Measure-Object -Sum).Sum
+                            }
+                            Add-Output -Output ('<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td></tr>' -f
+                                                $user,
+                                                (($interchangeableSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>'),
+                                                (($optimizableSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>'),
+                                                (($removableSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>'))
+                        }
+                        Add-Output -Output '</table></p>'
+                        if ($potentialSavings -gt 0) {
+                            Add-Output -Output ('<p>Potential savings when mitigating license assignment impact: {0:C}</p>' -f $potentialSavings)
+                        }
+                        Add-Output -Output '<p>The following criteria were used during the checkup:<ul>
+                                            <li>Check accounts with any number of assigned licenses</li>
+                                            <li>Report theoretically exclusive licenses as <strong>interchangeable</strong>, based on specified SKUs</li>
+                                            <li>Report practically inclusive licenses as <strong>optimizable</strong>, based on available SKU features</li>
+                                            <li>Report actually inclusive licenses as <strong>removable</strong>, based on enabled SKU features</li></ul></p>'
+                    }
+                    else {
+                        Add-Output -Output '<p>Nothing to report</p>'
+                    }
+                    # Output advanced user results
+                    Add-Output -Output '<p class=gray>Advanced checkup - Users</p>'
+                    if ($results.ContainsKey('User_Advanced')) {
+                        [decimal]$potentialSavings = 0
+                        Add-Output -Output '<p>Please check license assignments for the following user accounts and mitigate impact:</p>
+                                            <p><table><tr>
+                                            <th>Account</th>
+                                            <th>Preferable</th>
+                                            <th>Replaceable</th></tr>'
+                        foreach ($user in $results['User_Advanced'].Keys | Sort-Object) {
+                            $preferableSKUID = $results['User_Advanced'][$user]['Preferable']['preferableSKU'] | Where-Object{$null -ne $_}
+                            $opposingSKUIDs = $results['User_Advanced'][$user]['Preferable']['replaceableSKUs'] | Where-Object{$null -ne $_}
+                            if ($null -ne $SKUPrices) {
+                                $potentialSavings += ($opposingSKUIDs | ForEach-Object{[decimal]$SKUPrices["$_"]} | Measure-Object -Sum).Sum -
+                                                    [decimal]$SKUPrices["$preferableSKUID"]
+                            }
+                            Add-Output -Output ('<tr><td>{0}</td><td>{1}</td><td>{2}</td></tr>' -f
+                                                $user,
+                                                (Get-SKUName -SKUID $preferableSKUID),
+                                                (($opposingSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>'))
+                        }
+                        Add-Output -Output '</table></p>'
+                        if ($potentialSavings -gt 0) {
+                            Add-Output -Output ('<p>Potential savings when mitigating license assignment impact: {0:C}</p>' -f $potentialSavings)
+                        }
+                        Add-Output -Output '<p>The following criteria were used during the checkup, in order:</p>
+                        <p><table><tr>
+                        <th>License type</th>
+                        <th>Enabled</th>
+                        <th>Guest</th>
+                        <th>Creation limit</th>
+                        <th>Activity limit</th>
+                        <th>OneDrive limit</th>
+                        <th>Mailbox limit</th>
+                        <th>Mailbox archive</th>
+                        <th>Windows app</th>
+                        <th>Mac app</th>
+                        <th>Mobile app</th>
+                        <th>Web app</th></tr>'
+                        foreach ($preferableSKU in $PreferableSKUs) {
+                            Add-Output -Output ('<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3:yyyy-MM-dd}</td><td>{4:yyyy-MM-dd}</td><td>{5} GB</td><td>{6} GB</td><td>{7}</td><td>{8}</td><td>{9}</td><td>{10}</td><td>{11}</td></tr>' -f
+                                                (Get-SKUName -SKUID $preferableSKU.SKUID),
+                                                $preferableSKU.AccountEnabled.ToUpper(),
+                                                $preferableSKU.AccountGuest.ToUpper(),
+                                                $preferableSKU.CreatedEarlierThan,
+                                                $preferableSKU.LastActiveEarlierThan,
+                                                $preferableSKU.OneDriveGBUsedLessThan,
+                                                $preferableSKU.MailboxGBUsedLessThan,
+                                                $preferableSKU.MailboxHasArchive.ToUpper(),
+                                                $preferableSKU.WindowsAppUsed.ToUpper(),
+                                                $preferableSKU.MacAppUsed.ToUpper(),
+                                                $preferableSKU.MobileAppUsed.ToUpper(),
+                                                $preferableSKU.WebAppUsed.ToUpper())
+                        }
+                        Add-Output -Output '</table></p>'
+                    }
+                    else {
+                        Add-Output -Output '<p>Nothing to report</p>'
+                    }
+                    # Configure and send email
+                    $email = @{
+                        'message' = @{
+                            'subject' = 'Azure AD licenses need attention';
+                            'importance' = 'normal';
+                            'body' = @{
+                                'contentType' = 'HTML';
+                                'content' = $outputs.ToString()
+                            };
+                        }
+                    }
+                    $email['message'].Add('toRecipients', [System.Collections.Generic.List[hashtable]]::new())
+                    foreach ($recipientAddress in $RecipientAddresses_normal) {
+                        $email['message']['toRecipients'].Add(@{
+                            'emailAddress' = @{
+                                'address' = $recipientAddress
+                            }
+                        })
+                    }
+                    if ($critical) {
+                        $email['message']['subject'] = 'Azure AD licenses need urgent attention'
+                        $email['message']['importance'] = 'high'
+                        $email['message'].Add('ccRecipients', [System.Collections.Generic.List[hashtable]]::new())
+                        foreach ($recipientAddress in $RecipientAddresses_critical) {
+                            $email['message']['ccRecipients'].Add(@{
+                                'emailAddress' = @{
+                                    'address' = $recipientAddress
+                                }
+                            })
+                        }
+                    }
+                    Invoke-MgGraphRequest -Method POST -Uri ('https://graph.microsoft.com/v1.0/users/{0}/sendMail' -f $SenderAddress) -Body $email -ContentType 'application/json'
+                }
+                'JSON' {
+
                 }
             }
-            Invoke-MgGraphRequest -Method POST -Uri ('https://graph.microsoft.com/v1.0/users/{0}/sendMail' -f $SenderAddress) -Body $email -ContentType 'application/json'
         }
         #endregion
 

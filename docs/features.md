@@ -53,7 +53,9 @@ Check for license need based on Azure AD and Office feature information:
 
 Check for organization's preferable licenses, based on multiple criteria:
 
-&#x2714;  Whether a user is enabled
+&#x2714; Whether a user is enabled
+
+&#x2714; Whether a user is a guest
 
 &#x2714; When a user was created
 
