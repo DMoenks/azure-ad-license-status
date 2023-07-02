@@ -19,7 +19,7 @@ $applicationID = '00000000-0000-0000-0000-000000000000'
 $certificateThumbprint = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 $senderAddress = 'sender@example.com'
 $recipientAddresses_normal = @(
-    'recipient_1@example.com',
+    'recipient_1@example.com'
     'recipient_2@example.com'
 )
 
@@ -36,11 +36,11 @@ $applicationID = '00000000-0000-0000-0000-000000000000'
 $certificateThumbprint = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 $senderAddress = 'sender@example.com'
 $recipientAddresses_normal = @(
-    'recipient_1@example.com',
+    'recipient_1@example.com'
     'recipient_2@example.com'
 )
 $recipientAddresses_critical = @(
-    'recipient_3@example.com',
+    'recipient_3@example.com'
     'recipient_4@example.com'
 )
 $skuPercentageThreshold_normal = 1
@@ -63,11 +63,11 @@ $keyVaultName = 'MyKeyVault'
 $certificateName = 'MyCertificate'
 $senderAddress = 'sender@example.com'
 $recipientAddresses_normal = @(
-    'recipient_1@example.com',
+    'recipient_1@example.com'
     'recipient_2@example.com'
 )
 $recipientAddresses_critical = @(
-    'recipient_3@example.com',
+    'recipient_3@example.com'
     'recipient_4@example.com'
 )
 $skuPercentageThreshold_normal = 1
@@ -75,13 +75,13 @@ $skuTotalThreshold_normal = 100
 $skuPercentageThreshold_important = 1
 $skuTotalThreshold_important = 500
 $importantSKUs = @(
-    '18181a46-0d4e-45cd-891e-60aabd171b4e',
+    '18181a46-0d4e-45cd-891e-60aabd171b4e'
     '6fd2c87f-b296-42f0-b197-1e91e994b900'
 )
 $interchangeableSKUs = @(
-    '4b585984-651b-448a-9e53-3b10f069cf7f',
-    '18181a46-0d4e-45cd-891e-60aabd171b4e',
-    '6fd2c87f-b296-42f0-b197-1e91e994b900',
+    '4b585984-651b-448a-9e53-3b10f069cf7f'
+    '18181a46-0d4e-45cd-891e-60aabd171b4e'
+    '6fd2c87f-b296-42f0-b197-1e91e994b900'
     'c7df2760-2c81-4ef7-b578-5b5392b571df'
 )
 
@@ -100,11 +100,11 @@ $keyVaultName = 'MyKeyVault'
 $certificateName = 'MyCertificate'
 $senderAddress = 'sender@example.com'
 $recipientAddresses_normal = @(
-    'recipient_1@example.com',
+    'recipient_1@example.com'
     'recipient_2@example.com'
 )
 $recipientAddresses_critical = @(
-    'recipient_3@example.com',
+    'recipient_3@example.com'
     'recipient_4@example.com'
 )
 $skuPercentageThreshold_normal = 1
@@ -112,31 +112,43 @@ $skuTotalThreshold_normal = 100
 $skuPercentageThreshold_important = 1
 $skuTotalThreshold_important = 500
 $importantSKUs = @(
-    '18181a46-0d4e-45cd-891e-60aabd171b4e',
+    '18181a46-0d4e-45cd-891e-60aabd171b4e'
     '6fd2c87f-b296-42f0-b197-1e91e994b900'
 )
 $interchangeableSKUs = @(
-    '4b585984-651b-448a-9e53-3b10f069cf7f',
-    '18181a46-0d4e-45cd-891e-60aabd171b4e',
-    '6fd2c87f-b296-42f0-b197-1e91e994b900',
+    '4b585984-651b-448a-9e53-3b10f069cf7f'
+    '18181a46-0d4e-45cd-891e-60aabd171b4e'
+    '6fd2c87f-b296-42f0-b197-1e91e994b900'
     'c7df2760-2c81-4ef7-b578-5b5392b571df'
 )
 $preferableSKUs = @(
     [SKURule]@{
-        OneDriveGBUsedLessThan = 1;
-        MailboxGBUsedLessThan = 1;
-        MailboxHasArchive = 'False';
-        WindowsAppUsed = 'False';
-        MacAppUsed = 'False';
+        OneDriveGBUsedLessThan = 1
+        MailboxGBUsedLessThan = 1
+        MailboxHasArchive = 'False'
+        WindowsAppUsed = 'False'
+        MacAppUsed = 'False'
         SKUID = '4b585984-651b-448a-9e53-3b10f069cf7f'
     }
 )
-$skuPrices = @{
-    '4b585984-651b-448a-9e53-3b10f069cf7f' = 4.0;
-    '18181a46-0d4e-45cd-891e-60aabd171b4e' = 10.0;
-    '6fd2c87f-b296-42f0-b197-1e91e994b900' = 23.0;
-    'c7df2760-2c81-4ef7-b578-5b5392b571df' = 38.0
-}
+$skuPrices = @(
+    [SKUPrice]@{
+        SKUID = '4b585984-651b-448a-9e53-3b10f069cf7f'
+        Price = 4.0
+    }
+    [SKUPrice]@{
+        SKUID = '18181a46-0d4e-45cd-891e-60aabd171b4e'
+        Price = 10.0
+    }
+    [SKUPrice]@{
+        SKUID = '6fd2c87f-b296-42f0-b197-1e91e994b900'
+        Price = 23.0
+    }
+    [SKUPrice]@{
+        SKUID = 'c7df2760-2c81-4ef7-b578-5b5392b571df'
+        Price = 38.0
+    }
+)
 
 Get-AzureADLicenseStatus -DirectoryID $directoryID -ApplicationID $applicationID -SubscriptionID $subscriptionID -KeyVaultName $keyVaultName -CertificateName $certificateName -SenderAddress $senderAddress -RecipientAddresses_normal $recipientAddresses_normal -RecipientAddresses_critical $recipientAddresses_critical -SKUPercentageThreshold_normal $skuPercentageThreshold_normal -SKUTotalThreshold_normal $skuTotalThreshold_normal -SKUPercentageThreshold_important $skuPercentageThreshold_important -SKUTotalThreshold_important $skuTotalThreshold_important -ImportantSKUs $importantSKUs -InterchangeableSKUs $interchangeableSKUs -PreferableSKUs $preferableSKUs -SKUPrices $skuPrices -AdvancedCheckups
 ```

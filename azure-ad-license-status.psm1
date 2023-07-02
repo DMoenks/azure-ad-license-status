@@ -477,7 +477,7 @@ function Get-AzureADLicenseStatus {
     .PARAMETER RecipientAddresses_critical
     Specifies the additional recipient addresses to be used for report delivery in critical cases
     .PARAMETER SKUIgnoreThreshold
-    Specifies the minimum enabled license threshold for SKUs to be considered for the report
+    Specifies the minimum enabled license threshold for SKUs to be considered for the report, e.g. to ignore SKUs purchased for testing purposes or from trials
     .PARAMETER SKUPercentageThreshold_normal
     Specifies the minimum available license percentage threshold for SKUs to be included in the report
     .PARAMETER SKUTotalThreshold_normal
@@ -487,21 +487,23 @@ function Get-AzureADLicenseStatus {
     .PARAMETER SKUTotalThreshold_important
     Specifies the minimum available license amount threshold for SKUs to be included in the report
     .PARAMETER SKUWarningThreshold_basic
-    Specifies the warning percentage threshold to be used during report creation for basic checkups
+    Specifies the warning percentage threshold to be used during report creation for basic checkups, should be higher than the value provided for the parameter 'SKUCriticalThreshold_basic'
     .PARAMETER SKUCriticalThreshold_basic
-    Specifies the critical percentage threshold to be used during report creation for basic checkups
+    Specifies the critical percentage threshold to be used during report creation for basic checkups, should be lower than the value provided for the parameter 'SKUWarningThreshold_basic'
     .PARAMETER SKUWarningThreshold_advanced
-    Specifies the warning percentage threshold to be used during report creation for advanced checkups
+    Specifies the warning percentage threshold to be used during report creation for advanced checkups, should be higher than the value provided for the parameter 'SKUCriticalThreshold_advanced'
     .PARAMETER SKUCriticalThreshold_advanced
-    Specifies the critical percentage threshold to be used during report creation for advanced checkups
+    Specifies the critical percentage threshold to be used during report creation for advanced checkups, should be lower than the value provided for the parameter 'SKUWarningThreshold_advanced'
     .PARAMETER ImportantSKUs
     Specifies the SKUs which are deemed important, so different thresholds are used for calculation
     .PARAMETER InterchangeableSKUs
     Specifies a list of SKUs which are deemed interchangeable, e.g Office 365 E1 and Office 365 E3
     .PARAMETER PreferableSKUs
-    Specifies a list of SKUs which are deemed preferable based on their provided ruleset, relies on the paramater InterchangeableSKUs to calculate replaceable SKUs
+    Specifies a list of SKUs which are deemed preferable based on their provided ruleset, relies on the paramater 'InterchangeableSKUs' to calculate replaceable SKUs
     .PARAMETER SKUPrices
     Specifies a list of SKUs with their prices to calculate potential savings during user checkups
+    .PARAMETER AttachmentFormat
+    Specifies a format for user results attached to the report
     .PARAMETER LicensingURL
     Specifies a licensing portal URL to be linked in the report, refers to Microsoft's Volume Licensing Service Center by default
     .PARAMETER AdvancedCheckups
@@ -836,59 +838,63 @@ function Get-AzureADLicenseStatus {
                         else {
                             $userName = $user.userPrincipalName
                         }
-                        if ($appUsage.ContainsKey($userName)) {
-                            $userAppsUsedLastActivityDate = $appUsage[$userName]['LastActivityDate']
-                            $userWindowsAppUsed = $appUsage[$userName]['WindowsApp']
-                            $userMacAppUsed = $appUsage[$userName]['MacApp']
-                            $userMobileAppUsed = $appUsage[$userName]['MobileApp']
-                            $userWebAppUsed = $appUsage[$userName]['WebApp']
-                        }
-                        else {
-                            $userAppsUsedLastActivityDate = [datetime]::MinValue
-                            $userWindowsAppUsed = $false
-                            $userMacAppUsed = $false
-                            $userMobileAppUsed = $false
-                            $userWebAppUsed = $false
-                        }
-                        if ($mailboxUsage.ContainsKey($userName)) {
-                            $userMailboxLastActivityDate = $mailboxUsage[$userName]['LastActivityDate']
-                            $userMailboxStorageUsedGB = $mailboxUsage[$userName]['StorageUsed']
-                            $userMailboxHasArchive = $mailboxUsage[$userName]['HasArchive']
-                        }
-                        else {
-                            $userMailboxLastActivityDate = [datetime]::MinValue
-                            $userMailboxStorageUsedGB = 0
-                            $userMailboxHasArchive = $false
-                        }
-                        if ($driveUsage.ContainsKey($userName)) {
-                            $userOneDriveLastActivityDate = $driveUsage[$userName]['LastActivityDate']
-                            $userOneDriveStorageUsedGB = $driveUsage[$userName]['StorageUsed']
-                        }
-                        else {
-                            $userOneDriveLastActivityDate = [datetime]::MinValue
-                            $userOneDriveStorageUsedGB = 0
-                        }
-                        foreach ($preferableSKU in $PreferableSKUs) {
-                            if (($user.accountEnabled.ToString() -eq $preferableSKU.AccountEnabled -or $preferableSKU.AccountEnabled -eq 'Skip') -and
-                            (($user.userType -eq 'Guest').ToString() -eq $preferableSKU.AccountGuest -or $preferableSKU.AccountGuest -eq 'Skip') -and
-                            $user.createdDateTime -lt $preferableSKU.CreatedEarlierThan -and
-                            $userAppsUsedLastActivityDate -lt $preferableSKU.LastActiveEarlierThan.Date -and
-                            ($userWindowsAppUsed.ToString() -eq $preferableSKU.WindowsAppUsed -or $preferableSKU.WindowsAppUsed -eq 'Skip') -and
-                            ($userMacAppUsed.ToString() -eq $preferableSKU.MacAppUsed -or $preferableSKU.MacAppUsed -eq 'Skip') -and
-                            ($userMobileAppUsed.ToString() -eq $preferableSKU.MobileAppUsed -or $preferableSKU.MobileAppUsed -eq 'Skip') -and
-                            ($userWebAppUsed.ToString() -eq $preferableSKU.WebAppUsed -or $preferableSKU.WebAppUsed -eq 'Skip') -and
-                            $userMailboxLastActivityDate -lt $preferableSKU.LastActiveEarlierThan.Date -and
-                            $userMailboxStorageUsedGB -lt $preferableSKU.MailboxGBUsedLessThan -and
-                            ($userMailboxHasArchive.ToString() -eq $preferableSKU.MailboxHasArchive -or $preferableSKU.MailboxHasArchive -eq 'Skip') -and
-                            $userOneDriveLastActivityDate -lt $preferableSKU.LastActiveEarlierThan.Date -and
-                            $userOneDriveStorageUsedGB -lt $preferableSKU.OneDriveGBUsedLessThan) {
-                                if ((($InterchangeableSKUs -contains $preferableSKU.SKUID -and
-                                $userSKUs -notcontains $preferableSKU.SKUID) -or
-                                [guid]::Empty -eq $preferableSKU.SKUID) -and
-                                $userSKUs_interchangeable.Count -gt 0) {
-                                    $userSKUs_preferable = $preferableSKU.SKUID
+                        if ($appUsage.ContainsKey($userName) -or
+                        $mailboxUsage.ContainsKey($userName) -or
+                        $driveUsage.ContainsKey($userName)) {
+                            if ($appUsage.ContainsKey($userName)) {
+                                $userAppsUsedLastActivityDate = $appUsage[$userName]['LastActivityDate']
+                                $userWindowsAppUsed = $appUsage[$userName]['WindowsApp']
+                                $userMacAppUsed = $appUsage[$userName]['MacApp']
+                                $userMobileAppUsed = $appUsage[$userName]['MobileApp']
+                                $userWebAppUsed = $appUsage[$userName]['WebApp']
+                            }
+                            else {
+                                $userAppsUsedLastActivityDate = [datetime]::MinValue
+                                $userWindowsAppUsed = $false
+                                $userMacAppUsed = $false
+                                $userMobileAppUsed = $false
+                                $userWebAppUsed = $false
+                            }
+                            if ($mailboxUsage.ContainsKey($userName)) {
+                                $userMailboxLastActivityDate = $mailboxUsage[$userName]['LastActivityDate']
+                                $userMailboxStorageUsedGB = $mailboxUsage[$userName]['StorageUsed']
+                                $userMailboxHasArchive = $mailboxUsage[$userName]['HasArchive']
+                            }
+                            else {
+                                $userMailboxLastActivityDate = [datetime]::MinValue
+                                $userMailboxStorageUsedGB = 0
+                                $userMailboxHasArchive = $false
+                            }
+                            if ($driveUsage.ContainsKey($userName)) {
+                                $userOneDriveLastActivityDate = $driveUsage[$userName]['LastActivityDate']
+                                $userOneDriveStorageUsedGB = $driveUsage[$userName]['StorageUsed']
+                            }
+                            else {
+                                $userOneDriveLastActivityDate = [datetime]::MinValue
+                                $userOneDriveStorageUsedGB = 0
+                            }
+                            foreach ($preferableSKU in $PreferableSKUs) {
+                                if (($user.accountEnabled.ToString() -eq $preferableSKU.AccountEnabled -or $preferableSKU.AccountEnabled -eq 'Skip') -and
+                                (($user.userType -eq 'Guest').ToString() -eq $preferableSKU.AccountGuest -or $preferableSKU.AccountGuest -eq 'Skip') -and
+                                $user.createdDateTime -lt $preferableSKU.CreatedEarlierThan -and
+                                $userAppsUsedLastActivityDate -lt $preferableSKU.LastActiveEarlierThan.Date -and
+                                ($userWindowsAppUsed.ToString() -eq $preferableSKU.WindowsAppUsed -or $preferableSKU.WindowsAppUsed -eq 'Skip') -and
+                                ($userMacAppUsed.ToString() -eq $preferableSKU.MacAppUsed -or $preferableSKU.MacAppUsed -eq 'Skip') -and
+                                ($userMobileAppUsed.ToString() -eq $preferableSKU.MobileAppUsed -or $preferableSKU.MobileAppUsed -eq 'Skip') -and
+                                ($userWebAppUsed.ToString() -eq $preferableSKU.WebAppUsed -or $preferableSKU.WebAppUsed -eq 'Skip') -and
+                                $userMailboxLastActivityDate -lt $preferableSKU.LastActiveEarlierThan.Date -and
+                                $userMailboxStorageUsedGB -lt $preferableSKU.MailboxGBUsedLessThan -and
+                                ($userMailboxHasArchive.ToString() -eq $preferableSKU.MailboxHasArchive -or $preferableSKU.MailboxHasArchive -eq 'Skip') -and
+                                $userOneDriveLastActivityDate -lt $preferableSKU.LastActiveEarlierThan.Date -and
+                                $userOneDriveStorageUsedGB -lt $preferableSKU.OneDriveGBUsedLessThan) {
+                                    if ((($InterchangeableSKUs -contains $preferableSKU.SKUID -and
+                                    $userSKUs -notcontains $preferableSKU.SKUID) -or
+                                    [guid]::Empty -eq $preferableSKU.SKUID) -and
+                                    $userSKUs_interchangeable.Count -gt 0) {
+                                        $userSKUs_preferable = $preferableSKU.SKUID
+                                    }
+                                    break
                                 }
-                                break
                             }
                         }
                     }
