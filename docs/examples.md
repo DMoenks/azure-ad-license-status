@@ -122,7 +122,7 @@ $interchangeableSKUs = @(
     'c7df2760-2c81-4ef7-b578-5b5392b571df'
 )
 $preferableSKUs = @(
-    [PreferableSKURule]@{
+    [SKURule]@{
         OneDriveGBUsedLessThan = 1;
         MailboxGBUsedLessThan = 1;
         MailboxHasArchive = 'False';
@@ -147,35 +147,43 @@ Below example shows how a report might look like, although the example might dif
 
 <div>
     <style>
-    table, th, td {
-        border: none;
-        border-collapse: collapse;
-    }
-    th, td {
-        padding: 5px;
-        text-align: left;
-        vertical-align: top;
-    }
-    .gray {
-        border-left: 4pt solid darkslategray;
-        padding-left: 4pt;
-        background-color: lightslategray
-    }
-    .green {
-        border-left: 4pt solid darkgreen;
-        padding-left: 4pt;
-        background-color: lightgreen
-    }
-    .yellow {
-        border-left: 4pt solid darkgoldenrod;
-        padding-left: 4pt;
-        background-color: lightgoldenrodyellow
-    }
-    .red {
-        border-left: 4pt solid darkred;
-        padding-left: 4pt;
-        background-color: lightcoral
-    }
+        table, th, td {
+            border: none;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 5px;
+            vertical-align: top;
+        }
+        th {
+            text-align: center;
+        }
+        td {
+            text-align: left;
+        }
+        .gray {
+            border-left: 4pt solid darkslategray;
+            padding-left: 4pt;
+            background-color: lightslategray
+        }
+        .green {
+            border-left: 4pt solid darkgreen;
+            padding-left: 4pt;
+            background-color: lightgreen
+        }
+        .yellow {
+            border-left: 4pt solid darkgoldenrod;
+            padding-left: 4pt;
+            background-color: lightgoldenrodyellow
+        }
+        .red {
+            border-left: 4pt solid darkred;
+            padding-left: 4pt;
+            background-color: lightcoral
+        }
+        .rule {
+            border-left-style: solid;
+        }
     </style>
     <p class=gray>Basic checkup - Products</p>
     <p>Please check license counts for the following product SKUs and <a href="https://www.microsoft.com/licensing/servicecenter">reserve</a> additional licenses:</p>
@@ -263,6 +271,7 @@ Below example shows how a report might look like, although the example might dif
             <li>Check <em>Azure AD P1/P2</em> based on users covered by Conditional Access</li>
             <li>Check <em>Azure AD P2</em> based on users in scope of Privileged Identity Management</li>
             <li>Check <em>Defender for Office 365 P1/P2</em> based on protected Exchange Online recipients</li>
+            <li>Check <em>Intune Device</em> based on devices managed by Intune and used by unlicensed users</li>
         </ul>
     </p>
     <p class=gray>Basic checkup - Users</p>
@@ -335,69 +344,80 @@ Below example shows how a report might look like, although the example might dif
     <p>
         <table>
             <tr>
-                <th>License type</th>
-                <th>Enabled</th>
-                <th>Creation limit</th>
-                <th>Activity limit</th>
-                <th>OneDrive limit</th>
-                <th>Mailbox limit</th>
-                <th>Mailbox archive</th>
-                <th>Windows app</th>
-                <th>Mac app</th>
-                <th>Mobile app</th>
-                <th>Web app</th>
+                <th rowspan=2>License</th>
+                <th colspan=4 class=rule>Account</th>
+                <th colspan=1 class=rule>OneDrive</th>
+                <th colspan=2 class=rule>Mailbox</th>
+                <th colspan=4 class=rule>Apps</th>
+            </tr>
+            <tr>
+                <th class=rule>Enabled</th>
+                <th>Guest</th>
+                <th>Created</th>
+                <th>Active</th>
+                <th class=rule>Storage</th>
+                <th class=rule>Storage</th>
+                <th>Archive</th>
+                <th class=rule>Windows</th>
+                <th>Mac</th>
+                <th>Mobile</th>
+                <th>Web</th>
             </tr>
             <tr>
                 <td>N/A</td>
-                <td>SKIP</td>
-                <td>9999-12-31</td>
-                <td>2022-06-23</td>
-                <td>65535 GB</td>
-                <td>65535 GB</td>
-                <td>SKIP</td>
-                <td>SKIP</td>
-                <td>SKIP</td>
-                <td>SKIP</td>
-                <td>SKIP</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
+                <td>&lt;2022&#8209;06&#8209;23</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
             </tr>
             <tr>
                 <td>Microsoft 365 F3</td>
-                <td>SKIP</td>
-                <td>9999-12-31</td>
-                <td>9999-12-31</td>
-                <td>1 GB</td>
-                <td>1 GB</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
+                <td>&lt;1&nbsp;GB</td>
+                <td>&lt;1&nbsp;GB</td>
                 <td>FALSE</td>
                 <td>FALSE</td>
                 <td>FALSE</td>
-                <td>SKIP</td>
-                <td>SKIP</td>
+                <td>-</td>
+                <td>-</td>
             </tr>
             <tr>
                 <td>Office 365 E1</td>
-                <td>SKIP</td>
-                <td>9999-12-31</td>
-                <td>9999-12-31</td>
-                <td>1000 GB</td>
-                <td>50 GB</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
+                <td>&lt;1000&nbsp;GB</td>
+                <td>&lt;50&nbsp;GB</td>
                 <td>FALSE</td>
                 <td>FALSE</td>
                 <td>FALSE</td>
-                <td>SKIP</td>
-                <td>SKIP</td>
+                <td>-</td>
+                <td>-</td>
             </tr>
             <tr>
                 <td>Office 365 E3</td>
-                <td>SKIP</td>
-                <td>9999-12-31</td>
-                <td>9999-12-31</td>
-                <td>65535 GB</td>
-                <td>65535 GB</td>
-                <td>SKIP</td>
-                <td>SKIP</td>
-                <td>SKIP</td>
-                <td>SKIP</td>
-                <td>SKIP</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
             </tr>
         </table>
     </p>

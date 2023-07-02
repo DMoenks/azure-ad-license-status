@@ -2,14 +2,14 @@
 name: Feature request
 about: Create a feature request
 title: ''
-labels: ''
+labels: 'enhancement'
 assignees: ''
 ---
 
-**Is your feature request related to a problem? Please describe.**
-Provide a clear and concise description of what the problem is, preferably in form of a use case
+**Describe the feature**
+Provide a clear and concise description of what is missing, preferably in form of a use case
 
-**Describe the solution you'd like**
+**Describe the desired behavior**
 Provide a clear and concise description of what you want to happen
 
 **Describe alternatives you've considered**

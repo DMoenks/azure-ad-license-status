@@ -27,4 +27,4 @@ permalink: /preparations
 3. (optional, recommended) Limit permissions
    1. Create [Exchange Online application access policy](https://learn.microsoft.com/graph/auth-limit-mailbox-access) to restrict Azure AD application's _Mail.Send_ permission to intended sender mailbox
 
-> HINT: Most of the requirements and preparations for advanced Azure execution mentioned above can be deployed by using the provided Terraform module, the exception being an Exchange Online application access policy.
+> HINT: Most of the requirements and preparations for advanced Azure execution mentioned above can be deployed by using the Terraform module available in the [GitHub repository](https://github.com/DMoenks/azure-ad-license-status), the exception being an Exchange Online application access policy.
