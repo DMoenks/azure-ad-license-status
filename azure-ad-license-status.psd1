@@ -93,7 +93,7 @@
             LicenseUri = 'https://github.com/DMoenks/azure-ad-license-status/blob/main/LICENSE'
 
             # A URL to the main website for this project.
-            ProjectUri = 'https://github.com/DMoenks/azure-ad-license-status'
+            ProjectUri = 'https://dmoenks.github.io/azure-ad-license-status/'
 
             # A URL to an icon representing this module.
             # IconUri = ''
