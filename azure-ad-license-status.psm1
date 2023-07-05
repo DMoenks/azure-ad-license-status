@@ -1284,7 +1284,7 @@ function Get-AzureADLicenseStatus {
             # Output basic SKU results
             Add-Output -Output '<p class=gray>Basic checkup - Products</p>'
             if ($results.ContainsKey('SKU_Basic')) {
-                Add-Output -Output ('<p>Please check license counts for the following product SKUs and <a href="{0}">reserve</a> additional licenses:</p> `
+                Add-Output -Output ('<p>Please check license counts for the following product SKUs and <a href="{0}">reserve</a> additional licenses:</p>
                                     <p><table>
                                     <tr><th>License type</th>
                                     <th>Available count</th>
@@ -1373,7 +1373,7 @@ function Get-AzureADLicenseStatus {
                                     <th>Interchangeable</th>
                                     <th>Optimizable</th>
                                     <th>Removable</th></tr>'
-                foreach ($user in $results['User_Basic'] | Sort-Object) {
+                foreach ($user in $results['User_Basic'] | Sort-Object UserPrincipalName) {
                     if ($null -ne $SKUPrices) {
                         if ($null -ne ($interchangeableSKUPrices = $SKUPrices | Where-Object{$_.SKUID -in $user.InterchangeableSKUIDs})) {
                             $potentialSavings += ($interchangeableSKUPrices.Price |
@@ -1389,7 +1389,7 @@ function Get-AzureADLicenseStatus {
                         }
                     }
                     Add-Output -Output ('<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td></tr>' -f
-                                        $user,
+                                        $user.UserPrincipalName,
                                         (($user.InterchangeableSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>'),
                                         (($user.OptimizableSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>'),
                                         (($user.RemovableSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>'))
