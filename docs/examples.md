@@ -356,7 +356,8 @@ Below example shows how a report might look like, although the example might dif
     <p>
         <table>
             <tr>
-                <th rowspan=2>License</th>
+                <th rowspan=2>Priority</th>
+                <th rowspan=2 class=rule>License</th>
                 <th colspan=4 class=rule>Account</th>
                 <th colspan=1 class=rule>OneDrive</th>
                 <th colspan=2 class=rule>Mailbox</th>
@@ -376,6 +377,7 @@ Below example shows how a report might look like, although the example might dif
                 <th>Web</th>
             </tr>
             <tr>
+                <td>1</td>
                 <td>N/A</td>
                 <td>-</td>
                 <td>-</td>
@@ -390,6 +392,7 @@ Below example shows how a report might look like, although the example might dif
                 <td>-</td>
             </tr>
             <tr>
+                <td>2</td>
                 <td>Microsoft 365 F3</td>
                 <td>-</td>
                 <td>-</td>
@@ -404,6 +407,7 @@ Below example shows how a report might look like, although the example might dif
                 <td>-</td>
             </tr>
             <tr>
+                <td>3</td>
                 <td>Office 365 E1</td>
                 <td>-</td>
                 <td>-</td>
@@ -418,6 +422,7 @@ Below example shows how a report might look like, although the example might dif
                 <td>-</td>
             </tr>
             <tr>
+                <td>4</td>
                 <td>Office 365 E3</td>
                 <td>-</td>
                 <td>-</td>
