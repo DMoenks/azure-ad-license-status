@@ -27,8 +27,6 @@ Check for license need based on Azure AD and Office feature information:
 
 &#x2714; _Azure Active Directory Premium P1/P2_ based on users covered by Conditional Access
 
-> DISCLAIMER: For performance reasons, Conditional Access coverage calculation only considers two separate 5-day time slots. The first being the most recent full Monday-Friday slot, the second being the same slot two weeks earlier. Although this should result in a mostly accurate coverage calculation, taking at least 4-day time slots into account for each time zone, it will inevitably disregard users with irregular access patterns.
-
 &#x2714; _Azure Active Directory Premium P2_ based on users in scope of Privileged Identity Management
 
 &#x2714; _Defender for Office 365 P1/P2_ based on protected Exchange Online recipients

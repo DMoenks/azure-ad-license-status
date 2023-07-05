@@ -37,7 +37,6 @@ _Az.KeyVault_
 
 ### 3.2.2 Advanced
 
-- Microsoft Graph permission _AuditLog.Read.All_
 - Microsoft Graph permission _DeviceManagementManagedDevices.Read.All_
 - Microsoft Graph permission _Policy.Read.All_
 - Microsoft Graph permission _Reports.Read.All_
@@ -50,4 +49,4 @@ _Az.KeyVault_
 >- _Organization.Read.All_
 >- _User.Read.All_
 
-For further details please refer to [Graph permissions](https://learn.microsoft.com/graph/permissions-reference).
+For further details, please refer to [Graph permissions](https://learn.microsoft.com/graph/permissions-reference) and [App-only authentication for Exchange Online](https://learn.microsoft.com/powershell/exchange/app-only-auth-powershell-v2?view=exchange-ps#assign-azure-ad-roles-to-the-application).

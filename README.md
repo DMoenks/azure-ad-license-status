@@ -9,4 +9,4 @@ The main motivation for this report was to conquer side-effects of manual or sem
 
 > DISCLAIMER: The report can merely aid in complying with license terms and agreements. It cannot and never will lower or replace the liability to actually comply with any default or individually negotiated license terms and agreements applying to your organization.
 
-For further details please refer to the [manual](https://dmoenks.github.io/azure-ad-license-status/).
+For further details, please refer to the [manual](https://dmoenks.github.io/azure-ad-license-status/).
