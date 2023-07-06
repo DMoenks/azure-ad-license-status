@@ -27,7 +27,7 @@ Check for license need based on Azure AD and Office feature information:
 
 &#x2714; _Azure Active Directory Premium P1/P2_ based on users covered by Conditional Access
 
-&#x2714; _Azure Active Directory Premium P2_ based on users in scope of Privileged Identity Management
+&#x2714; _Azure Active Directory Premium P2_ based on users eligible for Privileged Identity Management
 
 &#x2714; _Defender for Office 365 P1/P2_ based on protected Exchange Online recipients
 

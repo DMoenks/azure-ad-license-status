@@ -13,4 +13,4 @@ The main motivation for this report was to conquer side-effects of manual or sem
 
 > DISCLAIMER: The report can merely aid in complying with license terms and agreements. It cannot and never will lower or replace the liability to actually comply with any default or individually negotiated license terms and agreements applying to your organization.
 
-The report has surpassed its initially intended purpose in a few directions by now, e.g. by taking a specific set of soft-licensed products into account, i.e. products that only require licenses to be available instead of them being assigned to users, such as Conditional Access. For a full overview, check the list of [features](/azure-ad-license-status/features).
+The report has surpassed its initially intended purpose in a few directions by now, e.g. by taking a specific set of soft-licensed products into account, i.e. products that only require licenses to be available instead of them being assigned to users, such as Conditional Access. For a full overview, please refer to the list of [features](/azure-ad-license-status/features).

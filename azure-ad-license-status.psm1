@@ -1025,7 +1025,7 @@ function Get-AzureADLicenseStatus {
                 }
             }
             Write-Message "Analyzed $conditionalAccessPolicyCount conditional access policies"
-            # Azure AD P2 based on users in scope of Privileged Identity Management
+            # Azure AD P2 based on users eligible for Privileged Identity Management
             $roleAssignmentCount = 0
             $URI = 'https://graph.microsoft.com/v1.0/roleManagement/directory/roleEligibilitySchedules?$select=principalId,scheduleInfo'
             while ($null -ne $URI) {
@@ -1356,7 +1356,7 @@ function Get-AzureADLicenseStatus {
                                     <li>Check <em>Azure AD P1</em> based on groups using dynamic user membership</li>
                                     <li>Check <em>Azure AD P1</em> based on applications using group-based assignment</li>
                                     <li>Check <em>Azure AD P1/P2</em> based on users covered by Conditional Access</li>
-                                    <li>Check <em>Azure AD P2</em> based on users in scope of Privileged Identity Management</li>
+                                    <li>Check <em>Azure AD P2</em> based on users eligible for Privileged Identity Management</li>
                                     <li>Check <em>Defender for Office 365 P1/P2</em> based on protected Exchange Online recipients</li>
                                     <li>Check <em>Intune Device</em> based on devices managed by Intune and used by unlicensed users</li></ul></p>'
             }
