@@ -20,6 +20,7 @@ class SKUPrice {
 }
 
 class SKURule {
+    [guid]$SKUID
     [ValidateSet('True', 'False', 'Skip')]
     [string]$AccountEnabled = [SKURule]::AccountEnabledDefault()
     [ValidateSet('True', 'False', 'Skip')]
@@ -38,7 +39,6 @@ class SKURule {
     [string]$MobileAppUsed = [SKURule]::MobileAppUsedDefault()
     [ValidateSet('True', 'False', 'Skip')]
     [string]$WebAppUsed = [SKURule]::WebAppUsedDefault()
-    [guid]$SKUID
 
     static [string]AccountEnabledDefault() {
         return 'Skip'
@@ -1375,7 +1375,7 @@ function Get-AzureADLicenseStatus {
                                     <th>Removable</th></tr>'
                 foreach ($user in $results['User_Basic'] | Sort-Object UserPrincipalName) {
                     if ($null -ne $SKUPrices) {
-                        if ($null -ne ($interchangeableSKUPrices = $SKUPrices | Where-Object{$_.SKUID -in $user.InterchangeableSKUIDs})) {
+                        if ($null -ne ($interchangeableSKUPrices = $SKUPrices | Where-Object{$_.SKUID -in $user.InterchangeableSKUIDs} | Sort-Object Price | Select-Object -Skip 1)) {
                             $potentialSavings += ($interchangeableSKUPrices.Price |
                                                 Measure-Object -Sum).Sum
                         }

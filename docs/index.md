@@ -3,7 +3,7 @@ layout: default
 permalink: /
 ---
 
-[1 Introduction](/azure-ad-license-status/) \| [2 Features](/azure-ad-license-status/features) \| [3 Requirements](/azure-ad-license-status/requirements) \| [4 Preparations](/azure-ad-license-status/preparations) \| [5 Examples](/azure-ad-license-status/examples)
+[1 Introduction](/azure-ad-license-status/) \| [2 Features](/azure-ad-license-status/features) \| [3 Requirements](/azure-ad-license-status/requirements) \| [4 Preparations](/azure-ad-license-status/preparations) \| [5 Usage](/azure-ad-license-status/usage) \| [6 Examples](/azure-ad-license-status/examples)
 
 [![PowerShell Gallery Version](https://img.shields.io/powershellgallery/v/azure-ad-license-status?label=PowerShell%20Gallery&logo=powershell&style=flat)](https://www.powershellgallery.com/packages/azure-ad-license-status)
 
