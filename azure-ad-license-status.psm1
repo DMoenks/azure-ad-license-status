@@ -133,7 +133,7 @@ function Add-Result {
         [guid]$SKUID,
         [Parameter(Mandatory = $true, ParameterSetName = 'SKU_Basic')]
         [ValidateNotNullOrEmpty()]
-        [UInt32]$AvailableCount,
+        [Int32]$AvailableCount,
         [Parameter(Mandatory = $true, ParameterSetName = 'SKU_Basic')]
         [ValidateNotNullOrEmpty()]
         [UInt32]$MinimumCount,
@@ -777,7 +777,7 @@ function Get-AzureADLicenseStatus {
                 }
                 if ($null -ne ($countViolations = $user.licenseAssignmentStates | Where-Object{$_.error -eq 'CountViolation'})) {
                     foreach ($countViolation in $countViolations.skuId | Sort-Object -Unique) {
-                        $results['SKU_Basic'][$countViolation]['availableCount'] -= 1
+                        $results['SKU_Basic'][[guid]$countViolation]['availableCount'] -= 1
                     }
                 }
                 # Identify interchangeable SKUs, based on specifications
