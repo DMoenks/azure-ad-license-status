@@ -122,7 +122,7 @@ function Add-Output {
     $nestingLevel++
     Write-Message 'Add-Output' -Type Verbose
     # Processing
-    $outputs.AppendLine($Output) | Out-Null
+    $outputs.AppendLine($Output) > $null
     $nestingLevel--
 }
 
@@ -217,7 +217,7 @@ function Get-AADGroupMember {
         }
     }
     if ($groupMembers.Count -gt 0) {
-        $groupMembers_unique = @($groupMembers.id | Select-Object -Unique)
+        $groupMembers_unique = @($groupMembers.id | Sort-Object -Unique)
     }
     else {
         $groupMembers_unique = @()
@@ -262,7 +262,7 @@ function Get-EXOGroupMember {
             }
         }
     }
-    $groupMembers_unique = @($groupMembers | Select-Object -Unique)
+    $groupMembers_unique = @($groupMembers | Sort-Object -Unique)
     Write-Message "Found $($groupMembers_unique.Count) members" -Type Verbose
     $nestingLevel--
     Write-Output ([pscustomobject[]]$groupMembers_unique) -NoEnumerate
@@ -314,8 +314,8 @@ function Resolve-ATPRecipient {
         }
     }
     Write-Message "Found $($affectedAsDomain.Count) recipients by domains" -Type Verbose
-    if ($null -ne ($resolvedUsers = @($affectedAsUser | Select-Object -Unique) + @($affectedAsGroup | Select-Object -Unique) + @($affectedAsDomain | Select-Object -Unique) | Group-Object -Property ExchangeObjectId | Where-Object{$_.Count -eq $categoryCount})) {
-        $resolvedUsers_unique = @($resolvedUsers.Group | Select-Object -Unique)
+    if ($null -ne ($resolvedUsers = @($affectedAsUser | Sort-Object -Unique) + @($affectedAsGroup | Sort-Object -Unique) + @($affectedAsDomain | Sort-Object -Unique) | Group-Object -Property ExchangeObjectId | Where-Object{$_.Count -eq $categoryCount})) {
+        $resolvedUsers_unique = @($resolvedUsers.Group | Sort-Object -Unique)
         Write-Message "Found $($resolvedUsers_unique.Count) recipients by combination" -Type Verbose
         $nestingLevel--
         Write-Output ([pscustomobject[]]$resolvedUsers_unique) -NoEnumerate
@@ -360,7 +360,7 @@ function Get-ATPRecipient {
     $null -eq $IncludedDomains) {
         $userRecipients = [pscustomobject[]]@(Get-EXORecipient -RecipientTypeDetails $EXOTypes_user -Properties $EXOProperties -ResultSize Unlimited) | Select-Object -Property $EXOProperties
         $groupRecipients = Get-EXOGroupMember -GroupIDs ([pscustomobject[]]@(Get-EXORecipient -RecipientTypeDetails $EXOTypes_group -Properties $EXOProperties -ResultSize Unlimited)).ExchangeObjectId
-        $includedRecipients = [pscustomobject[]]@($userRecipients + $groupRecipients | Select-Object -Unique)
+        $includedRecipients = [pscustomobject[]]@($userRecipients + $groupRecipients | Sort-Object -Unique)
     }
     else {
         $includedRecipients = Resolve-ATPRecipient -Users $IncludedUsers -Groups $IncludedGroups -Domains $IncludedDomains
@@ -383,7 +383,7 @@ function Get-ATPRecipient {
             $affectedRecipients.AddRange([pscustomobject[]]@($affectedRecipientResults.InputObject))
         }
     }
-    $affectedRecipients_unique = @($affectedRecipients | Select-Object -Unique)
+    $affectedRecipients_unique = @($affectedRecipients | Sort-Object -Unique)
     Write-Message "Found $($affectedRecipients_unique.Count) affected recipients" -Type Verbose
     $nestingLevel--
     Write-Output ([pscustomobject[]]$affectedRecipients_unique) -NoEnumerate
@@ -404,7 +404,7 @@ function Get-SKUName {
     if ($SKUID -eq [guid]::Empty) {
         $skuName = 'N/A'
     }
-    elseif ($null -ne ($skuName = ($skuTranslate | Where-Object{$_.GUID -eq $SKUID}).Product_Display_Name | Select-Object -Unique)) {
+    elseif ($null -ne ($skuName = ($skuTranslate | Where-Object{$_.GUID -eq $SKUID}).Product_Display_Name | Sort-Object -Unique)) {
         $skuName = [cultureinfo]::new('en-US').TextInfo.ToTitleCase($skuName.ToLower())
     }
     else {
@@ -599,13 +599,13 @@ function Get-AzureADLicenseStatus {
                 $azureCertificateSecret = Get-AzKeyVaultSecret -VaultName $KeyVaultName -Name $CertificateName -AsPlainText
                 $azureCertificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new([Convert]::FromBase64String($azureCertificateSecret))
                 Disconnect-AzAccount
-                Connect-MgGraph -Certificate $azureCertificate -TenantId $DirectoryID -ClientId $ApplicationID -ErrorAction Stop | Out-Null
+                Connect-MgGraph -Certificate $azureCertificate -TenantId $DirectoryID -ClientId $ApplicationID -ErrorAction Stop > $null
             }
             'LocalCertificate' {
-                Connect-MgGraph -Certificate $Certificate -TenantId $DirectoryID -ClientId $ApplicationID -ErrorAction Stop | Out-Null
+                Connect-MgGraph -Certificate $Certificate -TenantId $DirectoryID -ClientId $ApplicationID -ErrorAction Stop > $null
             }
             'LocalCertificateThumbprint' {
-                Connect-MgGraph -CertificateThumbprint $CertificateThumbprint -TenantId $DirectoryID -ClientId $ApplicationID -ErrorAction Stop | Out-Null
+                Connect-MgGraph -CertificateThumbprint $CertificateThumbprint -TenantId $DirectoryID -ClientId $ApplicationID -ErrorAction Stop > $null
             }
         }
         $graphAuthentication = $true
@@ -667,7 +667,7 @@ function Get-AzureADLicenseStatus {
             foreach ($entry in Import-Csv "$env:TEMP\appUsage.csv" | Select-Object -Property 'User Principal Name', 'Last Activity Date', 'Windows', 'Mac', 'Mobile', 'Web') {
                 if (-not $appUsage.ContainsKey($entry.'User Principal Name')) {
                     $lastActivityDate = [datetime]::MinValue
-                    [datetime]::TryParse($entry.'Last Activity Date', [ref]$lastActivityDate) | Out-Null
+                    [datetime]::TryParse($entry.'Last Activity Date', [ref]$lastActivityDate) > $null
                     if ($entry.'Windows' -eq 'Yes') {
                         $windowsApp = $true
                     }
@@ -708,7 +708,7 @@ function Get-AzureADLicenseStatus {
             foreach ($entry in Import-Csv "$env:TEMP\mailboxUsage.csv" | Select-Object -Property 'User Principal Name', 'Is Deleted', 'Last Activity Date', 'Storage Used (Byte)', 'Has Archive' | Where-Object{$_.'Is Deleted' -eq 'False'}) {
                 if (-not $mailboxUsage.ContainsKey($entry.'User Principal Name')) {
                     $lastActivityDate = [datetime]::MinValue
-                    [datetime]::TryParse($entry.'Last Activity Date', [ref]$lastActivityDate) | Out-Null
+                    [datetime]::TryParse($entry.'Last Activity Date', [ref]$lastActivityDate) > $null
                     $storageUsed = [decimal]($entry.'Storage Used (Byte)' / [System.Math]::Pow(1000, 3))
                     $hasArchive = [bool]::Parse($entry.'Has Archive')
                     $mailboxUsage.Add($entry.'User Principal Name', @{
@@ -725,7 +725,7 @@ function Get-AzureADLicenseStatus {
             foreach ($entry in Import-Csv "$env:TEMP\driveUsage.csv" | Select-Object -Property 'Owner Principal Name', 'Is Deleted', 'Last Activity Date', 'Storage Used (Byte)' | Where-Object{$_.'Is Deleted' -eq 'False'}) {
                 if (-not $driveUsage.ContainsKey($entry.'Owner Principal Name')) {
                     $lastActivityDate = [datetime]::MinValue
-                    [datetime]::TryParse($entry.'Last Activity Date', [ref]$lastActivityDate) | Out-Null
+                    [datetime]::TryParse($entry.'Last Activity Date', [ref]$lastActivityDate) > $null
                     $storageUsed = [decimal]($entry.'Storage Used (Byte)' / [System.Math]::Pow(1000, 3))
                     $driveUsage.Add($entry.'Owner Principal Name', @{
                         'LastActivityDate' = $lastActivityDate
@@ -776,7 +776,7 @@ function Get-AzureADLicenseStatus {
                     $userSKUs = @()
                 }
                 if ($null -ne ($countViolations = $user.licenseAssignmentStates | Where-Object{$_.error -eq 'CountViolation'})) {
-                    foreach ($countViolation in $countViolations.skuId | Select-Object -Unique) {
+                    foreach ($countViolation in $countViolations.skuId | Sort-Object -Unique) {
                         $results['SKU_Basic'][$countViolation]['availableCount'] -= 1
                     }
                 }
@@ -790,14 +790,14 @@ function Get-AzureADLicenseStatus {
                 }
                 # Identify optimizable SKUs, based on organization-level calculations
                 if ($null -ne ($comparison_replaceableOrganization = $userSKUs | Where-Object{$_ -in $superiorSKUs_organization.Keys} | ForEach-Object{$superiorSKUs_organization[$_]})) {
-                    $userSKUs_optimizable = Compare-Object -ReferenceObject $userSKUs -DifferenceObject $comparison_replaceableOrganization -ExcludeDifferent -IncludeEqual | ForEach-Object{$superiorSKU = $_.InputObject; $superiorSKUs_organization.Keys | Where-Object{$superiorSKUs_organization[$_] -contains $superiorSKU}} | Where-Object{$_ -in $userSKUs} | Select-Object -Unique
+                    $userSKUs_optimizable = Compare-Object -ReferenceObject $userSKUs -DifferenceObject $comparison_replaceableOrganization -ExcludeDifferent -IncludeEqual | ForEach-Object{$superiorSKU = $_.InputObject; $superiorSKUs_organization.Keys | Where-Object{$superiorSKUs_organization[$_] -contains $superiorSKU}} | Where-Object{$_ -in $userSKUs} | Sort-Object -Unique
                 }
                 else {
                     $userSKUs_optimizable = $null
                 }
                 # Identify removable SKUs, based on user-level calculations
                 $skuid_enabledPlans = @{}
-                foreach ($skuid in $user.licenseAssignmentStates.skuid | Where-Object{$organizationSKUs.skuId -contains $_} | Select-Object -Unique) {
+                foreach ($skuid in $user.licenseAssignmentStates.skuid | Where-Object{$organizationSKUs.skuId -contains $_} | Sort-Object -Unique) {
                     if (-not $skuid_enabledPlans.ContainsKey($skuid)) {
                         $skuid_enabledPlans.Add($skuid, [System.Collections.Generic.List[guid]]::new())
                     }
@@ -822,7 +822,7 @@ function Get-AzureADLicenseStatus {
                     }
                 }
                 if ($null -ne ($comparison_replaceableUser = $userSKUs | Where-Object{$_ -in $superiorSKUs_user.Keys} | ForEach-Object{$superiorSKUs_user[$_]})) {
-                    $userSKUs_removable = Compare-Object -ReferenceObject $userSKUs -DifferenceObject $comparison_replaceableUser -ExcludeDifferent -IncludeEqual | ForEach-Object{$superiorSKU = $_.InputObject; $superiorSKUs_user.Keys | Where-Object{$superiorSKUs_user[$_] -contains $superiorSKU}} | Where-Object{$_ -in $userSKUs} | Select-Object -Unique
+                    $userSKUs_removable = Compare-Object -ReferenceObject $userSKUs -DifferenceObject $comparison_replaceableUser -ExcludeDifferent -IncludeEqual | ForEach-Object{$superiorSKU = $_.InputObject; $superiorSKUs_user.Keys | Where-Object{$superiorSKUs_user[$_] -contains $superiorSKU}} | Where-Object{$_ -in $userSKUs} | Sort-Object -Unique
                 }
                 else {
                     $userSKUs_removable = $null
@@ -1183,7 +1183,7 @@ function Get-AzureADLicenseStatus {
                 else {
                     $AADP1Licenses = 0
                 }
-                $neededCount = @($AADP1Users | Select-Object -Unique).Count
+                $neededCount = @($AADP1Users | Sort-Object -Unique).Count
                 Write-Message "Found $neededCount needed, $AADP1Licenses enabled AADP1 licenses"
                 if ($AADP1Licenses -lt $neededCount) {
                     Add-Result -PlanName 'Azure Active Directory Premium P1' -EnabledCount $AADP1Licenses -NeededCount $neededCount
@@ -1196,14 +1196,14 @@ function Get-AzureADLicenseStatus {
                 else {
                     $AADP2Licenses = 0
                 }
-                $neededCount = @($AADP2Users | Select-Object -Unique).Count
+                $neededCount = @($AADP2Users | Sort-Object -Unique).Count
                 Write-Message "Found $neededCount needed, $AADP2Licenses enabled AADP2 licenses"
                 if ($AADP2Licenses -lt $neededCount) {
                     Add-Result -PlanName 'Azure Active Directory Premium P2' -EnabledCount $AADP2Licenses -NeededCount $neededCount
                 }
             }
             if ($ATPUsers.Count -gt 0) {
-                $neededCount = @($ATPUsers | Select-Object -Unique).Count
+                $neededCount = @($ATPUsers | Sort-Object -Unique).Count
                 switch ($ATPvariant) {
                     'DfOP1' {
                         $ATPSKUs = @($organizationSKUs | Where-Object{@($_.servicePlans.servicePlanId) -contains 'f20fedf3-f3c3-43c3-8267-2bfdd51c0939'})
@@ -1230,7 +1230,7 @@ function Get-AzureADLicenseStatus {
                 else {
                     $IntuneDeviceLicenses = 0
                 }
-                $neededCount = @($IntuneDevices | Select-Object -Unique).Count
+                $neededCount = @($IntuneDevices | Sort-Object -Unique).Count
                 Write-Message "Found $neededCount needed, $IntuneDeviceLicenses enabled Intune Device licenses"
                 if ($IntuneDeviceLicenses -lt $neededCount) {
                     Add-Result -PlanName 'Intune Device' -EnabledCount $IntuneDeviceLicenses -NeededCount $neededCount
@@ -1652,6 +1652,6 @@ function Get-AzureADLicenseStatus {
         }
         #endregion
 
-        Disconnect-MgGraph | Out-Null
+        Disconnect-MgGraph > $null
     }
 }
