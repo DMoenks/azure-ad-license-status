@@ -444,88 +444,10 @@ $EXOTypes_user = @(
 # Graph
 $pageSize = 500
 $reportDays = 180
-$timespanStart = [System.DayOfWeek]::Monday
-$timespanEnd = [System.DayOfWeek]::Friday
 #endregion
 
 function Get-AzureADLicenseStatus {
-    <#
-    .SYNOPSIS
-    Creates an Azure AD license report based on license assignments and consumption
-    .DESCRIPTION
-    This function is meant to conquer side-effects of semi-automatic license assignments for Microsoft services in Azure AD, i.e. the combination of group-based licensing with manual group membership management, by regularly reporting both on the amount of available licenses per SKU and any conflicting license assignments per user account. This allows for somewhat easier license management without either implementing a full-fledged software asset management solution or hiring a licensing service provider.
-
-    SKU IDs and names are in accordance with https://learn.microsoft.com/azure/active-directory/enterprise-users/licensing-service-plan-reference
-    .PARAMETER DirectoryID
-    Specifies the directory to connect to
-    .PARAMETER ApplicationID
-    Specifies the application in target directory to authenticate with
-    .PARAMETER SubscriptionID
-    Specifies the subscription in target directory to access
-    .PARAMETER KeyVaultName
-    Specifies the key vault in target subscription to access
-    .PARAMETER CertificateName
-    Specifies the certificate name in target key vault to use for authentication
-    .PARAMETER Certificate
-    Specifies the certificate to use for authentication
-    .PARAMETER CertificateThumbprint
-    Specifies the certificate thumbprint in local certificate store to use for authentication
-    .PARAMETER SenderAddress
-    Specifies the sender address to be used for report delivery
-    .PARAMETER RecipientAddresses_normal
-    Specifies the recipient addresses to be used for report delivery
-    .PARAMETER RecipientAddresses_critical
-    Specifies the additional recipient addresses to be used for report delivery in critical cases
-    .PARAMETER SKUIgnoreThreshold
-    Specifies the minimum enabled license threshold for SKUs to be considered for the report, e.g. to ignore SKUs purchased for testing purposes or from trials
-    .PARAMETER SKUPercentageThreshold_normal
-    Specifies the minimum available license percentage threshold for SKUs to be included in the report
-    .PARAMETER SKUTotalThreshold_normal
-    Specifies the minimum available license amount threshold for SKUs to be included in the report
-    .PARAMETER SKUPercentageThreshold_important
-    Specifies the minimum available license percentage threshold for SKUs to be included in the report
-    .PARAMETER SKUTotalThreshold_important
-    Specifies the minimum available license amount threshold for SKUs to be included in the report
-    .PARAMETER SKUWarningThreshold_basic
-    Specifies the warning percentage threshold to be used during report creation for basic checkups, should be higher than the value provided for the parameter 'SKUCriticalThreshold_basic'
-    .PARAMETER SKUCriticalThreshold_basic
-    Specifies the critical percentage threshold to be used during report creation for basic checkups, should be lower than the value provided for the parameter 'SKUWarningThreshold_basic'
-    .PARAMETER SKUWarningThreshold_advanced
-    Specifies the warning percentage threshold to be used during report creation for advanced checkups, should be higher than the value provided for the parameter 'SKUCriticalThreshold_advanced'
-    .PARAMETER SKUCriticalThreshold_advanced
-    Specifies the critical percentage threshold to be used during report creation for advanced checkups, should be lower than the value provided for the parameter 'SKUWarningThreshold_advanced'
-    .PARAMETER ImportantSKUs
-    Specifies the SKUs which are deemed important, so different thresholds are used for calculation
-    .PARAMETER InterchangeableSKUs
-    Specifies a list of SKUs which are deemed interchangeable, e.g Office 365 E1 and Office 365 E3
-    .PARAMETER PreferableSKUs
-    Specifies a list of SKUs which are deemed preferable based on their provided ruleset, relies on the paramater 'InterchangeableSKUs' to calculate replaceable SKUs
-    .PARAMETER SKUPrices
-    Specifies a list of SKUs with their prices to calculate potential savings during user checkups
-    .PARAMETER AttachmentFormat
-    Specifies a format for user results attached to the report
-    .PARAMETER LicensingURL
-    Specifies a licensing portal URL to be linked in the report, refers to Microsoft's Volume Licensing Service Center by default
-    .PARAMETER AdvancedCheckups
-    Specifies if advanced license checkups should be run
-    ATTENTION: Advanced checkups require additional access permissions and might increase the checkup duration
-    .EXAMPLE
-    Get-AzureADLicenseStatus -DirectoryID '00000000-0000-0000-0000-000000000000' -ApplicationID '00000000-0000-0000-0000-000000000000' -CertificateThumbprint 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' -SenderAddress 'sender@example.com' -RecipientAddresses_normal @('recipient_1@example.com', 'recipient_2@example.com')
-
-    Prepares a status report with default values by using only necessary parameters for authentication and report delivery
-    .EXAMPLE
-    Get-AzureADLicenseStatus -DirectoryID '00000000-0000-0000-0000-000000000000' -ApplicationID '00000000-0000-0000-0000-000000000000' -CertificateThumbprint 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' -SenderAddress 'sender@example.com' -RecipientAddresses_normal @('recipient_1@example.com', 'recipient_2@example.com') -RecipientAddresses_critical @('recipient_3@example.com', 'recipient_4@example.com') -SKUPercentageThreshold_normal 1 -SKUTotalThreshold_normal 100 -SKUPercentageThreshold_important 1 -SKUTotalThreshold_important 500
-
-    Prepares a status report with customized thresholds for larger organizations and additional recipients for when license counts reach critical levels
-    .EXAMPLE
-    Get-AzureADLicenseStatus -DirectoryID '00000000-0000-0000-0000-000000000000' -ApplicationID '00000000-0000-0000-0000-000000000000' -SubscriptionID '00000000-0000-0000-0000-000000000000' -KeyVaultName 'MyKeyVault' -CertificateName 'MyCertificate' -SenderAddress 'sender@example.com' -RecipientAddresses_normal @('recipient_1@example.com', 'recipient_2@example.com') -RecipientAddresses_critical @('recipient_3@example.com', 'recipient_4@example.com') -SKUPercentageThreshold_normal 1 -SKUTotalThreshold_normal 100 -SKUPercentageThreshold_important 1 -SKUTotalThreshold_important 500 -ImportantSKUs @('18181a46-0d4e-45cd-891e-60aabd171b4e', '6fd2c87f-b296-42f0-b197-1e91e994b900') -InterchangeableSKUs @('4b585984-651b-448a-9e53-3b10f069cf7f', '18181a46-0d4e-45cd-891e-60aabd171b4e', '6fd2c87f-b296-42f0-b197-1e91e994b900', 'c7df2760-2c81-4ef7-b578-5b5392b571df') -AdvancedCheckups
-
-    Prepares a status report by using an Azure certificate for automation purposes, specifying both important and interchangeable SKUs and activating advanced checkups
-    .EXAMPLE
-    Get-AzureADLicenseStatus -DirectoryID '00000000-0000-0000-0000-000000000000' -ApplicationID '00000000-0000-0000-0000-000000000000' -SubscriptionID '00000000-0000-0000-0000-000000000000' -KeyVaultName 'MyKeyVault' -CertificateName 'MyCertificate' -SenderAddress 'sender@example.com' -RecipientAddresses_normal @('recipient_1@example.com', 'recipient_2@example.com') -RecipientAddresses_critical @('recipient_3@example.com', 'recipient_4@example.com') -SKUPercentageThreshold_normal 1 -SKUTotalThreshold_normal 100 -SKUPercentageThreshold_important 1 -SKUTotalThreshold_important 500 -ImportantSKUs @('18181a46-0d4e-45cd-891e-60aabd171b4e', '6fd2c87f-b296-42f0-b197-1e91e994b900') -InterchangeableSKUs @('4b585984-651b-448a-9e53-3b10f069cf7f', '18181a46-0d4e-45cd-891e-60aabd171b4e', '6fd2c87f-b296-42f0-b197-1e91e994b900', 'c7df2760-2c81-4ef7-b578-5b5392b571df') -PreferableSKUs @([SKURule]@{OneDriveGBUsedLessThan = 1; MailboxGBUsedLessThan = 1; MailboxHasArchive = 'False'; WindowsAppUsed = 'False'; MacAppUsed = 'False'; SKUID = '4b585984-651b-448a-9e53-3b10f069cf7f'}) -SKUPrices @{'4b585984-651b-448a-9e53-3b10f069cf7f' = 4.0; '18181a46-0d4e-45cd-891e-60aabd171b4e' = 10.0; '6fd2c87f-b296-42f0-b197-1e91e994b900' = 23.0; 'c7df2760-2c81-4ef7-b578-5b5392b571df' = 38.0} -AdvancedCheckups
-
-    Prepares a status report by using an Azure certificate for automation purposes, specifying important, interchangeable and preferable SKUs with their prices and activating advanced checkups
-    #>
+    # .EXTERNALHELP azure-ad-license-status.psm1-help.xml
 
     [CmdletBinding(PositionalBinding = $false)]
     param (

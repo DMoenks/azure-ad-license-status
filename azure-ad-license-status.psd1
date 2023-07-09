@@ -79,7 +79,7 @@
     # ModuleList = @()
 
     # List of all files packaged with this module
-    FileList = 'azure-ad-license-status.psd1', 'azure-ad-license-status.psm1'
+    FileList = 'azure-ad-license-status.psd1', 'azure-ad-license-status.psm1', 'azure-ad-license-status.psm1-help.xml'
 
     # Private data to pass to the module specified in RootModule/ModuleToProcess. This may also contain a PSData hashtable with additional module metadata used by PowerShell.
     PrivateData = @{

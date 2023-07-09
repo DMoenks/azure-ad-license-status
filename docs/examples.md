@@ -123,12 +123,28 @@ $interchangeableSKUs = @(
 )
 $preferableSKUs = @(
     [SKURule]@{
-        OneDriveGBUsedLessThan = 1
-        MailboxGBUsedLessThan = 1
+        SKUID = [guid]::Empty
+        AccountGuest = 'True'
+    }
+    [SKURule]@{
+        SKUID = [guid]::Empty
+        CreatedEarlierThan = [datetime]::Now.AddYears(-2)
+        LastActiveEarlierThan = [datetime]::Now.AddYears(-2)
+    }
+    [SKURule]@{
+        SKUID = '4b585984-651b-448a-9e53-3b10f069cf7f'
+        OneDriveGBUsedLessThan = 2
+        MailboxGBUsedLessThan = 2
         MailboxHasArchive = 'False'
         WindowsAppUsed = 'False'
         MacAppUsed = 'False'
-        SKUID = '4b585984-651b-448a-9e53-3b10f069cf7f'
+    }
+    [SKURule]@{
+        SKUID = '18181a46-0d4e-45cd-891e-60aabd171b4e'
+        MailboxGBUsedLessThan = 50
+        MailboxHasArchive = 'False'
+        WindowsAppUsed = 'False'
+        MacAppUsed = 'False'
     }
 )
 $skuPrices = @(

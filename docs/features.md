@@ -66,3 +66,5 @@ Check for organization's preferable licenses, based on multiple criteria:
 &#x2714; Whether a user has used Windows/Mac/mobile/web versions of Office applications
 
 &#x2716; Whether a user has enrolled a device in Intune
+
+> DISCLAIMER: Multiple of the criteria above rely on usage reports also available in [Microsoft 365 admin center](https://admin.microsoft.com/Adminportal/Home#/reportsUsage) and therefore depend on their accuracy.
