@@ -396,9 +396,9 @@ Below example shows how a report might look like, although the example might dif
                 <td>1</td>
                 <td>N/A</td>
                 <td>-</td>
+                <td>True</td>
                 <td>-</td>
                 <td>-</td>
-                <td>&lt;2022&#8209;06&#8209;23</td>
                 <td>-</td>
                 <td>-</td>
                 <td>-</td>
@@ -409,28 +409,28 @@ Below example shows how a report might look like, although the example might dif
             </tr>
             <tr>
                 <td>2</td>
-                <td>Microsoft 365 F3</td>
+                <td>N/A</td>
+                <td>-</td>
+                <td>-</td>
+                <td>&lt;2021-07-01</td>
+                <td>&lt;2021-07-01</td>
                 <td>-</td>
                 <td>-</td>
                 <td>-</td>
                 <td>-</td>
-                <td>&lt;1&nbsp;GB</td>
-                <td>&lt;1&nbsp;GB</td>
-                <td>FALSE</td>
-                <td>FALSE</td>
-                <td>FALSE</td>
+                <td>-</td>
                 <td>-</td>
                 <td>-</td>
             </tr>
             <tr>
                 <td>3</td>
-                <td>Office 365 E1</td>
+                <td>Office 365 F3</td>
                 <td>-</td>
                 <td>-</td>
                 <td>-</td>
                 <td>-</td>
-                <td>&lt;1000&nbsp;GB</td>
-                <td>&lt;50&nbsp;GB</td>
+                <td>&lt;2&nbsp;GB</td>
+                <td>&lt;2&nbsp;GB</td>
                 <td>FALSE</td>
                 <td>FALSE</td>
                 <td>FALSE</td>
@@ -439,16 +439,16 @@ Below example shows how a report might look like, although the example might dif
             </tr>
             <tr>
                 <td>4</td>
-                <td>Office 365 E3</td>
+                <td>Office 365 E1</td>
                 <td>-</td>
                 <td>-</td>
                 <td>-</td>
                 <td>-</td>
                 <td>-</td>
-                <td>-</td>
-                <td>-</td>
-                <td>-</td>
-                <td>-</td>
+                <td>&lt;50&nbsp;GB</td>
+                <td>FALSE</td>
+                <td>FALSE</td>
+                <td>FALSE</td>
                 <td>-</td>
                 <td>-</td>
             </tr>

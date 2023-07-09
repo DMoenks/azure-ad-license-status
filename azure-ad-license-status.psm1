@@ -78,6 +78,8 @@ class SKURule {
 
 #region: Functions
 function Initialize-Module {
+    [OutputType([void])]
+
     $script:nestingLevel = 0
     $script:outputs = [System.Text.StringBuilder]::new()
     $script:results = @{}
@@ -88,6 +90,7 @@ function Initialize-Module {
 }
 
 function Write-Message {
+    [OutputType([void])]
     param (
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
@@ -112,6 +115,7 @@ function Write-Message {
 }
 
 function Add-Output {
+    [OutputType([void])]
     param (
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
@@ -122,11 +126,12 @@ function Add-Output {
     $nestingLevel++
     Write-Message 'Add-Output' -Type Verbose
     # Processing
-    $outputs.AppendLine($Output) > $null
+    $outputs.AppendLine($Output) | Out-Null
     $nestingLevel--
 }
 
 function Add-Result {
+    [OutputType([void])]
     param (
         [Parameter(Mandatory = $true, ParameterSetName = 'SKU_Basic')]
         [ValidateNotNullOrEmpty()]
@@ -450,6 +455,7 @@ function Get-AzureADLicenseStatus {
     # .EXTERNALHELP azure-ad-license-status.psm1-help.xml
 
     [CmdletBinding(PositionalBinding = $false)]
+    [OutputType([void])]
     param (
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
@@ -521,13 +527,13 @@ function Get-AzureADLicenseStatus {
                 $azureCertificateSecret = Get-AzKeyVaultSecret -VaultName $KeyVaultName -Name $CertificateName -AsPlainText
                 $azureCertificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new([Convert]::FromBase64String($azureCertificateSecret))
                 Disconnect-AzAccount
-                Connect-MgGraph -Certificate $azureCertificate -TenantId $DirectoryID -ClientId $ApplicationID -ErrorAction Stop > $null
+                Connect-MgGraph -Certificate $azureCertificate -TenantId $DirectoryID -ClientId $ApplicationID -ErrorAction Stop | Out-Null
             }
             'LocalCertificate' {
-                Connect-MgGraph -Certificate $Certificate -TenantId $DirectoryID -ClientId $ApplicationID -ErrorAction Stop > $null
+                Connect-MgGraph -Certificate $Certificate -TenantId $DirectoryID -ClientId $ApplicationID -ErrorAction Stop | Out-Null
             }
             'LocalCertificateThumbprint' {
-                Connect-MgGraph -CertificateThumbprint $CertificateThumbprint -TenantId $DirectoryID -ClientId $ApplicationID -ErrorAction Stop > $null
+                Connect-MgGraph -CertificateThumbprint $CertificateThumbprint -TenantId $DirectoryID -ClientId $ApplicationID -ErrorAction Stop | Out-Null
             }
         }
         $graphAuthentication = $true
@@ -589,7 +595,7 @@ function Get-AzureADLicenseStatus {
             foreach ($entry in Import-Csv "$env:TEMP\appUsage.csv" | Select-Object -Property 'User Principal Name', 'Last Activity Date', 'Windows', 'Mac', 'Mobile', 'Web') {
                 if (-not $appUsage.ContainsKey($entry.'User Principal Name')) {
                     $lastActivityDate = [datetime]::MinValue
-                    [datetime]::TryParse($entry.'Last Activity Date', [ref]$lastActivityDate) > $null
+                    [datetime]::TryParse($entry.'Last Activity Date', [ref]$lastActivityDate) | Out-Null
                     if ($entry.'Windows' -eq 'Yes') {
                         $windowsApp = $true
                     }
@@ -630,7 +636,7 @@ function Get-AzureADLicenseStatus {
             foreach ($entry in Import-Csv "$env:TEMP\mailboxUsage.csv" | Select-Object -Property 'User Principal Name', 'Is Deleted', 'Last Activity Date', 'Storage Used (Byte)', 'Has Archive' | Where-Object{$_.'Is Deleted' -eq 'False'}) {
                 if (-not $mailboxUsage.ContainsKey($entry.'User Principal Name')) {
                     $lastActivityDate = [datetime]::MinValue
-                    [datetime]::TryParse($entry.'Last Activity Date', [ref]$lastActivityDate) > $null
+                    [datetime]::TryParse($entry.'Last Activity Date', [ref]$lastActivityDate) | Out-Null
                     $storageUsed = [decimal]($entry.'Storage Used (Byte)' / [System.Math]::Pow(1000, 3))
                     $hasArchive = [bool]::Parse($entry.'Has Archive')
                     $mailboxUsage.Add($entry.'User Principal Name', @{
@@ -647,7 +653,7 @@ function Get-AzureADLicenseStatus {
             foreach ($entry in Import-Csv "$env:TEMP\driveUsage.csv" | Select-Object -Property 'Owner Principal Name', 'Is Deleted', 'Last Activity Date', 'Storage Used (Byte)' | Where-Object{$_.'Is Deleted' -eq 'False'}) {
                 if (-not $driveUsage.ContainsKey($entry.'Owner Principal Name')) {
                     $lastActivityDate = [datetime]::MinValue
-                    [datetime]::TryParse($entry.'Last Activity Date', [ref]$lastActivityDate) > $null
+                    [datetime]::TryParse($entry.'Last Activity Date', [ref]$lastActivityDate) | Out-Null
                     $storageUsed = [decimal]($entry.'Storage Used (Byte)' / [System.Math]::Pow(1000, 3))
                     $driveUsage.Add($entry.'Owner Principal Name', @{
                         'LastActivityDate' = $lastActivityDate
@@ -1574,6 +1580,6 @@ function Get-AzureADLicenseStatus {
         }
         #endregion
 
-        Disconnect-MgGraph > $null
+        Disconnect-MgGraph | Out-Null
     }
 }
