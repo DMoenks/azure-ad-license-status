@@ -233,7 +233,7 @@ function Get-AADGroupMember {
 }
 
 function Get-EXOGroupMember {
-    [OutputType([pscustomobject[]])]
+    [OutputType([psobject[]])]
     param (
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
@@ -244,7 +244,7 @@ function Get-EXOGroupMember {
     $nestingLevel++
     Write-Message 'Get-EXOGroupMember' -Type Verbose
     # Processing
-    $groupMembers = [System.Collections.Generic.List[pscustomobject]]::new()
+    $groupMembers = [System.Collections.Generic.List[psobject]]::new()
     foreach ($groupID in $GroupIDs) {
         if ($null -ne ($group = [pscustomobject](Get-EXORecipient $groupID.Guid -RecipientTypeDetails $EXOTypes_group -Properties $EXOProperties) | Select-Object -Property $EXOProperties)) {
             switch ($group.RecipientTypeDetails) {
@@ -274,7 +274,7 @@ function Get-EXOGroupMember {
 }
 
 function Resolve-ATPRecipient {
-    [OutputType([pscustomobject[]])]
+    [OutputType([psobject[]])]
     param (
         [Parameter(Mandatory = $true)]
         [AllowNull()]
@@ -292,9 +292,9 @@ function Resolve-ATPRecipient {
     Write-Message 'Resolve-ATPRecipient' -Type Verbose
     # Processing
     $categoryCount = 0
-    $affectedAsUser = [System.Collections.Generic.List[pscustomobject]]::new()
-    $affectedAsGroup = [System.Collections.Generic.List[pscustomobject]]::new()
-    $affectedAsDomain = [System.Collections.Generic.List[pscustomobject]]::new()
+    $affectedAsUser = [System.Collections.Generic.List[psobject]]::new()
+    $affectedAsGroup = [System.Collections.Generic.List[psobject]]::new()
+    $affectedAsDomain = [System.Collections.Generic.List[psobject]]::new()
     if ($null -ne $Users) {
         $categoryCount++
         if ($null -ne ($recipients = [pscustomobject[]]@(Get-EXORecipient -RecipientTypeDetails $EXOTypes_user -Properties $EXOProperties -ResultSize Unlimited) | Select-Object -Property $EXOProperties | Where-Object{$_.PrimarySmtpAddress -in $Users})) {
@@ -328,12 +328,12 @@ function Resolve-ATPRecipient {
     else {
         Write-Message 'Found 0 recipients by combination' -Type Verbose
         $nestingLevel--
-        Write-Output @([pscustomobject[]]::new(0)) -NoEnumerate
+        Write-Output @([psobject[]]::new(0)) -NoEnumerate
     }
 }
 
 function Get-ATPRecipient {
-    [OutputType([pscustomobject[]])]
+    [OutputType([psobject[]])]
     param (
         [Parameter(Mandatory = $true)]
         [AllowNull()]
@@ -382,7 +382,7 @@ function Get-ATPRecipient {
     }
     Write-Message "Found $($excludedRecipients.Count) excluded recipients" -Type Verbose
     Write-Message 'Checking affected recipients' -Type Verbose
-    $affectedRecipients = [System.Collections.Generic.List[pscustomobject]]::new()
+    $affectedRecipients = [System.Collections.Generic.List[psobject]]::new()
     if ($null -ne ($affectedRecipientComparison = Compare-Object -ReferenceObject $includedRecipients -DifferenceObject $excludedRecipients)) {
         if ($null -ne ($affectedRecipientResults = $affectedRecipientComparison | Where-Object{$_.SideIndicator -eq '<='})) {
             $affectedRecipients.AddRange([pscustomobject[]]@($affectedRecipientResults.InputObject))

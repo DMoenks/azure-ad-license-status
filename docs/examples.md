@@ -412,8 +412,8 @@ Below example shows how a report might look like, although the example might dif
                 <td>N/A</td>
                 <td>-</td>
                 <td>-</td>
-                <td>&lt;2021-07-01</td>
-                <td>&lt;2021-07-01</td>
+                <td>&lt;2021&#8209;07&#8209;01</td>
+                <td>&lt;2021&#8209;07&#8209;01</td>
                 <td>-</td>
                 <td>-</td>
                 <td>-</td>
