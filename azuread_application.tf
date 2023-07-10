@@ -11,10 +11,6 @@ resource "azuread_application" "application" {
   required_resource_access {
     resource_app_id = data.azuread_service_principal.service_principal_graph.application_id
     resource_access {
-      id   = data.azuread_service_principal.service_principal_graph.app_role_ids["AuditLog.Read.All"]
-      type = "Role"
-    }
-    resource_access {
       id   = data.azuread_service_principal.service_principal_graph.app_role_ids["DeviceManagementManagedDevices.Read.All"]
       type = "Role"
     }
@@ -42,12 +38,6 @@ resource "azuread_application" "application" {
       type = "Role"
     }
   }
-}
-
-resource "azuread_app_role_assignment" "app_role_assignment_graph_auditlog_read_all" {
-  principal_object_id = azuread_service_principal.service_principal_azure_ad_license_status.object_id
-  resource_object_id  = data.azuread_service_principal.service_principal_graph.object_id
-  app_role_id         = data.azuread_service_principal.service_principal_graph.app_role_ids["AuditLog.Read.All"]
 }
 
 resource "azuread_app_role_assignment" "app_role_assignment_graph_devicemanagementmanageddevices_read_all" {

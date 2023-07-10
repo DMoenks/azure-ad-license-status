@@ -27,9 +27,7 @@ Check for license need based on Azure AD and Office feature information:
 
 &#x2714; _Azure Active Directory Premium P1/P2_ based on users covered by Conditional Access
 
-> DISCLAIMER: For performance reasons, Conditional Access coverage calculation only considers two separate 5-day time slots. The first being the most recent full Monday-Friday slot, the second being the same slot two weeks earlier. Although this should result in a mostly accurate coverage calculation, taking at least 4-day time slots into account for each time zone, it will inevitably disregard users with irregular access patterns.
-
-&#x2714; _Azure Active Directory Premium P2_ based on users in scope of Privileged Identity Management
+&#x2714; _Azure Active Directory Premium P2_ based on users eligible for Privileged Identity Management
 
 &#x2714; _Defender for Office 365 P1/P2_ based on protected Exchange Online recipients
 
@@ -53,7 +51,9 @@ Check for license need based on Azure AD and Office feature information:
 
 Check for organization's preferable licenses, based on multiple criteria:
 
-&#x2714;  Whether a user is enabled
+&#x2714; Whether a user is enabled
+
+&#x2714; Whether a user is a guest
 
 &#x2714; When a user was created
 
@@ -66,3 +66,5 @@ Check for organization's preferable licenses, based on multiple criteria:
 &#x2714; Whether a user has used Windows/Mac/mobile/web versions of Office applications
 
 &#x2716; Whether a user has enrolled a device in Intune
+
+> DISCLAIMER: Multiple of the criteria above rely on [usage reports](https://admin.microsoft.com/Adminportal/Home#/reportsUsage) also available in Microsoft 365 admin center and therefore depend on the usage reports' accuracy.

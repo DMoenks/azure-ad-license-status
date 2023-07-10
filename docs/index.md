@@ -13,4 +13,4 @@ The main motivation for this report was to conquer side-effects of manual or sem
 
 > DISCLAIMER: The report can merely aid in complying with license terms and agreements. It cannot and never will lower or replace the liability to actually comply with any default or individually negotiated license terms and agreements applying to your organization.
 
-> HINT: Most of the requirements and preparations for advanced Azure execution mentioned below can be deployed by using the provided Terraform module, the exception being an Exchange Online application access policy.
+The report has surpassed its initially intended purpose in a few directions by now, e.g. by taking a specific set of soft-licensed products into account, i.e. products that only require licenses to be available instead of them being assigned to users, such as Conditional Access. For a full overview, please refer to the list of [features](/azure-ad-license-status/features).

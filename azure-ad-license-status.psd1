@@ -3,7 +3,7 @@
     RootModule = 'azure-ad-license-status.psm1'
 
     # Version number of this module.
-    ModuleVersion = '1.3.0'
+    ModuleVersion = '1.3.1'
 
     # Supported PSEditions
     # CompatiblePSEditions = @()
@@ -79,7 +79,7 @@
     # ModuleList = @()
 
     # List of all files packaged with this module
-    FileList = 'azure-ad-license-status.psd1', 'azure-ad-license-status.psm1'
+    FileList = 'azure-ad-license-status.psd1', 'azure-ad-license-status.psm1', 'azure-ad-license-status.psm1-help.xml'
 
     # Private data to pass to the module specified in RootModule/ModuleToProcess. This may also contain a PSData hashtable with additional module metadata used by PowerShell.
     PrivateData = @{
@@ -93,7 +93,7 @@
             LicenseUri = 'https://github.com/DMoenks/azure-ad-license-status/blob/main/LICENSE'
 
             # A URL to the main website for this project.
-            ProjectUri = 'https://github.com/DMoenks/azure-ad-license-status'
+            ProjectUri = 'https://dmoenks.github.io/azure-ad-license-status/'
 
             # A URL to an icon representing this module.
             # IconUri = ''
