@@ -67,4 +67,4 @@ Check for organization's preferable licenses, based on multiple criteria:
 
 &#x2716; Whether a user has enrolled a device in Intune
 
-> DISCLAIMER: Multiple of the criteria above rely on [usage reports](https://admin.microsoft.com/Adminportal/Home#/reportsUsage) also available in Microsoft 365 admin center and therefore depend on the usage reports' accuracy.
+> DISCLAIMER: Multiple of the criteria above rely on [usage reports](https://admin.microsoft.com/Adminportal/Home#/reportsUsage) available in Microsoft 365 admin center and therefore depend on those reports' accuracy.
