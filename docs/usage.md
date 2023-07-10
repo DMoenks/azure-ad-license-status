@@ -9,68 +9,68 @@ permalink: /usage
 
 ## 5.1 Parameters
 
-- DirectoryID <System.Guid>  
+- DirectoryID &lt;System.Guid&gt;  
   Specifies the directory to connect to
-- ApplicationID <System.Guid>  
+- ApplicationID &lt;System.Guid&gt;  
   Specifies the application in target directory to authenticate with
-- SubscriptionID <System.Guid>  
+- SubscriptionID &lt;System.Guid&gt;  
   Specifies the subscription in target directory to access
-- KeyVaultName <System.String>  
+- KeyVaultName &lt;System.String&gt;  
   Specifies the key vault in target subscription to access
-- CertificateName <System.String>  
+- CertificateName &lt;System.String&gt;  
   Specifies the certificate name in target key vault to use for authentication
-- Certificate <System.Security.Cryptography.X509Certificates.X509Certificate2>  
+- Certificate &lt;System.Security.Cryptography.X509Certificates.X509Certificate2&gt;  
   Specifies the certificate to use for authentication
-- CertificateThumbprint <System.String>  
+- CertificateThumbprint &lt;System.String&gt;  
   Specifies the certificate thumbprint in local certificate store to use for authentication
-- SenderAddress <System.String>  
+- SenderAddress &lt;System.String&gt;  
   Specifies the sender address to be used for report delivery
-- RecipientAddresses_normal <System.String[]>  
+- RecipientAddresses_normal &lt;System.String[]&gt;  
   Specifies the recipient addresses to be used for report delivery
-- RecipientAddresses_critical <System.String[]>  
+- RecipientAddresses_critical &lt;System.String[]&gt;  
   Specifies the additional recipient addresses to be used for report delivery in critical cases
-- SKUIgnoreThreshold <System.UInt32>  
+- SKUIgnoreThreshold &lt;System.UInt32&gt;  
   Specifies the minimum enabled license threshold for SKUs to be considered for the report, e.g. to ignore SKUs purchased for testing purposes or from trials  
   default: 10
-- SKUPercentageThreshold_normal <System.UInt16>  
+- SKUPercentageThreshold_normal &lt;System.UInt16&gt;  
   Specifies the minimum available license percentage threshold for SKUs to be included in the report  
   default: 5
-- SKUTotalThreshold_normal <System.UInt32>  
+- SKUTotalThreshold_normal &lt;System.UInt32&gt;  
   Specifies the minimum available license amount threshold for SKUs to be included in the report  
-  default: 10 <System.UInt16>
-- SKUPercentageThreshold_important  
+  default: 10
+- SKUPercentageThreshold_important &lt;System.UInt16&gt;  
   Specifies the minimum available license percentage threshold for SKUs to be included in the report  
   default: 5
-- SKUTotalThreshold_important <System.UInt32>  
+- SKUTotalThreshold_important &lt;System.UInt32&gt;  
   Specifies the minimum available license amount threshold for SKUs to be included in the report  
   default: 50
-- SKUWarningThreshold_basic <System.UInt16>  
+- SKUWarningThreshold_basic &lt;System.UInt16&gt;  
   Specifies the warning percentage threshold to be used during report creation for basic checkups, should be higher than the value provided for the parameter 'SKUCriticalThreshold_basic'  
   default: 80
-- SKUCriticalThreshold_basic <System.UInt16>  
+- SKUCriticalThreshold_basic &lt;System.UInt16&gt;  
   Specifies the critical percentage threshold to be used during report creation for basic checkups, should be lower than the value provided for the parameter 'SKUWarningThreshold_basic'  
   default: 20
-- SKUWarningThreshold_advanced <System.UInt16>  
+- SKUWarningThreshold_advanced &lt;System.UInt16&gt;  
   Specifies the warning percentage threshold to be used during report creation for advanced checkups, should be higher than the value provided for the parameter 'SKUCriticalThreshold_advanced'  
   default: 99
-- SKUCriticalThreshold_advanced <System.UInt16>  
+- SKUCriticalThreshold_advanced &lt;System.UInt16&gt;  
   Specifies the critical percentage threshold to be used during report creation for advanced checkups, should be lower than the value provided for the parameter 'SKUWarningThreshold_advanced'  
   default: 95
-- ImportantSKUs <System.Guid[]>  
+- ImportantSKUs &lt;System.Guid[]&gt;  
   Specifies the SKUs which are deemed important, so different thresholds are used for calculation
-- InterchangeableSKUs <System.Guid[]>  
+- InterchangeableSKUs &lt;System.Guid[]&gt;  
   Specifies a list of SKUs which are deemed interchangeable, e.g Office 365 E1 and Office 365 E3
-- PreferableSKUs <SKURule[]>  
+- PreferableSKUs &lt;SKURule[]&gt;  
   Specifies a list of SKUs which are deemed preferable based on their provided ruleset, relies on the parameter 'InterchangeableSKUs' to calculate replaceable SKUs
-- SKUPrices <SKUPrice[]>  
+- SKUPrices &lt;SKUPrice[]&gt;  
   Specifies a list of SKUs with their prices to calculate potential savings during user checkups
-- AttachmentFormat <System.String>  
+- AttachmentFormat &lt;System.String&gt;  
   Specifies a format for user results attached to the report  
   accepts: 'CSV', 'TranslatedCSV', 'JSON'
-- LicensingURL <System.String>  
+- LicensingURL &lt;System.String&gt;  
   Specifies a licensing portal URL to be linked in the report, refers to Microsoft's Volume Licensing Service Center by default  
   default: https://www.microsoft.com/licensing/servicecenter
-- AdvancedCheckups <System.Management.Automation.SwitchParameter>  
+- AdvancedCheckups &lt;System.Management.Automation.SwitchParameter&gt;  
   Specifies if advanced license checkups should be run  
   ATTENTION: Advanced checkups require additional access permissions and might increase the checkup duration
 
@@ -80,65 +80,65 @@ permalink: /usage
 
 #### 5.2.1.1 Properties
 
-- SKUID <System.Guid>
-- Price <System.Decimal>
+- SKUID &lt;System.Guid&gt;
+- Price &lt;System.Decimal&gt;
 
 ### 5.2.2 SKURule
 
 #### 5.2.2.1 Properties
 
-- SKUID <System.Guid>
-- AccountEnabled <System.String>  
+- SKUID &lt;System.Guid&gt;
+- AccountEnabled &lt;System.String&gt;  
   accepts: 'True', 'False', 'Skip'  
   default: [SKURule]::AccountEnabledDefault()
-- AccountGuest <System.String>  
+- AccountGuest &lt;System.String&gt;  
   accepts: 'True', 'False', 'Skip'  
   default: [SKURule]::AccountGuestDefault()
-- CreatedEarlierThan <System.DateTime>  
+- CreatedEarlierThan &lt;System.DateTime&gt;  
   default: [SKURule]::CreatedEarlierThanDefault()
-- LastActiveEarlierThan <System.DateTime>  
+- LastActiveEarlierThan &lt;System.DateTime&gt;  
   default: [SKURule]::LastActiveEarlierThanDefault()
-- OneDriveGBUsedLessThan <System.Decimal>  
+- OneDriveGBUsedLessThan &lt;System.Decimal&gt;  
   default: [SKURule]::OneDriveGBUsedLessThanDefault()
-- MailboxGBUsedLessThan <System.Decimal>  
+- MailboxGBUsedLessThan &lt;System.Decimal&gt;  
   default: [SKURule]::MailboxGBUsedLessThanDefault()
-- MailboxHasArchive <System.String>  
+- MailboxHasArchive &lt;System.String&gt;  
   accepts: 'True', 'False', 'Skip'  
   default: [SKURule]::MailboxHasArchiveDefault()
-- WindowsAppUsed <System.String>  
+- WindowsAppUsed &lt;System.String&gt;  
   accepts: 'True', 'False', 'Skip'  
   default: [SKURule]::WindowsAppUsedDefault()
-- MacAppUsed <System.String>  
+- MacAppUsed &lt;System.String&gt;  
   accepts: 'True', 'False', 'Skip'  
   default: [SKURule]::MacAppUsedDefault()
-- MobileAppUsed <System.String>  
+- MobileAppUsed &lt;System.String&gt;  
   accepts: 'True', 'False', 'Skip'  
   default: [SKURule]::MobileAppUsedDefault()
-- WebAppUsed <System.String>  
+- WebAppUsed &lt;System.String&gt;  
   accepts: 'True', 'False', 'Skip'  
   default: [SKURule]::WebAppUsedDefault()
 
 #### 5.2.2.2 Methods
 
-- AccountEnabledDefault() <System.String>  
+- AccountEnabledDefault() &lt;System.String&gt;  
   returns: 'Skip'
-- AccountGuestDefault() <System.String>  
+- AccountGuestDefault() &lt;System.String&gt;  
   returns: 'Skip'
-- CreatedEarlierThanDefault() <System.DateTime>  
+- CreatedEarlierThanDefault() &lt;System.DateTime&gt;  
   returns: [datetime]::MaxValue
-- LastActiveEarlierThanDefault() <System.DateTime>  
+- LastActiveEarlierThanDefault() &lt;System.DateTime&gt;  
   returns: [datetime]::MaxValue
-- OneDriveGBUsedLessThanDefault() <System.Decimal>  
+- OneDriveGBUsedLessThanDefault() &lt;System.Decimal&gt;  
   returns: [UInt16]::MaxValue
-- MailboxGBUsedLessThanDefault() <System.Decimal>  
+- MailboxGBUsedLessThanDefault() &lt;System.Decimal&gt;  
   returns: [UInt16]::MaxValue
-- MailboxHasArchiveDefault() <System.String>  
+- MailboxHasArchiveDefault() &lt;System.String&gt;  
   returns: 'Skip'
-- WindowsAppUsedDefault() <System.String>  
+- WindowsAppUsedDefault() &lt;System.String&gt;  
   returns: 'Skip'
-- MacAppUsedDefault() <System.String>  
+- MacAppUsedDefault() &lt;System.String&gt;  
   returns: 'Skip'
-- MobileAppUsedDefault() <System.String>  
+- MobileAppUsedDefault() &lt;System.String&gt;  
   returns: 'Skip'
-- WebAppUsedDefault() <System.String>  
+- WebAppUsedDefault() &lt;System.String&gt;  
   returns: 'Skip'
