@@ -3,13 +3,13 @@ layout: default
 permalink: /examples
 ---
 
-[1 Introduction](/azure-ad-license-status/) \| [2 Features](/azure-ad-license-status/features) \| [3 Requirements](/azure-ad-license-status/requirements) \| [4 Preparations](/azure-ad-license-status/preparations) \| [5 Examples](/azure-ad-license-status/examples)
+[1 Introduction](/azure-ad-license-status/) \| [2 Features](/azure-ad-license-status/features) \| [3 Requirements](/azure-ad-license-status/requirements) \| [4 Preparations](/azure-ad-license-status/preparations) \| [5 Usage](/azure-ad-license-status/usage) \| [6 Examples](/azure-ad-license-status/examples)
 
-# 5 Examples
+# 6 Examples
 
-## 5.1 Example calls
+## 6.1 Example calls
 
-### 5.1.1 Basic example with default settings
+### 6.1.1 Basic example with default settings
 
 Prepares a status report with default values by using only necessary parameters for authentication and report delivery
 
@@ -26,7 +26,7 @@ $recipientAddresses_normal = @(
 Get-AzureADLicenseStatus -DirectoryID $directoryID -ApplicationID $applicationID -CertificateThumbprint $certificateThumbprint -SenderAddress $senderAddress -RecipientAddresses_normal $recipientAddresses_normal
 ```
 
-### 5.1.2 Basic example with modified thresholds
+### 6.1.2 Basic example with modified thresholds
 
 Prepares a status report with customized thresholds for larger organizations and additional recipients for when license counts reach critical levels
 
@@ -51,7 +51,7 @@ $skuTotalThreshold_important = 500
 Get-AzureADLicenseStatus -DirectoryID $directoryID -ApplicationID $applicationID -CertificateThumbprint $certificateThumbprint -SenderAddress $senderAddress -RecipientAddresses_normal $recipientAddresses_normal -RecipientAddresses_critical $recipientAddresses_critical -SKUPercentageThreshold_normal $skuPercentageThreshold_normal -SKUTotalThreshold_normal $skuTotalThreshold_normal -SKUPercentageThreshold_important $skuPercentageThreshold_important -SKUTotalThreshold_important $skuTotalThreshold_important
 ```
 
-### 5.1.3 Advanced example
+### 6.1.3 Advanced example
 
 Prepares a status report by using an Azure certificate for automation purposes, specifying both important and interchangeable SKUs and activating advanced checkups
 
@@ -88,7 +88,7 @@ $interchangeableSKUs = @(
 Get-AzureADLicenseStatus -DirectoryID $directoryID -ApplicationID $applicationID -SubscriptionID $subscriptionID -KeyVaultName $keyVaultName -CertificateName $certificateName -SenderAddress $senderAddress -RecipientAddresses_normal $recipientAddresses_normal -RecipientAddresses_critical $recipientAddresses_critical -SKUPercentageThreshold_normal $skuPercentageThreshold_normal -SKUTotalThreshold_normal $skuTotalThreshold_normal -SKUPercentageThreshold_important $skuPercentageThreshold_important -SKUTotalThreshold_important $skuTotalThreshold_important -ImportantSKUs $importantSKUs -InterchangeableSKUs $interchangeableSKUs -AdvancedCheckups
 ```
 
-### 5.1.4 Complete example
+### 6.1.4 Complete example
 
 Prepares a status report by using an Azure certificate for automation purposes, specifying important, interchangeable and preferable SKUs with their prices and activating advanced checkups
 
@@ -169,7 +169,7 @@ $skuPrices = @(
 Get-AzureADLicenseStatus -DirectoryID $directoryID -ApplicationID $applicationID -SubscriptionID $subscriptionID -KeyVaultName $keyVaultName -CertificateName $certificateName -SenderAddress $senderAddress -RecipientAddresses_normal $recipientAddresses_normal -RecipientAddresses_critical $recipientAddresses_critical -SKUPercentageThreshold_normal $skuPercentageThreshold_normal -SKUTotalThreshold_normal $skuTotalThreshold_normal -SKUPercentageThreshold_important $skuPercentageThreshold_important -SKUTotalThreshold_important $skuTotalThreshold_important -ImportantSKUs $importantSKUs -InterchangeableSKUs $interchangeableSKUs -PreferableSKUs $preferableSKUs -SKUPrices $skuPrices -AdvancedCheckups
 ```
 
-## 5.2 Example report
+## 6.2 Example report
 
 Below example shows how a report might look like, although the example might differ from the actual result due to the manual's style settings
 
