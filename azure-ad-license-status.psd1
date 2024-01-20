@@ -3,7 +3,7 @@
     RootModule = 'azure-ad-license-status.psm1'
 
     # Version number of this module.
-    ModuleVersion = '1.3.1'
+    ModuleVersion = '1.3.2'
 
     # Supported PSEditions
     # CompatiblePSEditions = @()
@@ -42,8 +42,8 @@
     # ProcessorArchitecture = ''
 
     # Modules that must be imported into the global environment prior to importing this module
-    RequiredModules = @(@{ModuleName = 'ExchangeOnlineManagement'; GUID = 'b5eced50-afa4-455b-847a-d8fb64140a22'; ModuleVersion = '3.1.0'; },
-                   @{ModuleName = 'Microsoft.Graph.Authentication'; GUID = '883916f2-9184-46ee-b1f8-b6a2fb784cee'; ModuleVersion = '1.27.0'; })
+    RequiredModules = @(@{ModuleName = 'ExchangeOnlineManagement'; GUID = 'b5eced50-afa4-455b-847a-d8fb64140a22'; ModuleVersion = '3.3.0'; },
+                   @{ModuleName = 'Microsoft.Graph.Authentication'; GUID = '883916f2-9184-46ee-b1f8-b6a2fb784cee'; ModuleVersion = '2.6.1'; })
 
     # Assemblies that must be loaded prior to importing this module
     # RequiredAssemblies = @()
@@ -87,7 +87,7 @@
         PSData = @{
 
             # Tags applied to this module. These help with module discovery in online galleries.
-            Tags = 'AzureAD', 'AzureAutomation', 'LicenseManagement'
+            Tags = 'AzureAD', 'EntraID', 'AzureAutomation', 'LicenseManagement'
 
             # A URL to the license for this module.
             LicenseUri = 'https://github.com/DMoenks/azure-ad-license-status/blob/main/LICENSE'

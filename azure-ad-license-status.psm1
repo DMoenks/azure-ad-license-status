@@ -590,6 +590,9 @@ function Get-AzureADLicenseStatus {
         #endregion
 
         #region: Reports
+        #TODO: Add check for owned devices
+        #TODO: Add check for most recent license change
+        #TODO: Account for duplicate 'Unknown' user names
         if ($AdvancedCheckups) {
             Invoke-MgGraphRequest -Method GET -Uri ('https://graph.microsoft.com/v1.0/reports/getM365AppUserDetail(period=''D{0}'')?$format=text/csv' -f $reportDays) -OutputFilePath "$env:TEMP\appUsage.csv"
             foreach ($entry in Import-Csv "$env:TEMP\appUsage.csv" | Select-Object -Property 'User Principal Name', 'Last Activity Date', 'Windows', 'Mac', 'Mobile', 'Web') {
@@ -687,191 +690,194 @@ function Get-AzureADLicenseStatus {
 
         #region: Users
         # Retrieve users
+        $userCount = 0
         $users = [System.Collections.Generic.List[hashtable]]::new()
         $URI = 'https://graph.microsoft.com/v1.0/users?$select=id,accountEnabled,createdDateTime,licenseAssignmentStates,userPrincipalName,userType&$top={0}' -f $pageSize
         while ($null -ne $URI) {
             $data = Invoke-MgGraphRequest -Method GET -Uri $URI -Headers @{'ConsistencyLevel' = 'eventual'}
             $users.AddRange([hashtable[]]($data.value))
+            $userCount += $users.Count
             $URI = $data['@odata.nextLink']
-        }
-        # Analyze users
-        foreach ($user in $users) {
-            if ($user.licenseAssignmentStates.Count -gt 0) {
-                if ($null -ne ($userSKUAssignments = $user.licenseAssignmentStates | Where-Object{$_.state -eq 'Active' -or $_.error -in @('CountViolation', 'MutuallyExclusiveViolation')})) {
-                    $userSKUs = $userSKUAssignments.skuId
-                }
-                else {
-                    $userSKUs = @()
-                }
-                if ($null -ne ($countViolations = $user.licenseAssignmentStates | Where-Object{$_.error -eq 'CountViolation'})) {
-                    foreach ($countViolation in $countViolations.skuId | Sort-Object -Unique) {
-                        $results['SKU_Basic'][[guid]$countViolation]['availableCount'] -= 1
-                    }
-                }
-                # Identify interchangeable SKUs, based on specifications
-                $userSKUs_interchangeable = @()
-                if ($null -ne $userSKUs -and
-                $null -ne $InterchangeableSKUs) {
-                    if ($null -ne ($comparison_interchangeable = Compare-Object -ReferenceObject $userSKUs -DifferenceObject $InterchangeableSKUs -ExcludeDifferent -IncludeEqual)) {
-                        $userSKUs_interchangeable = @($comparison_interchangeable.InputObject)
-                    }
-                }
-                # Identify optimizable SKUs, based on organization-level calculations
-                if ($null -ne ($comparison_replaceableOrganization = $userSKUs | Where-Object{$_ -in $superiorSKUs_organization.Keys} | ForEach-Object{$superiorSKUs_organization[$_]})) {
-                    $userSKUs_optimizable = Compare-Object -ReferenceObject $userSKUs -DifferenceObject $comparison_replaceableOrganization -ExcludeDifferent -IncludeEqual | ForEach-Object{$superiorSKU = $_.InputObject; $superiorSKUs_organization.Keys | Where-Object{$superiorSKUs_organization[$_] -contains $superiorSKU}} | Where-Object{$_ -in $userSKUs} | Sort-Object -Unique
-                }
-                else {
-                    $userSKUs_optimizable = $null
-                }
-                # Identify removable SKUs, based on user-level calculations
-                $skuid_enabledPlans = @{}
-                foreach ($skuid in $user.licenseAssignmentStates.skuid | Where-Object{$organizationSKUs.skuId -contains $_} | Sort-Object -Unique) {
-                    if (-not $skuid_enabledPlans.ContainsKey($skuid)) {
-                        $skuid_enabledPlans.Add($skuid, [System.Collections.Generic.List[guid]]::new())
-                    }
-                    foreach ($assignment in $user.licenseAssignmentStates | Where-Object{$_.skuid -eq $skuid}) {
-                        $skuid_enabledPlans[$skuid].AddRange([guid[]]@((($organizationSKUs | Where-Object{$_.skuid -eq $skuid}).servicePlans | Where-Object{$_.servicePlanId -notin $assignment.disabledPlans -and $_.appliesTo -eq 'User'}).servicePlanId))
-                    }
-                }
-                $superiorSKUs_user = @{}
-                foreach ($referenceSKU in $skuid_enabledPlans.Keys) {
-                    foreach ($differenceSKU in $skuid_enabledPlans.Keys | Where-Object{$_ -ne $referenceSKU}) {
-                        if ($null -ne ($referenceServicePlans = $skuid_enabledPlans[$referenceSKU]) -and
-                        $null -ne ($differenceServicePlans = $skuid_enabledPlans[$differenceSKU])) {
-                            if ($null -ne ($comparisonSKU = Compare-Object -ReferenceObject $referenceServicePlans -DifferenceObject $differenceServicePlans -IncludeEqual) -and
-                            $comparisonSKU.SideIndicator -contains '==' -and
-                            $comparisonSKU.SideIndicator -notcontains '=>') {
-                                if (-not $superiorSKUs_user.ContainsKey($differenceSKU)) {
-                                    $superiorSKUs_user.Add($differenceSKU, [System.Collections.Generic.List[guid]]::new())
-                                }
-                                $superiorSKUs_user[$differenceSKU].Add($referenceSKU)
-                            }
-                        }
-                    }
-                }
-                if ($null -ne ($comparison_replaceableUser = $userSKUs | Where-Object{$_ -in $superiorSKUs_user.Keys} | ForEach-Object{$superiorSKUs_user[$_]})) {
-                    $userSKUs_removable = Compare-Object -ReferenceObject $userSKUs -DifferenceObject $comparison_replaceableUser -ExcludeDifferent -IncludeEqual | ForEach-Object{$superiorSKU = $_.InputObject; $superiorSKUs_user.Keys | Where-Object{$superiorSKUs_user[$_] -contains $superiorSKU}} | Where-Object{$_ -in $userSKUs} | Sort-Object -Unique
-                }
-                else {
-                    $userSKUs_removable = $null
-                }
-                # Identify preferable SKUs, based on user-level calculations
-                $userSKUs_preferable = $null
-                if ($AdvancedCheckups -and
-                $reportsRetrieved) {
-                    $hashCalculator = [System.Security.Cryptography.MD5]::Create()
-                    if ($hashedReports) {
-                        $userName = ($hashCalculator.ComputeHash([Text.Encoding]::ASCII.GetBytes($user.userPrincipalName)) | ForEach-Object{'{0:X2}' -f $_}) -join ''
+            # Analyze users
+            foreach ($user in $users) {
+                if ($user.licenseAssignmentStates.Count -gt 0) {
+                    if ($null -ne ($userSKUAssignments = $user.licenseAssignmentStates | Where-Object{$_.state -eq 'Active' -or $_.error -in @('CountViolation', 'MutuallyExclusiveViolation')})) {
+                        $userSKUs = $userSKUAssignments.skuId
                     }
                     else {
-                        $userName = $user.userPrincipalName
+                        $userSKUs = @()
                     }
-                    if ($appUsage.ContainsKey($userName) -or
-                    $mailboxUsage.ContainsKey($userName) -or
-                    $driveUsage.ContainsKey($userName)) {
-                        if ($appUsage.ContainsKey($userName)) {
-                            $userAppsUsedLastActivityDate = $appUsage[$userName]['LastActivityDate']
-                            $userWindowsAppUsed = $appUsage[$userName]['WindowsApp']
-                            $userMacAppUsed = $appUsage[$userName]['MacApp']
-                            $userMobileAppUsed = $appUsage[$userName]['MobileApp']
-                            $userWebAppUsed = $appUsage[$userName]['WebApp']
+                    if ($null -ne ($countViolations = $user.licenseAssignmentStates | Where-Object{$_.error -eq 'CountViolation'})) {
+                        foreach ($countViolation in $countViolations.skuId | Sort-Object -Unique) {
+                            $results['SKU_Basic'][[guid]$countViolation]['availableCount'] -= 1
                         }
-                        else {
-                            $userAppsUsedLastActivityDate = [datetime]::MinValue
-                            $userWindowsAppUsed = $false
-                            $userMacAppUsed = $false
-                            $userMobileAppUsed = $false
-                            $userWebAppUsed = $false
+                    }
+                    # Identify interchangeable SKUs, based on specifications
+                    $userSKUs_interchangeable = @()
+                    if ($null -ne $userSKUs -and
+                    $null -ne $InterchangeableSKUs) {
+                        if ($null -ne ($comparison_interchangeable = Compare-Object -ReferenceObject $userSKUs -DifferenceObject $InterchangeableSKUs -ExcludeDifferent -IncludeEqual)) {
+                            $userSKUs_interchangeable = @($comparison_interchangeable.InputObject)
                         }
-                        if ($mailboxUsage.ContainsKey($userName)) {
-                            $userMailboxLastActivityDate = $mailboxUsage[$userName]['LastActivityDate']
-                            $userMailboxStorageUsedGB = $mailboxUsage[$userName]['StorageUsed']
-                            $userMailboxHasArchive = $mailboxUsage[$userName]['HasArchive']
+                    }
+                    # Identify optimizable SKUs, based on organization-level calculations
+                    if ($null -ne ($comparison_replaceableOrganization = $userSKUs | Where-Object{$_ -in $superiorSKUs_organization.Keys} | ForEach-Object{$superiorSKUs_organization[$_]})) {
+                        $userSKUs_optimizable = Compare-Object -ReferenceObject $userSKUs -DifferenceObject $comparison_replaceableOrganization -ExcludeDifferent -IncludeEqual | ForEach-Object{$superiorSKU = $_.InputObject; $superiorSKUs_organization.Keys | Where-Object{$superiorSKUs_organization[$_] -contains $superiorSKU}} | Where-Object{$_ -in $userSKUs} | Sort-Object -Unique
+                    }
+                    else {
+                        $userSKUs_optimizable = $null
+                    }
+                    # Identify removable SKUs, based on user-level calculations
+                    $skuid_enabledPlans = @{}
+                    foreach ($skuid in $user.licenseAssignmentStates.skuid | Where-Object{$organizationSKUs.skuId -contains $_} | Sort-Object -Unique) {
+                        if (-not $skuid_enabledPlans.ContainsKey($skuid)) {
+                            $skuid_enabledPlans.Add($skuid, [System.Collections.Generic.List[guid]]::new())
                         }
-                        else {
-                            $userMailboxLastActivityDate = [datetime]::MinValue
-                            $userMailboxStorageUsedGB = 0
-                            $userMailboxHasArchive = $false
+                        foreach ($assignment in $user.licenseAssignmentStates | Where-Object{$_.skuid -eq $skuid}) {
+                            $skuid_enabledPlans[$skuid].AddRange([guid[]]@((($organizationSKUs | Where-Object{$_.skuid -eq $skuid}).servicePlans | Where-Object{$_.servicePlanId -notin $assignment.disabledPlans -and $_.appliesTo -eq 'User'}).servicePlanId))
                         }
-                        if ($driveUsage.ContainsKey($userName)) {
-                            $userOneDriveLastActivityDate = $driveUsage[$userName]['LastActivityDate']
-                            $userOneDriveStorageUsedGB = $driveUsage[$userName]['StorageUsed']
-                        }
-                        else {
-                            $userOneDriveLastActivityDate = [datetime]::MinValue
-                            $userOneDriveStorageUsedGB = 0
-                        }
-                        foreach ($preferableSKU in $PreferableSKUs) {
-                            if (($user.accountEnabled.ToString() -eq $preferableSKU.AccountEnabled -or $preferableSKU.AccountEnabled -eq 'Skip') -and
-                            (($user.userType -eq 'Guest').ToString() -eq $preferableSKU.AccountGuest -or $preferableSKU.AccountGuest -eq 'Skip') -and
-                            $user.createdDateTime -lt $preferableSKU.CreatedEarlierThan -and
-                            $userAppsUsedLastActivityDate -lt $preferableSKU.LastActiveEarlierThan.Date -and
-                            ($userWindowsAppUsed.ToString() -eq $preferableSKU.WindowsAppUsed -or $preferableSKU.WindowsAppUsed -eq 'Skip') -and
-                            ($userMacAppUsed.ToString() -eq $preferableSKU.MacAppUsed -or $preferableSKU.MacAppUsed -eq 'Skip') -and
-                            ($userMobileAppUsed.ToString() -eq $preferableSKU.MobileAppUsed -or $preferableSKU.MobileAppUsed -eq 'Skip') -and
-                            ($userWebAppUsed.ToString() -eq $preferableSKU.WebAppUsed -or $preferableSKU.WebAppUsed -eq 'Skip') -and
-                            $userMailboxLastActivityDate -lt $preferableSKU.LastActiveEarlierThan.Date -and
-                            $userMailboxStorageUsedGB -lt $preferableSKU.MailboxGBUsedLessThan -and
-                            ($userMailboxHasArchive.ToString() -eq $preferableSKU.MailboxHasArchive -or $preferableSKU.MailboxHasArchive -eq 'Skip') -and
-                            $userOneDriveLastActivityDate -lt $preferableSKU.LastActiveEarlierThan.Date -and
-                            $userOneDriveStorageUsedGB -lt $preferableSKU.OneDriveGBUsedLessThan) {
-                                if ((($InterchangeableSKUs -contains $preferableSKU.SKUID -and
-                                $userSKUs -notcontains $preferableSKU.SKUID) -or
-                                [guid]::Empty -eq $preferableSKU.SKUID) -and
-                                $userSKUs_interchangeable.Count -gt 0) {
-                                    $userSKUs_preferable = $preferableSKU.SKUID
+                    }
+                    $superiorSKUs_user = @{}
+                    foreach ($referenceSKU in $skuid_enabledPlans.Keys) {
+                        foreach ($differenceSKU in $skuid_enabledPlans.Keys | Where-Object{$_ -ne $referenceSKU}) {
+                            if ($null -ne ($referenceServicePlans = $skuid_enabledPlans[$referenceSKU]) -and
+                            $null -ne ($differenceServicePlans = $skuid_enabledPlans[$differenceSKU])) {
+                                if ($null -ne ($comparisonSKU = Compare-Object -ReferenceObject $referenceServicePlans -DifferenceObject $differenceServicePlans -IncludeEqual) -and
+                                $comparisonSKU.SideIndicator -contains '==' -and
+                                $comparisonSKU.SideIndicator -notcontains '=>') {
+                                    if (-not $superiorSKUs_user.ContainsKey($differenceSKU)) {
+                                        $superiorSKUs_user.Add($differenceSKU, [System.Collections.Generic.List[guid]]::new())
+                                    }
+                                    $superiorSKUs_user[$differenceSKU].Add($referenceSKU)
                                 }
-                                break
                             }
                         }
                     }
-                }
-                # Add results
-                if ($userSKUs_interchangeable.Count -gt 1) {
-                    Write-Message "Found $($userSKUs_interchangeable.Count) interchangeable SKUs for user $($user.userPrincipalName)"
-                    $basicResults_interchangeable = $userSKUs_interchangeable
-                }
-                else {
-                    $basicResults_interchangeable = [guid[]]::new(0)
-                }
-                if ($null -ne $userSKUs_optimizable) {
-                    Write-Message "Found $(@($userSKUs_optimizable).Count) optimizable SKUs for user $($user.userPrincipalName)"
-                    $basicResults_optimizable = $userSKUs_optimizable
-                }
-                else {
-                    $basicResults_optimizable = [guid[]]::new(0)
-                }
-                if ($null -ne $userSKUs_removable) {
-                    Write-Message "Found $(@($userSKUs_removable).Count) removable SKUs for user $($user.userPrincipalName)"
-                    $basicResults_removable = $userSKUs_removable
-                }
-                else {
-                    $basicResults_removable = [guid[]]::new(0)
-                }
-                if ($basicResults_interchangeable.Count -gt 0 -or
-                $basicResults_optimizable.Count -gt 0 -or
-                $basicResults_removable.Count -gt 0) {
-                    Add-Result -BasicUserResult ([BasicUserResult]@{
-                        'UserPrincipalName' = $user.userPrincipalName
-                        'InterchangeableSKUIDs' = $basicResults_interchangeable
-                        'OptimizableSKUIDs' = $basicResults_optimizable
-                        'RemovableSKUIDs' = $basicResults_removable
-                    })
-                }
-                if ($null -ne $userSKUs_preferable) {
-                    Write-Message "Found preferable SKU for user $($user.userPrincipalName)"
-                    Add-Result -AdvancedUserResult ([AdvancedUserResult]@{
-                        'UserPrincipalName' = $user.userPrincipalName
-                        'PreferableSKUID' = $userSKUs_preferable
-                        'ReplaceableSKUIDs' = $userSKUs_interchangeable
-                    })
+                    if ($null -ne ($comparison_replaceableUser = $userSKUs | Where-Object{$_ -in $superiorSKUs_user.Keys} | ForEach-Object{$superiorSKUs_user[$_]})) {
+                        $userSKUs_removable = Compare-Object -ReferenceObject $userSKUs -DifferenceObject $comparison_replaceableUser -ExcludeDifferent -IncludeEqual | ForEach-Object{$superiorSKU = $_.InputObject; $superiorSKUs_user.Keys | Where-Object{$superiorSKUs_user[$_] -contains $superiorSKU}} | Where-Object{$_ -in $userSKUs} | Sort-Object -Unique
+                    }
+                    else {
+                        $userSKUs_removable = $null
+                    }
+                    # Identify preferable SKUs, based on user-level calculations
+                    $userSKUs_preferable = $null
+                    if ($AdvancedCheckups -and
+                    $reportsRetrieved) {
+                        $hashCalculator = [System.Security.Cryptography.MD5]::Create()
+                        if ($hashedReports) {
+                            $userName = ($hashCalculator.ComputeHash([Text.Encoding]::ASCII.GetBytes($user.userPrincipalName)) | ForEach-Object{'{0:X2}' -f $_}) -join ''
+                        }
+                        else {
+                            $userName = $user.userPrincipalName
+                        }
+                        if ($appUsage.ContainsKey($userName) -or
+                        $mailboxUsage.ContainsKey($userName) -or
+                        $driveUsage.ContainsKey($userName)) {
+                            if ($appUsage.ContainsKey($userName)) {
+                                $userAppsUsedLastActivityDate = $appUsage[$userName]['LastActivityDate']
+                                $userWindowsAppUsed = $appUsage[$userName]['WindowsApp']
+                                $userMacAppUsed = $appUsage[$userName]['MacApp']
+                                $userMobileAppUsed = $appUsage[$userName]['MobileApp']
+                                $userWebAppUsed = $appUsage[$userName]['WebApp']
+                            }
+                            else {
+                                $userAppsUsedLastActivityDate = [datetime]::MinValue
+                                $userWindowsAppUsed = $false
+                                $userMacAppUsed = $false
+                                $userMobileAppUsed = $false
+                                $userWebAppUsed = $false
+                            }
+                            if ($mailboxUsage.ContainsKey($userName)) {
+                                $userMailboxLastActivityDate = $mailboxUsage[$userName]['LastActivityDate']
+                                $userMailboxStorageUsedGB = $mailboxUsage[$userName]['StorageUsed']
+                                $userMailboxHasArchive = $mailboxUsage[$userName]['HasArchive']
+                            }
+                            else {
+                                $userMailboxLastActivityDate = [datetime]::MinValue
+                                $userMailboxStorageUsedGB = 0
+                                $userMailboxHasArchive = $false
+                            }
+                            if ($driveUsage.ContainsKey($userName)) {
+                                $userOneDriveLastActivityDate = $driveUsage[$userName]['LastActivityDate']
+                                $userOneDriveStorageUsedGB = $driveUsage[$userName]['StorageUsed']
+                            }
+                            else {
+                                $userOneDriveLastActivityDate = [datetime]::MinValue
+                                $userOneDriveStorageUsedGB = 0
+                            }
+                            foreach ($preferableSKU in $PreferableSKUs) {
+                                if (($user.accountEnabled.ToString() -eq $preferableSKU.AccountEnabled -or $preferableSKU.AccountEnabled -eq 'Skip') -and
+                                (($user.userType -eq 'Guest').ToString() -eq $preferableSKU.AccountGuest -or $preferableSKU.AccountGuest -eq 'Skip') -and
+                                $user.createdDateTime -lt $preferableSKU.CreatedEarlierThan -and
+                                $userAppsUsedLastActivityDate -lt $preferableSKU.LastActiveEarlierThan.Date -and
+                                ($userWindowsAppUsed.ToString() -eq $preferableSKU.WindowsAppUsed -or $preferableSKU.WindowsAppUsed -eq 'Skip') -and
+                                ($userMacAppUsed.ToString() -eq $preferableSKU.MacAppUsed -or $preferableSKU.MacAppUsed -eq 'Skip') -and
+                                ($userMobileAppUsed.ToString() -eq $preferableSKU.MobileAppUsed -or $preferableSKU.MobileAppUsed -eq 'Skip') -and
+                                ($userWebAppUsed.ToString() -eq $preferableSKU.WebAppUsed -or $preferableSKU.WebAppUsed -eq 'Skip') -and
+                                $userMailboxLastActivityDate -lt $preferableSKU.LastActiveEarlierThan.Date -and
+                                $userMailboxStorageUsedGB -lt $preferableSKU.MailboxGBUsedLessThan -and
+                                ($userMailboxHasArchive.ToString() -eq $preferableSKU.MailboxHasArchive -or $preferableSKU.MailboxHasArchive -eq 'Skip') -and
+                                $userOneDriveLastActivityDate -lt $preferableSKU.LastActiveEarlierThan.Date -and
+                                $userOneDriveStorageUsedGB -lt $preferableSKU.OneDriveGBUsedLessThan) {
+                                    if ((($InterchangeableSKUs -contains $preferableSKU.SKUID -and
+                                    $userSKUs -notcontains $preferableSKU.SKUID) -or
+                                    [guid]::Empty -eq $preferableSKU.SKUID) -and
+                                    $userSKUs_interchangeable.Count -gt 0) {
+                                        $userSKUs_preferable = $preferableSKU.SKUID
+                                    }
+                                    break
+                                }
+                            }
+                        }
+                    }
+                    # Add results
+                    if ($userSKUs_interchangeable.Count -gt 1) {
+                        Write-Message "Found $($userSKUs_interchangeable.Count) interchangeable SKUs for user $($user.userPrincipalName)" -Type Verbose
+                        $basicResults_interchangeable = $userSKUs_interchangeable
+                    }
+                    else {
+                        $basicResults_interchangeable = [guid[]]::new(0)
+                    }
+                    if ($null -ne $userSKUs_optimizable) {
+                        Write-Message "Found $(@($userSKUs_optimizable).Count) optimizable SKUs for user $($user.userPrincipalName)" -Type Verbose
+                        $basicResults_optimizable = $userSKUs_optimizable
+                    }
+                    else {
+                        $basicResults_optimizable = [guid[]]::new(0)
+                    }
+                    if ($null -ne $userSKUs_removable) {
+                        Write-Message "Found $(@($userSKUs_removable).Count) removable SKUs for user $($user.userPrincipalName)" -Type Verbose
+                        $basicResults_removable = $userSKUs_removable
+                    }
+                    else {
+                        $basicResults_removable = [guid[]]::new(0)
+                    }
+                    if ($basicResults_interchangeable.Count -gt 0 -or
+                    $basicResults_optimizable.Count -gt 0 -or
+                    $basicResults_removable.Count -gt 0) {
+                        Add-Result -BasicUserResult ([BasicUserResult]@{
+                            'UserPrincipalName' = $user.userPrincipalName
+                            'InterchangeableSKUIDs' = $basicResults_interchangeable
+                            'OptimizableSKUIDs' = $basicResults_optimizable
+                            'RemovableSKUIDs' = $basicResults_removable
+                        })
+                    }
+                    if ($null -ne $userSKUs_preferable) {
+                        Write-Message "Found preferable SKU for user $($user.userPrincipalName)" -Type Verbose
+                        Add-Result -AdvancedUserResult ([AdvancedUserResult]@{
+                            'UserPrincipalName' = $user.userPrincipalName
+                            'PreferableSKUID' = $userSKUs_preferable
+                            'ReplaceableSKUIDs' = $userSKUs_interchangeable
+                        })
+                    }
                 }
             }
         }
-        Write-Message "Analyzed $($users.Count) users"
+        Write-Message "Analyzed $userCount users"
         #endregion
 
         #region: Advanced
+        #TODO: Account for human-based licensing instead of account-based licensing of AADP1/P2
         if ($AdvancedCheckups.IsPresent) {
             $AADP1Users = [System.Collections.Generic.List[guid]]::new()
             $AADP2Users = [System.Collections.Generic.List[guid]]::new()
@@ -923,6 +929,13 @@ function Get-AzureADLicenseStatus {
                 foreach ($conditionalAccessPolicy in $conditionalAccessPolicies) {
                     if ($conditionalAccessPolicy.conditions.users.includeUsers -notcontains 'None') {
                         if ($conditionalAccessPolicy.conditions.users.includeUsers -contains 'All') {
+                            $users = [System.Collections.Generic.List[hashtable]]::new()
+                            $URI = 'https://graph.microsoft.com/v1.0/users?$select=id&$top={0}' -f $pageSize
+                            while ($null -ne $URI) {
+                                $data = Invoke-MgGraphRequest -Method GET -Uri $URI -Headers @{'ConsistencyLevel' = 'eventual'}
+                                $users.AddRange([hashtable[]]($data.value))
+                                $URI = $data['@odata.nextLink']
+                            }
                             $includeUsers = $users.id
                         }
                         elseif ($null -eq ($includeUsers = @($conditionalAccessPolicy.conditions.users.includeUsers | Where-Object{$_ -ne 'GuestsOrExternalUsers'}))) {
@@ -1096,6 +1109,7 @@ function Get-AzureADLicenseStatus {
                 $managedDeviceCount += $managedDevices.Count
                 $URI = $data['@odata.nextLink']
                 # Analyze managed devices
+                #TODO: ???
                 foreach ($managedDevice in $managedDevices) {
                     if ($managedDevice.userId -notin $intuneUsers.id) {
                         $IntuneDevices.Add($managedDevice.id)
