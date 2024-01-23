@@ -81,7 +81,6 @@ function Initialize-Module {
     [OutputType([void])]
 
     $script:nestingLevel = 0
-    $script:outputs = [System.Text.StringBuilder]::new()
     $script:results = @{}
     $script:skuTranslate = [string]::new([char[]]((Invoke-WebRequest -Uri 'https://download.microsoft.com/download/e/3/e/e3e9faf2-f28b-490a-9ada-c6089a1fc5b0/Product%20names%20and%20service%20plan%20identifiers%20for%20licensing.csv' -UseBasicParsing).Content)) | ConvertFrom-Csv
     $script:appUsage = @{}
@@ -112,22 +111,6 @@ function Write-Message {
     else {
         $formattedMessage | Write-Output
     }
-}
-
-function Add-Output {
-    [OutputType([void])]
-    param (
-        [Parameter(Mandatory = $true)]
-        [ValidateNotNullOrEmpty()]
-        [string]$Output
-    )
-
-    # Logging
-    $nestingLevel++
-    Write-Message 'Add-Output' -Type Verbose
-    # Processing
-    $outputs.AppendLine($Output) | Out-Null
-    $nestingLevel--
 }
 
 function Add-Result {
@@ -691,11 +674,10 @@ function Get-AzureADLicenseStatus {
         #region: Users
         # Retrieve users
         $userCount = 0
-        $users = [System.Collections.Generic.List[hashtable]]::new()
         $URI = 'https://graph.microsoft.com/v1.0/users?$select=id,accountEnabled,createdDateTime,licenseAssignmentStates,userPrincipalName,userType&$top={0}' -f $pageSize
         while ($null -ne $URI) {
             $data = Invoke-MgGraphRequest -Method GET -Uri $URI -Headers @{'ConsistencyLevel' = 'eventual'}
-            $users.AddRange([hashtable[]]($data.value))
+            $users = [hashtable[]]($data.value)
             $userCount += $users.Count
             $URI = $data['@odata.nextLink']
             # Analyze users
@@ -1184,137 +1166,138 @@ function Get-AzureADLicenseStatus {
         #region: Report
         if ($results.Keys.Count -gt 0) {
             $critical = $false
-            Add-Output -Output '<style>
-                                table, th, td {
-                                    border: none;
-                                    border-collapse: collapse;
-                                }
-                                th, td {
-                                    padding: 5px;
-                                    vertical-align: top;
-                                }
-                                th {
-                                    text-align: center;
-                                }
-                                td {
-                                    text-align: left;
-                                }
-                                .gray {
-                                    border-left: 4pt solid darkslategray;
-                                    padding-left: 4pt;
-                                    background-color: lightslategray
-                                }
-                                .green {
-                                    border-left: 4pt solid darkgreen;
-                                    padding-left: 4pt;
-                                    background-color: lightgreen
-                                }
-                                .yellow {
-                                    border-left: 4pt solid darkgoldenrod;
-                                    padding-left: 4pt;
-                                    background-color: lightgoldenrodyellow
-                                }
-                                .red {
-                                    border-left: 4pt solid darkred;
-                                    padding-left: 4pt;
-                                    background-color: lightcoral
-                                }
-                                .rule {
-                                    border-left-style: solid;
-                                }
-                                </style>'
+            $outputs = [System.Text.StringBuilder]::new()
+            $null = $outputs.AppendLine('<style>
+                                            table, th, td {
+                                                border: none;
+                                                border-collapse: collapse;
+                                            }
+                                            th, td {
+                                                padding: 5px;
+                                                vertical-align: top;
+                                            }
+                                            th {
+                                                text-align: center;
+                                            }
+                                            td {
+                                                text-align: left;
+                                            }
+                                            .gray {
+                                                border-left: 4pt solid darkslategray;
+                                                padding-left: 4pt;
+                                                background-color: lightslategray
+                                            }
+                                            .green {
+                                                border-left: 4pt solid darkgreen;
+                                                padding-left: 4pt;
+                                                background-color: lightgreen
+                                            }
+                                            .yellow {
+                                                border-left: 4pt solid darkgoldenrod;
+                                                padding-left: 4pt;
+                                                background-color: lightgoldenrodyellow
+                                            }
+                                            .red {
+                                                border-left: 4pt solid darkred;
+                                                padding-left: 4pt;
+                                                background-color: lightcoral
+                                            }
+                                            .rule {
+                                                border-left-style: solid;
+                                            }
+                                            </style>')
             # Output basic SKU results
-            Add-Output -Output '<p class=gray>Basic checkup - Products</p>'
+            $null = $outputs.AppendLine('<p class=gray>Basic checkup - Products</p>')
             if ($results.ContainsKey('SKU_Basic')) {
-                Add-Output -Output ('<p>Please check license counts for the following product SKUs and <a href="{0}">reserve</a> additional licenses:</p>
-                                    <p><table>
-                                    <tr><th>License type</th>
-                                    <th>Available count</th>
-                                    <th>Minimum count</th>
-                                    <th>Difference</th></tr>' -f
-                                    $LicensingURL)
+                $null = $outputs.AppendLine(('<p>Please check license counts for the following product SKUs and <a href="{0}">reserve</a> additional licenses:</p>
+                                                <p><table>
+                                                <tr><th>License type</th>
+                                                <th>Available count</th>
+                                                <th>Minimum count</th>
+                                                <th>Difference</th></tr>' -f
+                                                $LicensingURL))
                 foreach ($SKU in $results['SKU_Basic'].Keys) {
                     $differenceCount = $results['SKU_Basic'][$SKU]['availableCount'] - $results['SKU_Basic'][$SKU]['minimumCount']
-                    Add-Output -Output ('<tr><td>{0}</td><td>{1}</td><td>{2}</td>' -f
-                                        (Get-SKUName -SKUID $SKU),
-                                        $results['SKU_Basic'][$SKU]['availableCount'],
-                                        $results['SKU_Basic'][$SKU]['minimumCount'])
+                    $null = $outputs.AppendLine(('<tr><td>{0}</td><td>{1}</td><td>{2}</td>' -f
+                                                    (Get-SKUName -SKUID $SKU),
+                                                    $results['SKU_Basic'][$SKU]['availableCount'],
+                                                    $results['SKU_Basic'][$SKU]['minimumCount']))
                     if ($results['SKU_Basic'][$SKU]['availableCount'] / $results['SKU_Basic'][$SKU]['minimumCount'] * 100 -ge $SKUWarningThreshold_basic) {
-                        Add-Output -Output "<td class=green>$differenceCount</td>"
+                        $null = $outputs.AppendLine("<td class=green>$differenceCount</td>")
                     }
                     elseif ($results['SKU_Basic'][$SKU]['availableCount'] / $results['SKU_Basic'][$SKU]['minimumCount'] * 100 -le $SKUCriticalThreshold_basic) {
                         $critical = $true
-                        Add-Output -Output "<td class=red>$differenceCount</td>"
+                        $null = $outputs.AppendLine("<td class=red>$differenceCount</td>")
                     }
                     else {
-                        Add-Output -Output "<td class=yellow>$differenceCount</td>"
+                        $null = $outputs.AppendLine("<td class=yellow>$differenceCount</td>")
                     }
-                    Add-Output -Output '</tr>'
+                    $null = $outputs.AppendLine('</tr>')
                 }
-                Add-Output -Output ('</table></p>
-                                    <p>The following criteria were used during the checkup:<ul>
-                                    <li>Check products with &gt;{0} total licenses</li>
-                                    <li>Report normal products having both &lt;{1} licenses and &lt;{2}% of their total licenses available</li>
-                                    <li>Report important products having both &lt;{3} licenses and &lt;{4}% of their total licenses available</li></ul></p>' -f
-                                    $SKUIgnoreThreshold,
-                                    $SKUTotalThreshold_normal,
-                                    $SKUPercentageThreshold_normal,
-                                    $SKUTotalThreshold_important,
-                                    $SKUPercentageThreshold_important)
+                $null = $outputs.AppendLine(('</table></p>
+                                                <p>The following criteria were used during the checkup:<ul>
+                                                <li>Check products with &gt;{0} total licenses</li>
+                                                <li>Report normal products having both &lt;{1} licenses and &lt;{2}% of their total licenses available</li>
+                                                <li>Report important products having both &lt;{3} licenses and &lt;{4}% of their total licenses available</li></ul></p>' -f
+                                                $SKUIgnoreThreshold,
+                                                $SKUTotalThreshold_normal,
+                                                $SKUPercentageThreshold_normal,
+                                                $SKUTotalThreshold_important,
+                                                $SKUPercentageThreshold_important))
             }
             else {
-                Add-Output -Output '<p>Nothing to report</p>'
+                $null = $outputs.AppendLine('<p>Nothing to report</p>')
             }
             # Output advanced SKU results
-            Add-Output -Output '<p class=gray>Advanced checkup - Products</p>'
+            $null = $outputs.AppendLine('<p class=gray>Advanced checkup - Products</p>')
             if ($results.ContainsKey('SKU_Advanced')) {
-                Add-Output -Output ('<p>Please check license counts for the following product SKUs and <a href="{0}">reserve</a> additional licenses:</p>
-                                    <p><table>
-                                    <tr><th>License type</th>
-                                    <th>Enabled count</th>
-                                    <th>Needed count</th>
-                                    <th>Difference</th></tr>' -f
-                                    $LicensingURL)
+                $null = $outputs.AppendLine(('<p>Please check license counts for the following product SKUs and <a href="{0}">reserve</a> additional licenses:</p>
+                                                <p><table>
+                                                <tr><th>License type</th>
+                                                <th>Enabled count</th>
+                                                <th>Needed count</th>
+                                                <th>Difference</th></tr>' -f
+                                                $LicensingURL))
                 foreach ($plan in $results['SKU_Advanced'].Keys) {
                     $differenceCount = $results['SKU_Advanced'][$plan]['enabledCount'] - $results['SKU_Advanced'][$plan]['neededCount']
-                    Add-Output -Output ('<tr><td>{0}</td><td>{1}</td><td>{2}</td>' -f
-                                        $plan,
-                                        $results['SKU_Advanced'][$plan]['enabledCount'],
-                                        $results['SKU_Advanced'][$plan]['neededCount'])
+                    $null = $outputs.AppendLine(('<tr><td>{0}</td><td>{1}</td><td>{2}</td>' -f
+                                                    $plan,
+                                                    $results['SKU_Advanced'][$plan]['enabledCount'],
+                                                    $results['SKU_Advanced'][$plan]['neededCount']))
                     if ($results['SKU_Advanced'][$plan]['enabledCount'] / $results['SKU_Advanced'][$plan]['neededCount'] * 100 -ge $SKUWarningThreshold_advanced) {
-                        Add-Output -Output "<td class=green>$differenceCount</td>"
+                        $null = $outputs.AppendLine("<td class=green>$differenceCount</td>")
                     }
                     elseif ($results['SKU_Advanced'][$plan]['enabledCount'] / $results['SKU_Advanced'][$plan]['neededCount'] * 100 -le $SKUCriticalThreshold_advanced) {
                         $critical = $true
-                        Add-Output -Output "<td class=red>$differenceCount</td>"
+                        $null = $outputs.AppendLine("<td class=red>$differenceCount</td>")
                     }
                     else {
-                        Add-Output -Output "<td class=yellow>$differenceCount</td>"
+                        $null = $outputs.AppendLine("<td class=yellow>$differenceCount</td>")
                     }
-                    Add-Output -Output '</tr>'
+                    $null = $outputs.AppendLine('</tr>')
                 }
-                Add-Output -Output '</table></p>
-                                    <p>The following criteria were used during the checkup:<ul>
-                                    <li>Check <em>Azure AD P1</em> based on groups using dynamic user membership</li>
-                                    <li>Check <em>Azure AD P1</em> based on applications using group-based assignment</li>
-                                    <li>Check <em>Azure AD P1/P2</em> based on users covered by Conditional Access</li>
-                                    <li>Check <em>Azure AD P2</em> based on users eligible for Privileged Identity Management</li>
-                                    <li>Check <em>Defender for Office 365 P1/P2</em> based on protected Exchange Online recipients</li>
-                                    <li>Check <em>Intune Device</em> based on devices managed by Intune and used by unlicensed users</li></ul></p>'
+                $null = $outputs.AppendLine('</table></p>
+                                                <p>The following criteria were used during the checkup:<ul>
+                                                <li>Check <em>Azure AD P1</em> based on groups using dynamic user membership</li>
+                                                <li>Check <em>Azure AD P1</em> based on applications using group-based assignment</li>
+                                                <li>Check <em>Azure AD P1/P2</em> based on users covered by Conditional Access</li>
+                                                <li>Check <em>Azure AD P2</em> based on users eligible for Privileged Identity Management</li>
+                                                <li>Check <em>Defender for Office 365 P1/P2</em> based on protected Exchange Online recipients</li>
+                                                <li>Check <em>Intune Device</em> based on devices managed by Intune and used by unlicensed users</li></ul></p>')
             }
             else {
-                Add-Output -Output '<p>Nothing to report</p>'
+                $null = $outputs.AppendLine('<p>Nothing to report</p>')
             }
             # Output basic user results
-            Add-Output -Output '<p class=gray>Basic checkup - Users</p>'
+            $null = $outputs.AppendLine('<p class=gray>Basic checkup - Users</p>')
             if ($results.ContainsKey('User_Basic')) {
                 [decimal]$potentialSavings = 0
-                Add-Output -Output '<p>Please check license assignments for the following user accounts and mitigate impact:</p>
-                                    <p><table>
-                                    <tr><th>Account</th>
-                                    <th>Interchangeable</th>
-                                    <th>Optimizable</th>
-                                    <th>Removable</th></tr>'
+                $null = $outputs.AppendLine('<p>Please check license assignments for the following user accounts and mitigate impact:</p>
+                                                <p><table>
+                                                <tr><th>Account</th>
+                                                <th>Interchangeable</th>
+                                                <th>Optimizable</th>
+                                                <th>Removable</th></tr>')
                 foreach ($user in $results['User_Basic'] | Sort-Object UserPrincipalName) {
                     if ($null -ne $SKUPrices) {
                         if ($null -ne ($interchangeableSKUPrices = $SKUPrices | Where-Object{$_.SKUID -in $user.InterchangeableSKUIDs} | Sort-Object Price | Select-Object -Skip 1)) {
@@ -1330,35 +1313,35 @@ function Get-AzureADLicenseStatus {
                                                 Measure-Object -Sum).Sum
                         }
                     }
-                    Add-Output -Output ('<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td></tr>' -f
-                                        $user.UserPrincipalName,
-                                        (($user.InterchangeableSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>'),
-                                        (($user.OptimizableSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>'),
-                                        (($user.RemovableSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>'))
+                    $null = $outputs.AppendLine(('<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td></tr>' -f
+                                                    $user.UserPrincipalName,
+                                                    (($user.InterchangeableSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>'),
+                                                    (($user.OptimizableSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>'),
+                                                    (($user.RemovableSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>')))
                 }
-                Add-Output -Output '</table></p>'
+                $null = $outputs.AppendLine('</table></p>')
                 if ($potentialSavings -gt 0) {
-                    Add-Output -Output ('<p>Potential savings when mitigating license assignment impact: {0:C}</p>' -f
-                                        $potentialSavings)
+                    $null = $outputs.AppendLine(('<p>Potential savings when mitigating license assignment impact: {0:C}</p>' -f
+                                                    $potentialSavings))
                 }
-                Add-Output -Output '<p>The following criteria were used during the checkup:<ul>
-                                    <li>Check accounts with any number of assigned licenses</li>
-                                    <li>Report theoretically exclusive licenses as <strong>interchangeable</strong>, based on specified SKUs</li>
-                                    <li>Report practically inclusive licenses as <strong>optimizable</strong>, based on available SKU features</li>
-                                    <li>Report actually inclusive licenses as <strong>removable</strong>, based on enabled SKU features</li></ul></p>'
+                $null = $outputs.AppendLine('<p>The following criteria were used during the checkup:<ul>
+                                                <li>Check accounts with any number of assigned licenses</li>
+                                                <li>Report theoretically exclusive licenses as <strong>interchangeable</strong>, based on specified SKUs</li>
+                                                <li>Report practically inclusive licenses as <strong>optimizable</strong>, based on available SKU features</li>
+                                                <li>Report actually inclusive licenses as <strong>removable</strong>, based on enabled SKU features</li></ul></p>')
             }
             else {
-                Add-Output -Output '<p>Nothing to report</p>'
+                $null = $outputs.AppendLine('<p>Nothing to report</p>')
             }
             # Output advanced user results
-            Add-Output -Output '<p class=gray>Advanced checkup - Users</p>'
+            $null = $outputs.AppendLine('<p class=gray>Advanced checkup - Users</p>')
             if ($results.ContainsKey('User_Advanced')) {
                 [decimal]$potentialSavings = 0
-                Add-Output -Output '<p>Please check license assignments for the following user accounts and mitigate impact:</p>
-                                    <p><table>
-                                    <tr><th>Account</th>
-                                    <th>Preferable</th>
-                                    <th>Replaceable</th></tr>'
+                $null = $outputs.AppendLine('<p>Please check license assignments for the following user accounts and mitigate impact:</p>
+                                                <p><table>
+                                                <tr><th>Account</th>
+                                                <th>Preferable</th>
+                                                <th>Replaceable</th></tr>')
                 foreach ($user in $results['User_Advanced'] | Sort-Object UserPrincipalName) {
                     if ($null -ne $SKUPrices) {
                         if ($null -ne ($replaceableSKUPrices = $SKUPrices | Where-Object{$_.SKUID -in $user.ReplaceableSKUIDs})) {
@@ -1373,35 +1356,35 @@ function Get-AzureADLicenseStatus {
                             }
                         }
                     }
-                    Add-Output -Output ('<tr><td>{0}</td><td>{1}</td><td>{2}</td></tr>' -f
-                                        $user.UserPrincipalName,
-                                        (Get-SKUName -SKUID $user.PreferableSKUID),
-                                        (($user.ReplaceableSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>'))
+                    $null = $outputs.AppendLine(('<tr><td>{0}</td><td>{1}</td><td>{2}</td></tr>' -f
+                                                    $user.UserPrincipalName,
+                                                    (Get-SKUName -SKUID $user.PreferableSKUID),
+                                                    (($user.ReplaceableSKUIDs | ForEach-Object{Get-SKUName -SKUID $_} | Sort-Object) -join '<br>')))
                 }
-                Add-Output -Output '</table></p>'
+                $null = $outputs.AppendLine('</table></p>')
                 if ($potentialSavings -gt 0) {
-                    Add-Output -Output ('<p>Potential savings when mitigating license assignment impact: {0:C}</p>' -f
-                                        $potentialSavings)
+                    $null = $outputs.AppendLine(('<p>Potential savings when mitigating license assignment impact: {0:C}</p>' -f
+                                                    $potentialSavings))
                 }
-                Add-Output -Output '<p>The following criteria were used during the checkup:</p>
-                                    <p><table>
-                                    <tr><th rowspan=2>Priority</th>
-                                    <th rowspan=2 class=rule>License</th>
-                                    <th colspan=4 class=rule>Account</th>
-                                    <th colspan=1 class=rule>OneDrive</th>
-                                    <th colspan=2 class=rule>Mailbox</th>
-                                    <th colspan=4 class=rule>Apps</th></tr>
-                                    <tr><th class=rule>Enabled</th>
-                                    <th>Guest</th>
-                                    <th>Created</th>
-                                    <th>Active</th>
-                                    <th class=rule>Storage</th>
-                                    <th class=rule>Storage</th>
-                                    <th>Archive</th>
-                                    <th class=rule>Windows</th>
-                                    <th>Mac</th>
-                                    <th>Mobile</th>
-                                    <th>Web</th></tr>'
+                $null = $outputs.AppendLine('<p>The following criteria were used during the checkup:</p>
+                                                <p><table>
+                                                <tr><th rowspan=2>Priority</th>
+                                                <th rowspan=2 class=rule>License</th>
+                                                <th colspan=4 class=rule>Account</th>
+                                                <th colspan=1 class=rule>OneDrive</th>
+                                                <th colspan=2 class=rule>Mailbox</th>
+                                                <th colspan=4 class=rule>Apps</th></tr>
+                                                <tr><th class=rule>Enabled</th>
+                                                <th>Guest</th>
+                                                <th>Created</th>
+                                                <th>Active</th>
+                                                <th class=rule>Storage</th>
+                                                <th class=rule>Storage</th>
+                                                <th>Archive</th>
+                                                <th class=rule>Windows</th>
+                                                <th>Mac</th>
+                                                <th>Mobile</th>
+                                                <th>Web</th></tr>')
                 for ($i = 0; $i -lt $PreferableSKUs.Count; $i++) {
                     $preferableSKU = $PreferableSKUs[$i]
                     if ($preferableSKU.AccountEnabled -ne [SKURule]::AccountEnabledDefault()) {
@@ -1470,25 +1453,25 @@ function Get-AzureADLicenseStatus {
                     else {
                         $ruleSetting_webAppUsed = '-'
                     }
-                    Add-Output -Output ('<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td><td>{4:&l\t\;yyyy&#8209\;MM&#8209\;dd}</td><td>{5:&l\t\;yyyy&#8209\;MM&#8209\;dd}</td><td>{6:&lt\;0.#&nbsp\;GB}</td><td>{7:&lt\;0.#&nbsp\;GB}</td><td>{8}</td><td>{9}</td><td>{10}</td><td>{11}</td><td>{12}</td></tr>' -f
-                                        ($i + 1),
-                                        (Get-SKUName -SKUID $preferableSKU.SKUID),
-                                        $ruleSetting_accountEnabled,
-                                        $ruleSetting_accountGuest,
-                                        $ruleSetting_createdEarlierThan,
-                                        $ruleSetting_lastActiveEarlierThan,
-                                        $ruleSetting_oneDriveGBUsedLessThan,
-                                        $ruleSetting_mailboxGBUsedLessThan,
-                                        $ruleSetting_mailboxHasArchive,
-                                        $ruleSetting_windowsAppUsed,
-                                        $ruleSetting_macAppUsed,
-                                        $ruleSetting_mobileAppUsed,
-                                        $ruleSetting_webAppUsed)
+                    $null = $outputs.AppendLine(('<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td><td>{4:&l\t\;yyyy&#8209\;MM&#8209\;dd}</td><td>{5:&l\t\;yyyy&#8209\;MM&#8209\;dd}</td><td>{6:&lt\;0.#&nbsp\;GB}</td><td>{7:&lt\;0.#&nbsp\;GB}</td><td>{8}</td><td>{9}</td><td>{10}</td><td>{11}</td><td>{12}</td></tr>' -f
+                                                    ($i + 1),
+                                                    (Get-SKUName -SKUID $preferableSKU.SKUID),
+                                                    $ruleSetting_accountEnabled,
+                                                    $ruleSetting_accountGuest,
+                                                    $ruleSetting_createdEarlierThan,
+                                                    $ruleSetting_lastActiveEarlierThan,
+                                                    $ruleSetting_oneDriveGBUsedLessThan,
+                                                    $ruleSetting_mailboxGBUsedLessThan,
+                                                    $ruleSetting_mailboxHasArchive,
+                                                    $ruleSetting_windowsAppUsed,
+                                                    $ruleSetting_macAppUsed,
+                                                    $ruleSetting_mobileAppUsed,
+                                                    $ruleSetting_webAppUsed))
                 }
-                Add-Output -Output '</table></p>'
+                $null = $outputs.AppendLine('</table></p>')
             }
             else {
-                Add-Output -Output '<p>Nothing to report</p>'
+                $null = $outputs.AppendLine('<p>Nothing to report</p>')
             }
             # Configure and send email
             $email = @{
