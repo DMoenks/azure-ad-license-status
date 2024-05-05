@@ -267,13 +267,13 @@ Below example shows how a report might look like, although the example might dif
                 <th>Difference</th>
             </tr>
             <tr>
-                <td>Azure Active Directory Premium P1</td>
+                <td>Entra ID Premium P1</td>
                 <td>200</td>
                 <td>670</td>
                 <td class=red>-470</td>
             </tr>
             <tr>
-                <td>Azure Active Directory Premium P2</td>
+                <td>Entra ID Premium P2</td>
                 <td>100</td>
                 <td>170</td>
                 <td class=yellow>-70</td>
@@ -294,10 +294,10 @@ Below example shows how a report might look like, although the example might dif
     </p>
     <p>The following criteria were used during the checkup:
         <ul>
-            <li>Check <em>Azure AD P1</em> based on groups using dynamic user membership</li>
-            <li>Check <em>Azure AD P1</em> based on applications using group-based assignment</li>
-            <li>Check <em>Azure AD P1/P2</em> based on users covered by Conditional Access</li>
-            <li>Check <em>Azure AD P2</em> based on users in scope of Privileged Identity Management</li>
+            <li>Check <em>Entra ID P1</em> based on groups using dynamic user membership</li>
+            <li>Check <em>Entra ID P1</em> based on applications using group-based assignment</li>
+            <li>Check <em>Entra ID P1/P2</em> based on users covered by Conditional Access</li>
+            <li>Check <em>Entra ID P2</em> based on users in scope of Privileged Identity Management</li>
             <li>Check <em>Defender for Office 365 P1/P2</em> based on protected Exchange Online recipients</li>
             <li>Check <em>Intune Device</em> based on devices managed by Intune and used by unlicensed users</li>
         </ul>

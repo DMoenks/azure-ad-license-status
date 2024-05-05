@@ -42,7 +42,7 @@ _Az.KeyVault_
 - Microsoft Graph permission _Reports.Read.All_
 - Microsoft Graph permission _RoleManagement.Read.All_
 - Office 365 Exchange Online permission _Exchange.ManageAsApp_
-- Azure AD role _Global Reader_
+- Entra ID role _Global Reader_
 
 > HINT: When granting the _Global Reader_ role to the application, the following Microsoft Graph permissions can be revoked, as they are already included in the role's permissions.
 >

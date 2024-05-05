@@ -11,23 +11,23 @@ permalink: /features
 
 ### 2.1.1 Basic
 
-&#x2714; Check for license availability based on Azure AD license information
+&#x2714; Check for license availability based on Entra ID license information
 
 &#x2714; Calculate report importance based on organization's thresholds
 
 ### 2.1.2 Advanced
 
-Check for license need based on Azure AD and Office feature information:
+Check for license need based on Microsoft Entra ID and Microsoft 365 feature information:
 
-&#x2716; _Azure Active Directory Premium P1_ based on applications using application proxy
+&#x2716; _Entra ID Premium P1_ based on applications using application proxy
 
-&#x2714; _Azure Active Directory Premium P1_ based on groups using dynamic user membership
+&#x2714; _Entra ID Premium P1_ based on groups using dynamic user membership
 
-&#x2714; _Azure Active Directory Premium P1_ based on applications using group-based assignment
+&#x2714; _Entra ID Premium P1_ based on applications using group-based assignment
 
-&#x2714; _Azure Active Directory Premium P1/P2_ based on users covered by Conditional Access
+&#x2714; _Entra ID Premium P1/P2_ based on users covered by Conditional Access
 
-&#x2714; _Azure Active Directory Premium P2_ based on users eligible for Privileged Identity Management
+&#x2714; _Entra ID Premium P2_ based on users eligible for Privileged Identity Management
 
 &#x2714; _Defender for Office 365 P1/P2_ based on protected Exchange Online recipients
 

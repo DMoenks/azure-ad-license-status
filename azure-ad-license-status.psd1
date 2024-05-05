@@ -87,7 +87,7 @@
         PSData = @{
 
             # Tags applied to this module. These help with module discovery in online galleries.
-            Tags = 'AzureAD', 'EntraID', 'AzureAutomation', 'LicenseManagement'
+            Tags = 'AzureAD', 'EntraID', 'LicenseReport', 'LicenseManagement', 'AzureAutomation'
 
             # A URL to the license for this module.
             LicenseUri = 'https://github.com/DMoenks/azure-ad-license-status/blob/main/LICENSE'

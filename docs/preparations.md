@@ -24,12 +24,12 @@ permalink: /preparations
 
 ## 4.2 Authentication
 
-1. Register [Azure AD application](https://learn.microsoft.com/azure/active-directory/develop/quickstart-register-app)
+1. Register [Entra ID application](https://learn.microsoft.com/entra/identity-platform/quickstart-register-app)
 2. Add required permissions
 3. Upload certificate
 
 ## 4.3 Permissions
 
-1. (optional, recommended) Create [Exchange Online application access policy](https://learn.microsoft.com/graph/auth-limit-mailbox-access) to restrict Azure AD application's _Mail.Send_ permission to intended sender mailbox
+1. (optional, recommended) Create [Exchange Online application access policy](https://learn.microsoft.com/graph/auth-limit-mailbox-access) to restrict Entra ID application's _Mail.Send_ permission to intended sender mailbox
 
 > HINT: Most of the preparations for advanced Azure execution mentioned above can be deployed by using the Terraform module available in the [GitHub repository](https://github.com/DMoenks/azure-ad-license-status), the exception being an Exchange Online application access policy.

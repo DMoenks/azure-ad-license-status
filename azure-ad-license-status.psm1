@@ -27,6 +27,9 @@ class SKURule {
     [string]$AccountGuest = [SKURule]::AccountGuestDefault()
     [datetime]$CreatedEarlierThan = [SKURule]::CreatedEarlierThanDefault()
     [datetime]$LastActiveEarlierThan = [SKURule]::LastActiveEarlierThanDefault()
+    [datetime]$LastLicenseChangeEarlierThan = [SKURule]::LastLicenseChangeEarlierThanDefault()
+    [ValidateSet('True', 'False', 'Skip')]
+    [string]$DeviceOwned = [SKURule]::DeviceOwnedDefault()
     [decimal]$OneDriveGBUsedLessThan = [SKURule]::OneDriveGBUsedLessThanDefault()
     [decimal]$MailboxGBUsedLessThan = [SKURule]::MailboxGBUsedLessThanDefault()
     [ValidateSet('True', 'False', 'Skip')]
@@ -51,6 +54,12 @@ class SKURule {
     }
     static [datetime]LastActiveEarlierThanDefault() {
         return [datetime]::MaxValue
+    }
+    static [datetime]LastLicenseChangeEarlierThanDefault() {
+        return [datetime]::MaxValue
+    }
+    static [string]DeviceOwnedDefault() {
+        return 'Skip'
     }
     static [UInt16]OneDriveGBUsedLessThanDefault() {
         return [UInt16]::MaxValue
@@ -82,7 +91,7 @@ function Initialize-Module {
 
     $script:nestingLevel = 0
     $script:results = @{}
-    $script:skuTranslate = [string]::new([char[]]((Invoke-WebRequest -Uri 'https://download.microsoft.com/download/e/3/e/e3e9faf2-f28b-490a-9ada-c6089a1fc5b0/Product%20names%20and%20service%20plan%20identifiers%20for%20licensing.csv' -UseBasicParsing).Content)) | ConvertFrom-Csv
+    $script:skuTranslate = [System.Text.Encoding]::UTF8.GetString((Invoke-WebRequest -Uri 'https://download.microsoft.com/download/e/3/e/e3e9faf2-f28b-490a-9ada-c6089a1fc5b0/Product%20names%20and%20service%20plan%20identifiers%20for%20licensing.csv' -UseBasicParsing).Content) | ConvertFrom-Csv
     $script:appUsage = @{}
     $script:mailboxUsage = @{}
     $script:driveUsage = @{}
@@ -95,7 +104,9 @@ function Write-Message {
         [ValidateNotNullOrEmpty()]
         [string]$Message,
         [ValidateSet('Error', 'Verbose')]
-        [string]$Type
+        [string]$Type,
+        [ValidateSet('AuthenticationError', 'InvalidArgument', 'InvalidData')]
+        [string]$Category
     )
 
     $formattedMessage = '[{0:yyyy-MM-dd HH:mm:ss}] {1}{2}' -f
@@ -103,7 +114,7 @@ function Write-Message {
                         [string]::new('-', $nestingLevel),
                         $Message
     if ($Type -eq 'Error') {
-        Write-Error -Message $formattedMessage -Category AuthenticationError
+        Write-Error -Message $formattedMessage -Category $Category
     }
     elseif ($Type -eq 'Verbose') {
         Write-Verbose -Message $formattedMessage
@@ -495,6 +506,8 @@ function Get-AzureADLicenseStatus {
         [SKURule[]]$PreferableSKUs,
         [ValidateNotNullOrEmpty()]
         [SKUPrice[]]$SKUPrices,
+        [ValidateNotNullOrEmpty()]
+        [hashtable]$HumanUserAttributes,
         [ValidateSet('CSV', 'TranslatedCSV', 'JSON')]
         [string]$AttachmentFormat,
         [ValidateNotNullOrEmpty()]
@@ -510,13 +523,13 @@ function Get-AzureADLicenseStatus {
                 $azureCertificateSecret = Get-AzKeyVaultSecret -VaultName $KeyVaultName -Name $CertificateName -AsPlainText
                 $azureCertificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new([Convert]::FromBase64String($azureCertificateSecret))
                 Disconnect-AzAccount
-                Connect-MgGraph -Certificate $azureCertificate -TenantId $DirectoryID -ClientId $ApplicationID -ErrorAction Stop | Out-Null
+                $null = Connect-MgGraph -Certificate $azureCertificate -TenantId $DirectoryID -ClientId $ApplicationID -ErrorAction Stop
             }
             'LocalCertificate' {
-                Connect-MgGraph -Certificate $Certificate -TenantId $DirectoryID -ClientId $ApplicationID -ErrorAction Stop | Out-Null
+                $null = Connect-MgGraph -Certificate $Certificate -TenantId $DirectoryID -ClientId $ApplicationID -ErrorAction Stop
             }
             'LocalCertificateThumbprint' {
-                Connect-MgGraph -CertificateThumbprint $CertificateThumbprint -TenantId $DirectoryID -ClientId $ApplicationID -ErrorAction Stop | Out-Null
+                $null = Connect-MgGraph -CertificateThumbprint $CertificateThumbprint -TenantId $DirectoryID -ClientId $ApplicationID -ErrorAction Stop
             }
         }
         $graphAuthentication = $true
@@ -524,7 +537,7 @@ function Get-AzureADLicenseStatus {
     }
     catch {
         $graphAuthentication = $false
-        Write-Message -Message 'Failed to authenticate with Graph' -Type Error
+        Write-Message -Message 'Failed to authenticate with Graph' -Type Error -Category AuthenticationError
     }
     if ($graphAuthentication) {
         #region: SKUs
@@ -573,15 +586,13 @@ function Get-AzureADLicenseStatus {
         #endregion
 
         #region: Reports
-        #TODO: Add check for owned devices
-        #TODO: Add check for most recent license change
         #TODO: Account for duplicate 'Unknown' user names
         if ($AdvancedCheckups) {
             Invoke-MgGraphRequest -Method GET -Uri ('https://graph.microsoft.com/v1.0/reports/getM365AppUserDetail(period=''D{0}'')?$format=text/csv' -f $reportDays) -OutputFilePath "$env:TEMP\appUsage.csv"
             foreach ($entry in Import-Csv "$env:TEMP\appUsage.csv" | Select-Object -Property 'User Principal Name', 'Last Activity Date', 'Windows', 'Mac', 'Mobile', 'Web') {
                 if (-not $appUsage.ContainsKey($entry.'User Principal Name')) {
                     $lastActivityDate = [datetime]::MinValue
-                    [datetime]::TryParse($entry.'Last Activity Date', [ref]$lastActivityDate) | Out-Null
+                    $null = [datetime]::TryParse($entry.'Last Activity Date', [ref]$lastActivityDate)
                     if ($entry.'Windows' -eq 'Yes') {
                         $windowsApp = $true
                     }
@@ -615,14 +626,14 @@ function Get-AzureADLicenseStatus {
                     })
                 }
                 else {
-                    Write-Message -Message "Found duplicate user name $($entry.'User Principal Name') in app usage reports" -Type Error
+                    Write-Message -Message "Found duplicate user name $($entry.'User Principal Name') in app usage reports" -Type Error -Category InvalidData
                 }
             }
             Invoke-MgGraphRequest -Method GET -Uri ('https://graph.microsoft.com/v1.0/reports/getMailboxUsageDetail(period=''D{0}'')' -f $reportDays) -OutputFilePath "$env:TEMP\mailboxUsage.csv"
             foreach ($entry in Import-Csv "$env:TEMP\mailboxUsage.csv" | Select-Object -Property 'User Principal Name', 'Is Deleted', 'Last Activity Date', 'Storage Used (Byte)', 'Has Archive' | Where-Object{$_.'Is Deleted' -eq 'False'}) {
                 if (-not $mailboxUsage.ContainsKey($entry.'User Principal Name')) {
                     $lastActivityDate = [datetime]::MinValue
-                    [datetime]::TryParse($entry.'Last Activity Date', [ref]$lastActivityDate) | Out-Null
+                    $null = [datetime]::TryParse($entry.'Last Activity Date', [ref]$lastActivityDate)
                     $storageUsed = [decimal]($entry.'Storage Used (Byte)' / [System.Math]::Pow(1000, 3))
                     $hasArchive = [bool]::Parse($entry.'Has Archive')
                     $mailboxUsage.Add($entry.'User Principal Name', @{
@@ -632,14 +643,14 @@ function Get-AzureADLicenseStatus {
                     })
                 }
                 else {
-                    Write-Message -Message "Found duplicate user name $($entry.'User Principal Name') in mailbox usage reports" -Type Error
+                    Write-Message -Message "Found duplicate user name $($entry.'User Principal Name') in mailbox usage reports" -Type Error -Category InvalidData
                 }
             }
             Invoke-MgGraphRequest -Method GET -Uri ('https://graph.microsoft.com/v1.0/reports/getOneDriveUsageAccountDetail(period=''D{0}'')' -f $reportDays) -OutputFilePath "$env:TEMP\driveUsage.csv"
             foreach ($entry in Import-Csv "$env:TEMP\driveUsage.csv" | Select-Object -Property 'Owner Principal Name', 'Is Deleted', 'Last Activity Date', 'Storage Used (Byte)' | Where-Object{$_.'Is Deleted' -eq 'False'}) {
                 if (-not $driveUsage.ContainsKey($entry.'Owner Principal Name')) {
                     $lastActivityDate = [datetime]::MinValue
-                    [datetime]::TryParse($entry.'Last Activity Date', [ref]$lastActivityDate) | Out-Null
+                    $null = [datetime]::TryParse($entry.'Last Activity Date', [ref]$lastActivityDate)
                     $storageUsed = [decimal]($entry.'Storage Used (Byte)' / [System.Math]::Pow(1000, 3))
                     $driveUsage.Add($entry.'Owner Principal Name', @{
                         'LastActivityDate' = $lastActivityDate
@@ -647,7 +658,7 @@ function Get-AzureADLicenseStatus {
                     })
                 }
                 else {
-                    Write-Message -Message "Found duplicate user name $($entry.'User Principal Name') in OneDrive usage reports" -Type Error
+                    Write-Message -Message "Found duplicate user name $($entry.'User Principal Name') in OneDrive usage reports" -Type Error -Category InvalidData
                 }
             }
             if ($appUsage.Keys.Count -gt 0 -and
@@ -666,7 +677,7 @@ function Get-AzureADLicenseStatus {
             }
             else {
                 $reportsRetrieved = $false
-                Write-Message -Message 'Failed to retrieve usage reports' -Type Error
+                Write-Message -Message 'Failed to retrieve usage reports' -Type Error -Category InvalidData
             }
         }
         #endregion
@@ -674,9 +685,9 @@ function Get-AzureADLicenseStatus {
         #region: Users
         # Retrieve users
         $userCount = 0
-        $URI = 'https://graph.microsoft.com/v1.0/users?$select=id,accountEnabled,createdDateTime,licenseAssignmentStates,userPrincipalName,userType&$top={0}' -f $pageSize
+        $URI = 'https://graph.microsoft.com/v1.0/users?$select=id,accountEnabled,createdDateTime,licenseAssignmentStates,userPrincipalName,userType&$expand=ownedDevices&$top={0}' -f $pageSize
         while ($null -ne $URI) {
-            $data = Invoke-MgGraphRequest -Method GET -Uri $URI -Headers @{'ConsistencyLevel' = 'eventual'}
+            $data = Invoke-MgGraphRequest -Method GET -Uri $URI
             $users = [hashtable[]]($data.value)
             $userCount += $users.Count
             $URI = $data['@odata.nextLink']
@@ -755,6 +766,12 @@ function Get-AzureADLicenseStatus {
                         if ($appUsage.ContainsKey($userName) -or
                         $mailboxUsage.ContainsKey($userName) -or
                         $driveUsage.ContainsKey($userName)) {
+                            if ($null -ne $userSKUAssignments) {
+                                $userLicenseLastChangeDate =  ($userSKUAssignments | Sort-Object lastUpdatedDateTime -Descending | Select-Object -First 1).lastUpdatedDateTime
+                            }
+                            else {
+                                $userLicenseLastChangeDate =  [datetime]::MinValue
+                            }
                             if ($appUsage.ContainsKey($userName)) {
                                 $userAppsUsedLastActivityDate = $appUsage[$userName]['LastActivityDate']
                                 $userWindowsAppUsed = $appUsage[$userName]['WindowsApp']
@@ -792,6 +809,8 @@ function Get-AzureADLicenseStatus {
                                 (($user.userType -eq 'Guest').ToString() -eq $preferableSKU.AccountGuest -or $preferableSKU.AccountGuest -eq 'Skip') -and
                                 $user.createdDateTime -lt $preferableSKU.CreatedEarlierThan -and
                                 $userAppsUsedLastActivityDate -lt $preferableSKU.LastActiveEarlierThan.Date -and
+                                $userLicenseLastChangeDate -lt $preferableSKU.LastLicenseChangeEarlierThan -and
+                                (($user.ownedDevices.Count -gt 0).ToString() -eq $preferableSKU.DeviceOwned -or $preferableSKU.DeviceOwned -eq 'Skip') -and
                                 ($userWindowsAppUsed.ToString() -eq $preferableSKU.WindowsAppUsed -or $preferableSKU.WindowsAppUsed -eq 'Skip') -and
                                 ($userMacAppUsed.ToString() -eq $preferableSKU.MacAppUsed -or $preferableSKU.MacAppUsed -eq 'Skip') -and
                                 ($userMobileAppUsed.ToString() -eq $preferableSKU.MobileAppUsed -or $preferableSKU.MobileAppUsed -eq 'Skip') -and
@@ -859,110 +878,134 @@ function Get-AzureADLicenseStatus {
         #endregion
 
         #region: Advanced
-        #TODO: Account for human-based licensing instead of account-based licensing of AADP1/P2
+        #TODO: Account for human-based licensing instead of account-based licensing of AADP1/P2, possibly based on attributes (employeeType, onPremisesExtensionAttributes), assigned licenses, or interactive sign-ins
         if ($AdvancedCheckups.IsPresent) {
             $AADP1Users = [System.Collections.Generic.List[guid]]::new()
             $AADP2Users = [System.Collections.Generic.List[guid]]::new()
             $ATPUsers = [System.Collections.Generic.List[guid]]::new()
             $IntuneDevices = [System.Collections.Generic.List[guid]]::new()
-            # Azure AD P1 based on groups using dynamic user membership
-            $dynamicGroupCount = 0
-            $URI = 'https://graph.microsoft.com/v1.0/groups?$filter=groupTypes/any(x:x eq ''DynamicMembership'')&$select=id,membershipRule&$top={0}' -f $pageSize
-            while ($null -ne $URI) {
-                # Retrieve dynamic groups
-                $data = Invoke-MgGraphRequest -Method GET -Uri $URI
-                $dynamicGroups = [hashtable[]]($data.value)
-                $dynamicGroupCount += $dynamicGroups.Count
-                $URI = $data['@odata.nextLink']
-                # Analyze dynamic groups
-                if ($null -ne ($dynamicUserGroups = $dynamicGroups | Where-Object{$_.membershipRule -like '*user.*'})) {
-                    $AADP1Users.AddRange((Get-AADGroupMember -GroupIDs $dynamicUserGroups.id))
+            # 'Human' users based on parameters
+            $URI = 'https://graph.microsoft.com/v1.0/users?$select=id&$filter={0}&top={1}&$count=true' -f (($humanUserAttributes.Keys | ForEach-Object{"$_ in ('$($humanUserAttributes[$_] -join ''',''')')"}) -join ' and '), $pageSize
+            $humanUsers = [System.Collections.Generic.List[hashtable]]::new()
+            try {
+                while ($null -ne $URI) {
+                    $data = Invoke-MgGraphRequest -Method GET -Uri $URI -Headers @{'ConsistencyLevel' = 'eventual'} -ErrorAction Stop
+                    $humanUsers.AddRange([hashtable[]]($data.value))
+                    $URI = $data['@odata.nextLink']
                 }
+                Write-Message "Found $($humanUsers.Count) human users" -Type Verbose
             }
-            Write-Message "Analyzed $dynamicGroupCount dynamic groups"
-            # Azure AD P1 based on applications using group-based assignment
-            $applicationCount = 0
-            $URI = 'https://graph.microsoft.com/v1.0/servicePrincipals?$filter=accountEnabled eq true and appRoleAssignmentRequired eq true and servicePrincipalType eq ''Application''&$top={0}&$count=true' -f $pageSize
-            while ($null -ne $URI) {
-                # Retrieve applications
-                $data = Invoke-MgGraphRequest -Method GET -Uri $URI -Headers @{'ConsistencyLevel' = 'eventual'}
-                $applications = [hashtable[]]($data.value)
-                $applicationCount += $applications.Count
-                $URI = $data['@odata.nextLink']
-                # Analyze applications
-                foreach ($application in $applications) {
-                    $applicationData = Invoke-MgGraphRequest -Method GET -Uri ('https://graph.microsoft.com/v1.0/servicePrincipals/{0}?$expand=appRoleAssignedTo&$select=id,appRoleAssignedTo' -f $application.id)
-                    if ($null -ne ($applicationGroups = $applicationData.appRoleAssignedTo | Where-Object{$_.principalType -eq 'Group'})) {
-                        $AADP1Users.AddRange((Get-AADGroupMember -GroupIDs $applicationGroups.principalId))
+            catch {
+                Write-Message "Found 0 human users, property mismatch" -Type Error -Category InvalidArgument
+            }
+            if ($humanUsers.Count -gt 0) {
+                # Entra ID P1 based on groups using dynamic user membership
+                $dynamicGroupCount = 0
+                $URI = 'https://graph.microsoft.com/v1.0/groups?$filter=groupTypes/any(x:x eq ''DynamicMembership'')&$select=id,membershipRule&$top={0}' -f $pageSize
+                while ($null -ne $URI) {
+                    # Retrieve dynamic groups
+                    $data = Invoke-MgGraphRequest -Method GET -Uri $URI
+                    $dynamicGroups = [hashtable[]]($data.value)
+                    $dynamicGroupCount += $dynamicGroups.Count
+                    $URI = $data['@odata.nextLink']
+                    # Analyze dynamic groups
+                    if ($null -ne ($dynamicUserGroups = $dynamicGroups | Where-Object{$_.membershipRule -like '*user.*'})) {
+                        if ($null -ne ($matchedUsers = Compare-Object $humanUsers.id (Get-AADGroupMember -GroupIDs $dynamicUserGroups.id) -ExcludeDifferent -IncludeEqual)) {
+                            $AADP1Users.AddRange([guid[]]@($matchedUsers.InputObject))
+                        }
                     }
                 }
-            }
-            Write-Message "Analyzed $applicationCount applications"
-            # Azure AD P1/P2 based on users covered by Conditional Access
-            $conditionalAccessPolicyCount = 0
-            $URI = 'https://graph.microsoft.com/v1.0/identity/conditionalAccess/policies?$select=conditions&$filter=state eq ''enabled'''
-            while ($null -ne $URI) {
-                # Retrieve Conditional Access policies
-                $data = Invoke-MgGraphRequest -Method GET -Uri $URI
-                $conditionalAccessPolicies = [hashtable[]]($data.value)
-                $conditionalAccessPolicyCount += $conditionalAccessPolicies.Count
-                $URI = $data['@odata.nextLink']
-                # Analyze Conditional Access policies
-                foreach ($conditionalAccessPolicy in $conditionalAccessPolicies) {
-                    if ($conditionalAccessPolicy.conditions.users.includeUsers -notcontains 'None') {
-                        if ($conditionalAccessPolicy.conditions.users.includeUsers -contains 'All') {
-                            $users = [System.Collections.Generic.List[hashtable]]::new()
-                            $URI = 'https://graph.microsoft.com/v1.0/users?$select=id&$top={0}' -f $pageSize
-                            while ($null -ne $URI) {
-                                $data = Invoke-MgGraphRequest -Method GET -Uri $URI -Headers @{'ConsistencyLevel' = 'eventual'}
-                                $users.AddRange([hashtable[]]($data.value))
-                                $URI = $data['@odata.nextLink']
+                Write-Message "Analyzed $dynamicGroupCount dynamic groups"
+                # Entra ID P1 based on applications using group-based assignment
+                $applicationCount = 0
+                $URI = 'https://graph.microsoft.com/v1.0/servicePrincipals?$filter=accountEnabled eq true and appRoleAssignmentRequired eq true and servicePrincipalType eq ''Application''&$top={0}&$count=true' -f $pageSize
+                while ($null -ne $URI) {
+                    # Retrieve applications
+                    $data = Invoke-MgGraphRequest -Method GET -Uri $URI -Headers @{'ConsistencyLevel' = 'eventual'}
+                    $applications = [hashtable[]]($data.value)
+                    $applicationCount += $applications.Count
+                    $URI = $data['@odata.nextLink']
+                    # Analyze applications
+                    foreach ($application in $applications) {
+                        $applicationData = Invoke-MgGraphRequest -Method GET -Uri ('https://graph.microsoft.com/v1.0/servicePrincipals/{0}?$expand=appRoleAssignedTo&$select=id,appRoleAssignedTo' -f $application.id)
+                        if ($null -ne ($applicationGroups = $applicationData.appRoleAssignedTo | Where-Object{$_.principalType -eq 'Group'})) {
+                            if ($null -ne ($matchedUsers = Compare-Object $humanUsers.id (Get-AADGroupMember -GroupIDs $applicationGroups.principalId) -ExcludeDifferent -IncludeEqual)) {
+                                $AADP1Users.AddRange([guid[]]@($matchedUsers.InputObject))
                             }
-                            $includeUsers = $users.id
                         }
-                        elseif ($null -eq ($includeUsers = @($conditionalAccessPolicy.conditions.users.includeUsers | Where-Object{$_ -ne 'GuestsOrExternalUsers'}))) {
-                            $includeUsers = @()
-                        }
-                        $excludeUsers = $conditionalAccessPolicy.conditions.users.excludeUsers
-                        if ($conditionalAccessPolicy.conditions.users.includeGroups.Count -gt 0) {
-                            $includeGroupUsers = Get-AADGroupMember -GroupIDs $conditionalAccessPolicy.conditions.users.includeGroups
-                        }
-                        else {
-                            $includeGroupUsers = @()
-                        }
-                        if ($conditionalAccessPolicy.conditions.users.excludeGroups.Count -gt 0) {
-                            $excludeGroupUsers = Get-AADGroupMember -GroupIDs $conditionalAccessPolicy.conditions.users.excludeGroups
-                        }
-                        else {
-                            $excludeGroupUsers = @()
-                        }
-                        if ($null -ne ($conditionalAccessUsers = Compare-Object -ReferenceObject ([guid[]]$includeUsers + [guid[]]$includeGroupUsers) -DifferenceObject ([guid[]]$excludeUsers + [guid[]]$excludeGroupUsers) | Where-Object{$_.SideIndicator -eq '<='})) {
-                            if ($conditionalAccessPolicy.conditions.userRiskLevels.Count -gt 0 -or $conditionalAccessPolicy.conditions.signInRiskLevels.Count -gt 0) {
-                                $AADP2Users.AddRange([guid[]]@($conditionalAccessUsers.InputObject))
+                    }
+                }
+                Write-Message "Analyzed $applicationCount applications"
+                # Entra ID P1/P2 based on users covered by Conditional Access
+                $conditionalAccessPolicyCount = 0
+                $URI = 'https://graph.microsoft.com/v1.0/identity/conditionalAccess/policies?$select=conditions&$filter=state eq ''enabled'''
+                while ($null -ne $URI) {
+                    # Retrieve Conditional Access policies
+                    $data = Invoke-MgGraphRequest -Method GET -Uri $URI
+                    $conditionalAccessPolicies = [hashtable[]]($data.value)
+                    $conditionalAccessPolicyCount += $conditionalAccessPolicies.Count
+                    $URI = $data['@odata.nextLink']
+                    # Analyze Conditional Access policies
+                    foreach ($conditionalAccessPolicy in $conditionalAccessPolicies) {
+                        if ($conditionalAccessPolicy.conditions.users.includeUsers -notcontains 'None') {
+                            if ($conditionalAccessPolicy.conditions.users.includeUsers -contains 'All') {
+                                $users = [System.Collections.Generic.List[hashtable]]::new()
+                                $URI = 'https://graph.microsoft.com/v1.0/users?$select=id&$top={0}' -f $pageSize
+                                while ($null -ne $URI) {
+                                    $data = Invoke-MgGraphRequest -Method GET -Uri $URI
+                                    $users.AddRange([hashtable[]]($data.value))
+                                    $URI = $data['@odata.nextLink']
+                                }
+                                $includeUsers = $users.id
+                            }
+                            elseif ($null -eq ($includeUsers = @($conditionalAccessPolicy.conditions.users.includeUsers | Where-Object{$_ -ne 'GuestsOrExternalUsers'}))) {
+                                $includeUsers = @()
+                            }
+                            $excludeUsers = $conditionalAccessPolicy.conditions.users.excludeUsers
+                            if ($conditionalAccessPolicy.conditions.users.includeGroups.Count -gt 0) {
+                                $includeGroupUsers = Get-AADGroupMember -GroupIDs $conditionalAccessPolicy.conditions.users.includeGroups
                             }
                             else {
-                                $AADP1Users.AddRange([guid[]]@($conditionalAccessUsers.InputObject))
+                                $includeGroupUsers = @()
+                            }
+                            if ($conditionalAccessPolicy.conditions.users.excludeGroups.Count -gt 0) {
+                                $excludeGroupUsers = Get-AADGroupMember -GroupIDs $conditionalAccessPolicy.conditions.users.excludeGroups
+                            }
+                            else {
+                                $excludeGroupUsers = @()
+                            }
+                            if ($null -ne ($conditionalAccessUsers = Compare-Object -ReferenceObject ([guid[]]$includeUsers + [guid[]]$includeGroupUsers) -DifferenceObject ([guid[]]$excludeUsers + [guid[]]$excludeGroupUsers) | Where-Object{$_.SideIndicator -eq '<='})) {
+                                if ($null -ne ($matchedUsers = Compare-Object $humanUsers.id $conditionalAccessUsers.InputObject -ExcludeDifferent -IncludeEqual)) {
+                                    if ($conditionalAccessPolicy.conditions.userRiskLevels.Count -gt 0 -or $conditionalAccessPolicy.conditions.signInRiskLevels.Count -gt 0) {
+                                        $AADP2Users.AddRange([guid[]]@($matchedUsers.InputObject))
+                                    }
+                                    else {
+                                        $AADP1Users.AddRange([guid[]]@($matchedUsers.InputObject))
+                                    }
+                                }
                             }
                         }
                     }
                 }
-            }
-            Write-Message "Analyzed $conditionalAccessPolicyCount conditional access policies"
-            # Azure AD P2 based on users eligible for Privileged Identity Management
-            $roleAssignmentCount = 0
-            $URI = 'https://graph.microsoft.com/v1.0/roleManagement/directory/roleEligibilitySchedules?$select=principalId,scheduleInfo'
-            while ($null -ne $URI) {
-                # Retrieve role assignments
-                $data = Invoke-MgGraphRequest -Method GET -Uri $URI
-                $roleAssignments = [hashtable[]]($data.value)
-                $roleAssignmentCount += $roleAssignments.Count
-                $URI = $data['@odata.nextLink']
-                # Analyze role assignments
-                if ($null -ne ($eligibleRoleAssignments = $roleAssignments | Where-Object{$_.scheduleInfo.startDateTime -le [datetime]::Today -and ($_.scheduleInfo.expiration.endDateTime -ge [datetime]::Today -or $_.scheduleInfo.expiration.type -eq 'noExpiration')})) {
-                    $AADP2Users.AddRange([guid[]]@($eligibleRoleAssignments.principalId))
+                Write-Message "Analyzed $conditionalAccessPolicyCount conditional access policies"
+                # Entra ID P2 based on users eligible for Privileged Identity Management
+                $roleAssignmentCount = 0
+                $URI = 'https://graph.microsoft.com/v1.0/roleManagement/directory/roleEligibilitySchedules?$select=principalId,scheduleInfo'
+                while ($null -ne $URI) {
+                    # Retrieve role assignments
+                    $data = Invoke-MgGraphRequest -Method GET -Uri $URI
+                    $roleAssignments = [hashtable[]]($data.value)
+                    $roleAssignmentCount += $roleAssignments.Count
+                    $URI = $data['@odata.nextLink']
+                    # Analyze role assignments
+                    if ($null -ne ($eligibleRoleAssignments = $roleAssignments | Where-Object{$_.scheduleInfo.startDateTime -le [datetime]::Today -and ($_.scheduleInfo.expiration.endDateTime -ge [datetime]::Today -or $_.scheduleInfo.expiration.type -eq 'noExpiration')})) {
+                        if ($null -ne ($matchedUsers = Compare-Object $humanUsers.id $eligibleRoleAssignments.principalId -ExcludeDifferent -IncludeEqual)) {
+                            $AADP2Users.AddRange([guid[]]@($matchedUsers.InputObject))
+                        }
+                    }
                 }
+                Write-Message "Analyzed $roleAssignmentCount role assignments"
             }
-            Write-Message "Analyzed $roleAssignmentCount role assignments"
             # Defender for Office 365 P1/P2 based on https://learn.microsoft.com/office365/servicedescriptions/office-365-advanced-threat-protection-service-description#licensing-terms
             $orgDomain = (Invoke-MgGraphRequest -Method GET -Uri 'https://graph.microsoft.com/v1.0/organization?$select=verifiedDomains').value.verifiedDomains | Where-Object{$_.isInitial -eq $true}
             try {
@@ -982,7 +1025,7 @@ function Get-AzureADLicenseStatus {
             }
             catch {
                 $exchangeAuthentication = $false
-                Write-Message -Message 'Failed to authenticate with Exchange Online' -Type Error
+                Write-Message -Message 'Failed to authenticate with Exchange Online' -Type Error -Category AuthenticationError
             }
             if ($exchangeAuthentication) {
                 if ($null -ne (Compare-Object -ReferenceObject $organizationSKUs.servicePlans.servicePlanId -DifferenceObject @('f20fedf3-f3c3-43c3-8267-2bfdd51c0939', '8e0c0a52-6a6c-4d40-8370-dd62790dcd70') -ExcludeDifferent -IncludeEqual)) {
@@ -1073,7 +1116,7 @@ function Get-AzureADLicenseStatus {
                 }
                 Disconnect-ExchangeOnline -Confirm:$false
             }
-            # Intune Device based on devices managed by Intune and used by unlicensed users
+            # Intune Device based on devices managed by Intune and assigned to unlicensed users
             $managedDeviceCount = 0
             # Retrieve Intune licensed users
             $intuneUsers = [System.Collections.Generic.List[hashtable]]::new()
@@ -1091,7 +1134,7 @@ function Get-AzureADLicenseStatus {
                 $managedDeviceCount += $managedDevices.Count
                 $URI = $data['@odata.nextLink']
                 # Analyze managed devices
-                #TODO: ???
+                #TODO: Verify calculation for correctness based on license terms
                 foreach ($managedDevice in $managedDevices) {
                     if ($managedDevice.userId -notin $intuneUsers.id) {
                         $IntuneDevices.Add($managedDevice.id)
@@ -1108,9 +1151,9 @@ function Get-AzureADLicenseStatus {
                     $AADP1Licenses = 0
                 }
                 $neededCount = @($AADP1Users | Sort-Object -Unique).Count
-                Write-Message "Found $neededCount needed, $AADP1Licenses enabled AADP1 licenses"
+                Write-Message "Found $neededCount needed, $AADP1Licenses enabled EIDP1 licenses"
                 if ($AADP1Licenses -lt $neededCount) {
-                    Add-Result -PlanName 'Azure Active Directory Premium P1' -EnabledCount $AADP1Licenses -NeededCount $neededCount
+                    Add-Result -PlanName 'Entra ID Premium P1' -EnabledCount $AADP1Licenses -NeededCount $neededCount
                 }
             }
             if ($AADP2Users.Count -gt 0) {
@@ -1121,9 +1164,9 @@ function Get-AzureADLicenseStatus {
                     $AADP2Licenses = 0
                 }
                 $neededCount = @($AADP2Users | Sort-Object -Unique).Count
-                Write-Message "Found $neededCount needed, $AADP2Licenses enabled AADP2 licenses"
+                Write-Message "Found $neededCount needed, $AADP2Licenses enabled EIDP2 licenses"
                 if ($AADP2Licenses -lt $neededCount) {
-                    Add-Result -PlanName 'Azure Active Directory Premium P2' -EnabledCount $AADP2Licenses -NeededCount $neededCount
+                    Add-Result -PlanName 'Entra ID Premium P2' -EnabledCount $AADP2Licenses -NeededCount $neededCount
                 }
             }
             if ($ATPUsers.Count -gt 0) {
@@ -1278,10 +1321,10 @@ function Get-AzureADLicenseStatus {
                 }
                 $null = $outputs.AppendLine('</table></p>
                                                 <p>The following criteria were used during the checkup:<ul>
-                                                <li>Check <em>Azure AD P1</em> based on groups using dynamic user membership</li>
-                                                <li>Check <em>Azure AD P1</em> based on applications using group-based assignment</li>
-                                                <li>Check <em>Azure AD P1/P2</em> based on users covered by Conditional Access</li>
-                                                <li>Check <em>Azure AD P2</em> based on users eligible for Privileged Identity Management</li>
+                                                <li>Check <em>Entra ID P1</em> based on groups using dynamic user membership</li>
+                                                <li>Check <em>Entra ID P1</em> based on applications using group-based assignment</li>
+                                                <li>Check <em>Entra ID P1/P2</em> based on users covered by Conditional Access</li>
+                                                <li>Check <em>Entra ID P2</em> based on users eligible for Privileged Identity Management</li>
                                                 <li>Check <em>Defender for Office 365 P1/P2</em> based on protected Exchange Online recipients</li>
                                                 <li>Check <em>Intune Device</em> based on devices managed by Intune and used by unlicensed users</li></ul></p>')
             }
@@ -1370,7 +1413,8 @@ function Get-AzureADLicenseStatus {
                                                 <p><table>
                                                 <tr><th rowspan=2>Priority</th>
                                                 <th rowspan=2 class=rule>License</th>
-                                                <th colspan=4 class=rule>Account</th>
+                                                <th colspan=5 class=rule>Account</th>
+                                                <th rowspan=2 class=rule>Device</th>
                                                 <th colspan=1 class=rule>OneDrive</th>
                                                 <th colspan=2 class=rule>Mailbox</th>
                                                 <th colspan=4 class=rule>Apps</th></tr>
@@ -1378,6 +1422,7 @@ function Get-AzureADLicenseStatus {
                                                 <th>Guest</th>
                                                 <th>Created</th>
                                                 <th>Active</th>
+                                                <th>Licensed</th>
                                                 <th class=rule>Storage</th>
                                                 <th class=rule>Storage</th>
                                                 <th>Archive</th>
@@ -1410,6 +1455,18 @@ function Get-AzureADLicenseStatus {
                     }
                     else {
                         $ruleSetting_lastActiveEarlierThan = '-'
+                    }
+                    if ($preferableSKU.LastLicenseChangeEarlierThan -ne [SKURule]::LastLicenseChangeEarlierThanDefault()) {
+                        $ruleSetting_lastLicenseChangeEarlierThan = $preferableSKU.LastLicenseChangeEarlierThan
+                    }
+                    else {
+                        $ruleSetting_lastLicenseChangeEarlierThan = '-'
+                    }
+                    if ($preferableSKU.DeviceOwned -ne [SKURule]::DeviceOwnedDefault()) {
+                        $ruleSetting_deviceOwned = $preferableSKU.DeviceOwned
+                    }
+                    else {
+                        $ruleSetting_deviceOwned = '-'
                     }
                     if ($preferableSKU.OneDriveGBUsedLessThan -ne [SKURule]::OneDriveGBUsedLessThanDefault()) {
                         $ruleSetting_oneDriveGBUsedLessThan = $preferableSKU.OneDriveGBUsedLessThan
@@ -1453,13 +1510,15 @@ function Get-AzureADLicenseStatus {
                     else {
                         $ruleSetting_webAppUsed = '-'
                     }
-                    $null = $outputs.AppendLine(('<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td><td>{4:&l\t\;yyyy&#8209\;MM&#8209\;dd}</td><td>{5:&l\t\;yyyy&#8209\;MM&#8209\;dd}</td><td>{6:&lt\;0.#&nbsp\;GB}</td><td>{7:&lt\;0.#&nbsp\;GB}</td><td>{8}</td><td>{9}</td><td>{10}</td><td>{11}</td><td>{12}</td></tr>' -f
+                    $null = $outputs.AppendLine(('<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td><td>{4:&l\t\;yyyy&#8209\;MM&#8209\;dd}</td><td>{5:&l\t\;yyyy&#8209\;MM&#8209\;dd}</td><td>{6:&l\t\;yyyy&#8209\;MM&#8209\;dd}</td><td>{7}</td><td>{8:&lt\;0.#&nbsp\;GB}</td><td>{9:&lt\;0.#&nbsp\;GB}</td><td>{10}</td><td>{11}</td><td>{12}</td><td>{13}</td><td>{14}</td></tr>' -f
                                                     ($i + 1),
                                                     (Get-SKUName -SKUID $preferableSKU.SKUID),
                                                     $ruleSetting_accountEnabled,
                                                     $ruleSetting_accountGuest,
                                                     $ruleSetting_createdEarlierThan,
                                                     $ruleSetting_lastActiveEarlierThan,
+                                                    $ruleSetting_lastLicenseChangeEarlierThan,
+                                                    $ruleSetting_deviceOwned,
                                                     $ruleSetting_oneDriveGBUsedLessThan,
                                                     $ruleSetting_mailboxGBUsedLessThan,
                                                     $ruleSetting_mailboxHasArchive,
@@ -1476,7 +1535,7 @@ function Get-AzureADLicenseStatus {
             # Configure and send email
             $email = @{
                 'message' = @{
-                    'subject' = 'Azure AD licenses need attention'
+                    'subject' = 'Entra ID licenses need attention'
                     'importance' = 'normal'
                     'body' = @{
                         'contentType' = 'HTML'
@@ -1493,7 +1552,7 @@ function Get-AzureADLicenseStatus {
                 })
             }
             if ($critical) {
-                $email['message']['subject'] = 'Azure AD licenses need urgent attention'
+                $email['message']['subject'] = 'Entra ID licenses need urgent attention'
                 $email['message']['importance'] = 'high'
                 $email['message'].Add('ccRecipients', [System.Collections.Generic.List[hashtable]]::new())
                 foreach ($recipientAddress in $RecipientAddresses_critical) {
@@ -1577,6 +1636,6 @@ function Get-AzureADLicenseStatus {
         }
         #endregion
 
-        Disconnect-MgGraph | Out-Null
+        $null = Disconnect-MgGraph
     }
 }
