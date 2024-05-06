@@ -658,7 +658,7 @@ function Get-AzureADLicenseStatus {
                     })
                 }
                 else {
-                    Write-Message -Message "Found duplicate user name $($entry.'User Principal Name') in OneDrive usage reports" -Type Error -Category InvalidData
+                    Write-Message -Message "Found duplicate user name $($entry.'Owner Principal Name') in OneDrive usage reports" -Type Error -Category InvalidData
                 }
             }
             if ($appUsage.Keys.Count -gt 0 -and
