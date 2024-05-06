@@ -83,7 +83,7 @@ function Initialize-Module {
     $script:nestingLevel = 0
     $script:outputs = [System.Text.StringBuilder]::new()
     $script:results = @{}
-    $script:skuTranslate = [string]::new([char[]]((Invoke-WebRequest -Uri 'https://download.microsoft.com/download/e/3/e/e3e9faf2-f28b-490a-9ada-c6089a1fc5b0/Product%20names%20and%20service%20plan%20identifiers%20for%20licensing.csv' -UseBasicParsing).Content)) | ConvertFrom-Csv
+    $script:skuTranslate = [System.Text.Encoding]::UTF8.GetString((Invoke-WebRequest -Uri 'https://download.microsoft.com/download/e/3/e/e3e9faf2-f28b-490a-9ada-c6089a1fc5b0/Product%20names%20and%20service%20plan%20identifiers%20for%20licensing.csv' -UseBasicParsing).Content) | ConvertFrom-Csv
     $script:appUsage = @{}
     $script:mailboxUsage = @{}
     $script:driveUsage = @{}
@@ -661,7 +661,7 @@ function Get-AzureADLicenseStatus {
                     })
                 }
                 else {
-                    Write-Message -Message "Found duplicate user name $($entry.'User Principal Name') in OneDrive usage reports" -Type Error
+                    Write-Message -Message "Found duplicate user name $($entry.'Owner Principal Name') in OneDrive usage reports" -Type Error
                 }
             }
             if ($appUsage.Keys.Count -gt 0 -and
