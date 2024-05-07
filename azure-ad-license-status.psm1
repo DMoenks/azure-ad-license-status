@@ -899,6 +899,7 @@ function Get-AzureADLicenseStatus {
                 Write-Message "Found 0 human users, property mismatch" -Type Error -Category InvalidArgument
             }
             if ($humanUsers.Count -gt 0) {
+                $humanUsersHashSet = [System.Collections.Generic.HashSet[guid]]@($humanUsers.id)
                 # Entra ID P1 based on groups using dynamic user membership
                 $dynamicGroupCount = 0
                 $URI = 'https://graph.microsoft.com/v1.0/groups?$filter=groupTypes/any(x:x eq ''DynamicMembership'')&$select=id,membershipRule&$top={0}' -f $pageSize
@@ -910,8 +911,15 @@ function Get-AzureADLicenseStatus {
                     $URI = $data['@odata.nextLink']
                     # Analyze dynamic groups
                     if ($null -ne ($dynamicUserGroups = $dynamicGroups | Where-Object{$_.membershipRule -like '*user.*'})) {
+                        <#
                         if ($null -ne ($matchedUsers = Compare-Object $humanUsers.id (Get-AADGroupMember -GroupIDs $dynamicUserGroups.id) -ExcludeDifferent -IncludeEqual)) {
                             $AADP1Users.AddRange([guid[]]@($matchedUsers.InputObject))
+                        }
+                        #>
+                        $tmpUsersHashSet = [System.Collections.Generic.HashSet[guid]](Get-AADGroupMember -GroupIDs $dynamicUserGroups.id)
+                        $tmpUsersHashSet.IntersectWith($humanUsersHashSet)
+                        if ($tmpUsersHashSet.Count -gt 0) {
+                            $AADP1Users.AddRange([guid[]]@($tmpUsersHashSet))
                         }
                     }
                 }
@@ -929,8 +937,15 @@ function Get-AzureADLicenseStatus {
                     foreach ($application in $applications) {
                         $applicationData = Invoke-MgGraphRequest -Method GET -Uri ('https://graph.microsoft.com/v1.0/servicePrincipals/{0}?$expand=appRoleAssignedTo&$select=id,appRoleAssignedTo' -f $application.id)
                         if ($null -ne ($applicationGroups = $applicationData.appRoleAssignedTo | Where-Object{$_.principalType -eq 'Group'})) {
+                            <#
                             if ($null -ne ($matchedUsers = Compare-Object $humanUsers.id (Get-AADGroupMember -GroupIDs $applicationGroups.principalId) -ExcludeDifferent -IncludeEqual)) {
                                 $AADP1Users.AddRange([guid[]]@($matchedUsers.InputObject))
+                            }
+                            #>
+                            $tmpUsersHashSet = [System.Collections.Generic.HashSet[guid]](Get-AADGroupMember -GroupIDs $applicationGroups.principalId)
+                            $tmpUsersHashSet.IntersectWith($humanUsersHashSet)
+                            if ($tmpUsersHashSet.Count -gt 0) {
+                                $AADP1Users.AddRange([guid[]]@($tmpUsersHashSet))
                             }
                         }
                     }
@@ -975,6 +990,7 @@ function Get-AzureADLicenseStatus {
                                 $excludeGroupUsers = @()
                             }
                             if ($null -ne ($conditionalAccessUsers = Compare-Object -ReferenceObject ([guid[]]$includeUsers + [guid[]]$includeGroupUsers) -DifferenceObject ([guid[]]$excludeUsers + [guid[]]$excludeGroupUsers) | Where-Object{$_.SideIndicator -eq '<='})) {
+                                <#
                                 if ($null -ne ($matchedUsers = Compare-Object $humanUsers.id $conditionalAccessUsers.InputObject -ExcludeDifferent -IncludeEqual)) {
                                     if ($conditionalAccessPolicy.conditions.userRiskLevels.Count -gt 0 -or $conditionalAccessPolicy.conditions.signInRiskLevels.Count -gt 0) {
                                         $AADP2Users.AddRange([guid[]]@($matchedUsers.InputObject))
@@ -983,6 +999,15 @@ function Get-AzureADLicenseStatus {
                                         $AADP1Users.AddRange([guid[]]@($matchedUsers.InputObject))
                                     }
                                 }
+                                #>
+                                $tmpUsersHashSet = [System.Collections.Generic.HashSet[guid]]@($conditionalAccessUsers.InputObject)
+                                $tmpUsersHashSet.IntersectWith($humanUsersHashSet)
+                                if ($conditionalAccessPolicy.conditions.userRiskLevels.Count -gt 0 -or $conditionalAccessPolicy.conditions.signInRiskLevels.Count -gt 0) {
+                                    $AADP2Users.AddRange([guid[]]@($tmpUsersHashSet))
+                                }
+                                else {
+                                    $AADP1Users.AddRange([guid[]]@($tmpUsersHashSet))
+                                }                                
                             }
                         }
                     }
@@ -999,8 +1024,15 @@ function Get-AzureADLicenseStatus {
                     $URI = $data['@odata.nextLink']
                     # Analyze role assignments
                     if ($null -ne ($eligibleRoleAssignments = $roleAssignments | Where-Object{$_.scheduleInfo.startDateTime -le [datetime]::Today -and ($_.scheduleInfo.expiration.endDateTime -ge [datetime]::Today -or $_.scheduleInfo.expiration.type -eq 'noExpiration')})) {
+                        <#
                         if ($null -ne ($matchedUsers = Compare-Object $humanUsers.id $eligibleRoleAssignments.principalId -ExcludeDifferent -IncludeEqual)) {
                             $AADP2Users.AddRange([guid[]]@($matchedUsers.InputObject))
+                        }
+                        #>
+                        $tmpUsersHashSet = [System.Collections.Generic.HashSet[guid]]@($eligibleRoleAssignments.principalId)
+                        $tmpUsersHashSet.IntersectWith($humanUsersHashSet)
+                        if ($tmpUsersHashSet.Count -gt 0) {
+                            $AADP2Users.AddRange([guid[]]@($tmpUsersHashSet))
                         }
                     }
                 }
