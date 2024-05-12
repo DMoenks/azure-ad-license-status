@@ -240,13 +240,13 @@ function Get-EXOGroupMember {
     # Processing
     $groupMembers = [System.Collections.Generic.List[psobject]]::new()
     foreach ($groupID in $GroupIDs) {
-        if ($null -ne ($group = [pscustomobject](Get-EXORecipient $groupID.Guid -RecipientTypeDetails $EXOTypes_group -Properties $EXOProperties) | Select-Object -Property $EXOProperties)) {
+        if ($null -ne ($group = [pscustomobject](Get-EXORecipient $groupID -RecipientTypeDetails $EXOTypes_group -Properties $EXOProperties) | Select-Object -Property $EXOProperties)) {
             switch ($group.RecipientTypeDetails) {
                 'GroupMailbox' {
-                    $members = @(Get-UnifiedGroupLinks $group.ExchangeObjectId.Guid -LinkType Members -ResultSize Unlimited | Select-Object -Property $EXOProperties)
+                    $members = @(Get-UnifiedGroupLinks $group.ExternalDirectoryObjectId -LinkType Members -ResultSize Unlimited | Select-Object -Property $EXOProperties)
                 }
                 Default {
-                    $members = @(Get-DistributionGroupMember $group.ExchangeObjectId.Guid -ResultSize Unlimited | Select-Object -Property $EXOProperties)
+                    $members = @(Get-DistributionGroupMember $group.ExternalDirectoryObjectId -ResultSize Unlimited | Select-Object -Property $EXOProperties)
                 }
             }
             foreach ($member in $members) {
@@ -255,13 +255,13 @@ function Get-EXOGroupMember {
                         $groupMembers.Add($member)
                     }
                     {$_ -in $EXOTypes_group} {
-                        $groupMembers.AddRange((Get-EXOGroupMember -GroupIDs $member.ExchangeObjectId))
+                        $groupMembers.AddRange((Get-EXOGroupMember -GroupIDs $member.ExternalDirectoryObjectId))
                     }
                 }
             }
         }
     }
-    $groupMembers_unique = @($groupMembers | Sort-Object -Unique)
+    $groupMembers_unique = @($groupMembers | Sort-Object -Property $EXOProperties -Unique)
     Write-Message "Found $($groupMembers_unique.Count) members" -Type Verbose
     $nestingLevel--
     Write-Output ([pscustomobject[]]$groupMembers_unique) -NoEnumerate
@@ -299,7 +299,7 @@ function Resolve-ATPRecipient {
     if ($null -ne $Groups) {
         $categoryCount++
         if ($null -ne ($recipients = [pscustomobject[]]@(Get-EXORecipient -RecipientTypeDetails $EXOTypes_group -Properties $EXOProperties -ResultSize Unlimited) | Select-Object -Property $EXOProperties | Where-Object{$_.PrimarySmtpAddress -in $Groups})) {
-            $affectedAsGroup.AddRange((Get-EXOGroupMember -GroupIDs $recipients.ExchangeObjectId))
+            $affectedAsGroup.AddRange((Get-EXOGroupMember -GroupIDs $recipients.ExternalDirectoryObjectId))
         }
     }
     Write-Message "Found $($affectedAsGroup.Count) recipients by groups" -Type Verbose
@@ -309,12 +309,12 @@ function Resolve-ATPRecipient {
             $affectedAsDomain.AddRange([pscustomobject[]]@($recipients))
         }
         if ($null -ne ($recipients = [pscustomobject[]]@(Get-EXORecipient -RecipientTypeDetails $EXOTypes_group -Properties $EXOProperties -ResultSize Unlimited) | Select-Object -Property $EXOProperties | Where-Object{$_.PrimarySmtpAddress.Split('@')[1] -in $Domains})) {
-            $affectedAsDomain.AddRange((Get-EXOGroupMember -GroupIDs $recipients.ExchangeObjectId))
+            $affectedAsDomain.AddRange((Get-EXOGroupMember -GroupIDs $recipients.ExternalDirectoryObjectId))
         }
     }
     Write-Message "Found $($affectedAsDomain.Count) recipients by domains" -Type Verbose
-    if ($null -ne ($resolvedUsers = @($affectedAsUser | Sort-Object -Unique) + @($affectedAsGroup | Sort-Object -Unique) + @($affectedAsDomain | Sort-Object -Unique) | Group-Object -Property ExchangeObjectId | Where-Object{$_.Count -eq $categoryCount})) {
-        $resolvedUsers_unique = @($resolvedUsers.Group | Sort-Object -Unique)
+    if ($null -ne ($resolvedUsers = @($affectedAsUser | Sort-Object -Property $EXOProperties -Unique) + @($affectedAsGroup | Sort-Object -Property $EXOProperties -Unique) + @($affectedAsDomain | Sort-Object -Property $EXOProperties -Unique) | Group-Object -Property ExternalDirectoryObjectId | Where-Object{$_.Count -eq $categoryCount})) {
+        $resolvedUsers_unique = @($resolvedUsers.Group | Sort-Object -Property $EXOProperties -Unique)
         Write-Message "Found $($resolvedUsers_unique.Count) recipients by combination" -Type Verbose
         $nestingLevel--
         Write-Output ([pscustomobject[]]$resolvedUsers_unique) -NoEnumerate
@@ -358,8 +358,8 @@ function Get-ATPRecipient {
     $null -eq $IncludedGroups -and
     $null -eq $IncludedDomains) {
         $userRecipients = [pscustomobject[]]@(Get-EXORecipient -RecipientTypeDetails $EXOTypes_user -Properties $EXOProperties -ResultSize Unlimited) | Select-Object -Property $EXOProperties
-        $groupRecipients = Get-EXOGroupMember -GroupIDs ([pscustomobject[]]@(Get-EXORecipient -RecipientTypeDetails $EXOTypes_group -Properties $EXOProperties -ResultSize Unlimited)).ExchangeObjectId
-        $includedRecipients = [pscustomobject[]]@($userRecipients + $groupRecipients | Sort-Object -Unique)
+        $groupRecipients = Get-EXOGroupMember -GroupIDs ([pscustomobject[]]@(Get-EXORecipient -RecipientTypeDetails $EXOTypes_group -Properties $EXOProperties -ResultSize Unlimited)).ExternalDirectoryObjectId
+        $includedRecipients = [pscustomobject[]]@($userRecipients + $groupRecipients | Sort-Object -Property $EXOProperties -Unique)
     }
     else {
         $includedRecipients = Resolve-ATPRecipient -Users $IncludedUsers -Groups $IncludedGroups -Domains $IncludedDomains
@@ -377,12 +377,13 @@ function Get-ATPRecipient {
     Write-Message "Found $($excludedRecipients.Count) excluded recipients" -Type Verbose
     Write-Message 'Checking affected recipients' -Type Verbose
     $affectedRecipients = [System.Collections.Generic.List[psobject]]::new()
-    if ($null -ne ($affectedRecipientComparison = Compare-Object -ReferenceObject $includedRecipients -DifferenceObject $excludedRecipients)) {
+    # Replace with 'ExceptWith'
+    if ($null -ne ($affectedRecipientComparison = Compare-Object -ReferenceObject $includedRecipients -DifferenceObject $excludedRecipients -Property $EXOProperties)) {
         if ($null -ne ($affectedRecipientResults = $affectedRecipientComparison | Where-Object{$_.SideIndicator -eq '<='})) {
-            $affectedRecipients.AddRange([pscustomobject[]]@($affectedRecipientResults.InputObject))
+            $affectedRecipients.AddRange([pscustomobject[]]@($affectedRecipientResults | Select-Object -Property $EXOProperties))
         }
     }
-    $affectedRecipients_unique = @($affectedRecipients | Sort-Object -Unique)
+    $affectedRecipients_unique = @($affectedRecipients | Sort-Object -Property $EXOProperties -Unique)
     Write-Message "Found $($affectedRecipients_unique.Count) affected recipients" -Type Verbose
     $nestingLevel--
     Write-Output ([pscustomobject[]]$affectedRecipients_unique) -NoEnumerate
@@ -429,7 +430,6 @@ $EXOCmdlets = @(
     'Get-SafeLinksRule',
     'Get-SafeLinksPolicy')
 $EXOProperties = @(
-    'ExchangeObjectId',
     'ExternalDirectoryObjectId',
     'PrimarySmtpAddress',
     'RecipientTypeDetails')
@@ -571,9 +571,20 @@ function Get-AzureADLicenseStatus {
             foreach ($differenceSKU in $organizationSKUs | Where-Object{$_.skuId -ne $referenceSKU.skuId}) {
                 if ($null -ne ($referenceServicePlans = $referenceSKU.servicePlans | Where-Object{$_.appliesTo -eq 'User'}) -and
                 $null -ne ($differenceServicePlans = $differenceSKU.servicePlans | Where-Object{$_.appliesTo -eq 'User'})) {
+                    # Replace with 'IsSubsetOf'
+                    <#
                     if ($null -ne ($comparisonSKU = Compare-Object -ReferenceObject $referenceServicePlans.servicePlanId -DifferenceObject $differenceServicePlans.servicePlanId -IncludeEqual) -and
                     $comparisonSKU.SideIndicator -contains '==' -and
                     $comparisonSKU.SideIndicator -notcontains '=>') {
+                        if (-not $superiorSKUs_organization.ContainsKey($differenceSKU.skuId)) {
+                            $superiorSKUs_organization.Add($differenceSKU.skuId, [System.Collections.Generic.List[guid]]::new())
+                        }
+                        $superiorSKUs_organization[$differenceSKU.skuId].Add($referenceSKU.skuId)
+                    }
+                    #>
+                    $referenceServicePlanIDs = [System.Collections.Generic.HashSet[guid]]$referenceServicePlans.servicePlanId
+                    $differenceServicePlanIDs = [System.Collections.Generic.HashSet[guid]]$differenceServicePlans.servicePlanId
+                    if ($referenceServicePlanIDs.IsSupersetOf($differenceServicePlanIDs)) {
                         if (-not $superiorSKUs_organization.ContainsKey($differenceSKU.skuId)) {
                             $superiorSKUs_organization.Add($differenceSKU.skuId, [System.Collections.Generic.List[guid]]::new())
                         }
@@ -709,12 +720,19 @@ function Get-AzureADLicenseStatus {
                     $userSKUs_interchangeable = @()
                     if ($null -ne $userSKUs -and
                     $null -ne $InterchangeableSKUs) {
+                        # Replace with 'IntersectWith'
+                        <#
                         if ($null -ne ($comparison_interchangeable = Compare-Object -ReferenceObject $userSKUs -DifferenceObject $InterchangeableSKUs -ExcludeDifferent -IncludeEqual)) {
                             $userSKUs_interchangeable = @($comparison_interchangeable.InputObject)
                         }
+                        #>
+                        $userSKUs_interchangeable = [System.Collections.Generic.HashSet[guid]]$userSKUs
+                        $organizationSKUs_interchangeable = [System.Collections.Generic.HashSet[guid]]$InterchangeableSKUs
+                        $userSKUs_interchangeable.IntersectWith($organizationSKUs_interchangeable)
                     }
                     # Identify optimizable SKUs, based on organization-level calculations
                     if ($null -ne ($comparison_replaceableOrganization = $userSKUs | Where-Object{$_ -in $superiorSKUs_organization.Keys} | ForEach-Object{$superiorSKUs_organization[$_]})) {
+                        # Replace with 'IntersectWith'
                         $userSKUs_optimizable = Compare-Object -ReferenceObject $userSKUs -DifferenceObject $comparison_replaceableOrganization -ExcludeDifferent -IncludeEqual | ForEach-Object{$superiorSKU = $_.InputObject; $superiorSKUs_organization.Keys | Where-Object{$superiorSKUs_organization[$_] -contains $superiorSKU}} | Where-Object{$_ -in $userSKUs} | Sort-Object -Unique
                     }
                     else {
@@ -735,9 +753,20 @@ function Get-AzureADLicenseStatus {
                         foreach ($differenceSKU in $skuid_enabledPlans.Keys | Where-Object{$_ -ne $referenceSKU}) {
                             if ($null -ne ($referenceServicePlans = $skuid_enabledPlans[$referenceSKU]) -and
                             $null -ne ($differenceServicePlans = $skuid_enabledPlans[$differenceSKU])) {
+                                # Replace with 'IsSubsetOf'
+                                <#
                                 if ($null -ne ($comparisonSKU = Compare-Object -ReferenceObject $referenceServicePlans -DifferenceObject $differenceServicePlans -IncludeEqual) -and
                                 $comparisonSKU.SideIndicator -contains '==' -and
                                 $comparisonSKU.SideIndicator -notcontains '=>') {
+                                    if (-not $superiorSKUs_user.ContainsKey($differenceSKU)) {
+                                        $superiorSKUs_user.Add($differenceSKU, [System.Collections.Generic.List[guid]]::new())
+                                    }
+                                    $superiorSKUs_user[$differenceSKU].Add($referenceSKU)
+                                }
+                                #>
+                                $referenceServicePlanIDs = [System.Collections.Generic.HashSet[guid]]$referenceServicePlans.servicePlanId
+                                $differenceServicePlanIDs = [System.Collections.Generic.HashSet[guid]]$differenceServicePlans.servicePlanId
+                                if ($referenceServicePlanIDs.IsSupersetOf($differenceServicePlanIDs)) {
                                     if (-not $superiorSKUs_user.ContainsKey($differenceSKU)) {
                                         $superiorSKUs_user.Add($differenceSKU, [System.Collections.Generic.List[guid]]::new())
                                     }
@@ -747,6 +776,7 @@ function Get-AzureADLicenseStatus {
                         }
                     }
                     if ($null -ne ($comparison_replaceableUser = $userSKUs | Where-Object{$_ -in $superiorSKUs_user.Keys} | ForEach-Object{$superiorSKUs_user[$_]})) {
+                        # Replace with 'IntersectWith'
                         $userSKUs_removable = Compare-Object -ReferenceObject $userSKUs -DifferenceObject $comparison_replaceableUser -ExcludeDifferent -IncludeEqual | ForEach-Object{$superiorSKU = $_.InputObject; $superiorSKUs_user.Keys | Where-Object{$superiorSKUs_user[$_] -contains $superiorSKU}} | Where-Object{$_ -in $userSKUs} | Sort-Object -Unique
                     }
                     else {
@@ -989,6 +1019,10 @@ function Get-AzureADLicenseStatus {
                             else {
                                 $excludeGroupUsers = @()
                             }
+                            # Replace with 'ExceptWith'
+                            $includeUsers_Complete = [System.Collections.Generic.HashSet[guid]]([guid[]]$includeUsers + [guid[]]$includeGroupUsers)
+                            $excludeUsers_Complete = [System.Collections.Generic.HashSet[guid]]([guid[]]$excludeUsers + [guid[]]$excludeGroupUsers)
+                            $includeUsers_Complete.ExceptWith($excludeUsers_Complete)
                             if ($null -ne ($conditionalAccessUsers = Compare-Object -ReferenceObject ([guid[]]$includeUsers + [guid[]]$includeGroupUsers) -DifferenceObject ([guid[]]$excludeUsers + [guid[]]$excludeGroupUsers) | Where-Object{$_.SideIndicator -eq '<='})) {
                                 <#
                                 if ($null -ne ($matchedUsers = Compare-Object $humanUsers.id $conditionalAccessUsers.InputObject -ExcludeDifferent -IncludeEqual)) {
@@ -1060,6 +1094,7 @@ function Get-AzureADLicenseStatus {
                 Write-Message -Message 'Failed to authenticate with Exchange Online' -Type Error -Category AuthenticationError
             }
             if ($exchangeAuthentication) {
+                # Replace with 'IntersectWith'?
                 if ($null -ne (Compare-Object -ReferenceObject $organizationSKUs.servicePlans.servicePlanId -DifferenceObject @('f20fedf3-f3c3-43c3-8267-2bfdd51c0939', '8e0c0a52-6a6c-4d40-8370-dd62790dcd70') -ExcludeDifferent -IncludeEqual)) {
                     # Protected mailboxes
                     if ($null -ne ($organizationSKUs | Where-Object{@($_.servicePlans.servicePlanId) -contains '8e0c0a52-6a6c-4d40-8370-dd62790dcd70'})) {
