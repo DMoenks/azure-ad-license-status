@@ -377,7 +377,6 @@ function Get-ATPRecipient {
     Write-Message "Found $($excludedRecipients.Count) excluded recipients" -Type Verbose
     Write-Message 'Checking affected recipients' -Type Verbose
     $affectedRecipients = [System.Collections.Generic.List[psobject]]::new()
-    # Replace with 'ExceptWith'
     if ($null -ne ($affectedRecipientComparison = Compare-Object -ReferenceObject $includedRecipients -DifferenceObject $excludedRecipients -Property $EXOProperties)) {
         if ($null -ne ($affectedRecipientResults = $affectedRecipientComparison | Where-Object{$_.SideIndicator -eq '<='})) {
             $affectedRecipients.AddRange([pscustomobject[]]@($affectedRecipientResults | Select-Object -Property $EXOProperties))
@@ -764,8 +763,8 @@ function Get-AzureADLicenseStatus {
                                     $superiorSKUs_user[$differenceSKU].Add($referenceSKU)
                                 }
                                 #>
-                                $referenceServicePlanIDs = [System.Collections.Generic.HashSet[guid]]$referenceServicePlans.servicePlanId
-                                $differenceServicePlanIDs = [System.Collections.Generic.HashSet[guid]]$differenceServicePlans.servicePlanId
+                                $referenceServicePlanIDs = [System.Collections.Generic.HashSet[guid]]$referenceServicePlans
+                                $differenceServicePlanIDs = [System.Collections.Generic.HashSet[guid]]$differenceServicePlans
                                 if ($referenceServicePlanIDs.IsSupersetOf($differenceServicePlanIDs)) {
                                     if (-not $superiorSKUs_user.ContainsKey($differenceSKU)) {
                                         $superiorSKUs_user.Add($differenceSKU, [System.Collections.Generic.List[guid]]::new())
@@ -1020,11 +1019,8 @@ function Get-AzureADLicenseStatus {
                                 $excludeGroupUsers = @()
                             }
                             # Replace with 'ExceptWith'
-                            $includeUsers_Complete = [System.Collections.Generic.HashSet[guid]]([guid[]]$includeUsers + [guid[]]$includeGroupUsers)
-                            $excludeUsers_Complete = [System.Collections.Generic.HashSet[guid]]([guid[]]$excludeUsers + [guid[]]$excludeGroupUsers)
-                            $includeUsers_Complete.ExceptWith($excludeUsers_Complete)
+                            <#
                             if ($null -ne ($conditionalAccessUsers = Compare-Object -ReferenceObject ([guid[]]$includeUsers + [guid[]]$includeGroupUsers) -DifferenceObject ([guid[]]$excludeUsers + [guid[]]$excludeGroupUsers) | Where-Object{$_.SideIndicator -eq '<='})) {
-                                <#
                                 if ($null -ne ($matchedUsers = Compare-Object $humanUsers.id $conditionalAccessUsers.InputObject -ExcludeDifferent -IncludeEqual)) {
                                     if ($conditionalAccessPolicy.conditions.userRiskLevels.Count -gt 0 -or $conditionalAccessPolicy.conditions.signInRiskLevels.Count -gt 0) {
                                         $AADP2Users.AddRange([guid[]]@($matchedUsers.InputObject))
@@ -1033,15 +1029,17 @@ function Get-AzureADLicenseStatus {
                                         $AADP1Users.AddRange([guid[]]@($matchedUsers.InputObject))
                                     }
                                 }
-                                #>
-                                $tmpUsersHashSet = [System.Collections.Generic.HashSet[guid]]@($conditionalAccessUsers.InputObject)
-                                $tmpUsersHashSet.IntersectWith($humanUsersHashSet)
-                                if ($conditionalAccessPolicy.conditions.userRiskLevels.Count -gt 0 -or $conditionalAccessPolicy.conditions.signInRiskLevels.Count -gt 0) {
-                                    $AADP2Users.AddRange([guid[]]@($tmpUsersHashSet))
-                                }
-                                else {
-                                    $AADP1Users.AddRange([guid[]]@($tmpUsersHashSet))
-                                }                                
+                            }
+                            #>
+                            $includeUsers_Complete = [System.Collections.Generic.HashSet[guid]]([guid[]]$includeUsers + [guid[]]$includeGroupUsers)
+                            $excludeUsers_Complete = [System.Collections.Generic.HashSet[guid]]([guid[]]$excludeUsers + [guid[]]$excludeGroupUsers)
+                            $includeUsers_Complete.ExceptWith($excludeUsers_Complete)
+                            $includeUsers_Complete.IntersectWith($humanUsersHashSet)
+                            if ($conditionalAccessPolicy.conditions.userRiskLevels.Count -gt 0 -or $conditionalAccessPolicy.conditions.signInRiskLevels.Count -gt 0) {
+                                $AADP2Users.AddRange([guid[]]@($includeUsers_Complete))
+                            }
+                            else {
+                                $AADP1Users.AddRange([guid[]]@($includeUsers_Complete))
                             }
                         }
                     }
