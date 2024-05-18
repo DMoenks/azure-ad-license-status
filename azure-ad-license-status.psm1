@@ -596,7 +596,6 @@ function Get-AzureADLicenseStatus {
         #endregion
 
         #region: Reports
-        #TODO: Account for duplicate 'Unknown' user names
         if ($AdvancedCheckups) {
             Invoke-MgGraphRequest -Method GET -Uri ('https://graph.microsoft.com/v1.0/reports/getM365AppUserDetail(period=''D{0}'')?$format=text/csv' -f $reportDays) -OutputFilePath "$env:TEMP\appUsage.csv"
             foreach ($entry in Import-Csv "$env:TEMP\appUsage.csv" | Select-Object -Property 'User Principal Name', 'Last Activity Date', 'Windows', 'Mac', 'Mobile', 'Web') {
@@ -907,7 +906,6 @@ function Get-AzureADLicenseStatus {
         #endregion
 
         #region: Advanced
-        #TODO: Account for human-based licensing instead of account-based licensing of AADP1/P2, possibly based on attributes (employeeType, onPremisesExtensionAttributes), assigned licenses, or interactive sign-ins
         if ($AdvancedCheckups.IsPresent) {
             $AADP1Users = [System.Collections.Generic.List[guid]]::new()
             $AADP2Users = [System.Collections.Generic.List[guid]]::new()

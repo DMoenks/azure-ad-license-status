@@ -59,12 +59,14 @@ Check for organization's preferable licenses, based on multiple criteria:
 
 &#x2714; When a user was last active
 
+&#x2714; When a user's licenses were last changed
+
 &#x2714; How much OneDrive storage a user has used
 
 &#x2714; How much mailbox storage a user has used and whether the mailbox has an archive
 
 &#x2714; Whether a user has used Windows/Mac/mobile/web versions of Office applications
 
-&#x2716; Whether a user has enrolled a device in Intune
+&#x2714; Whether a user has enrolled a device in Intune
 
 > DISCLAIMER: Multiple of the criteria above rely on [usage reports](https://admin.microsoft.com/Adminportal/Home#/reportsUsage) available in Microsoft 365 admin center and therefore depend on those reports' accuracy.
