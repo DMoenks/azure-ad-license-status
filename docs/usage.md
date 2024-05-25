@@ -69,23 +69,30 @@ permalink: /usage
   accepts: 'CSV', 'TranslatedCSV', 'JSON'
 - LicensingURL &lt;System.String&gt;  
   Specifies a licensing portal URL to be linked in the report, refers to Microsoft's Volume Licensing Service Center by default  
-  default: https://www.microsoft.com/licensing/servicecenter
+  default: <https://www.microsoft.com/licensing/servicecenter>
 - AdvancedCheckups &lt;System.Management.Automation.SwitchParameter&gt;  
   Specifies if advanced license checkups should be run  
   ATTENTION: Advanced checkups require additional access permissions and might increase the checkup duration
 
 ## 5.2 Types
 
-### 5.2.1 SKUPrice
+## 5.2.1 HumanIdentifier
 
-#### 5.2.1.1 Properties
+### 5.2.1.1 Properties
+
+- AttributeName &lt;System.String&gt;
+- AttributeValues &lt;System.String[]&gt;
+
+### 5.2.2 SKUPrice
+
+#### 5.2.2.1 Properties
 
 - SKUID &lt;System.Guid&gt;
 - Price &lt;System.Decimal&gt;
 
-### 5.2.2 SKURule
+### 5.2.3 SKURule
 
-#### 5.2.2.1 Properties
+#### 5.2.3.1 Properties
 
 - SKUID &lt;System.Guid&gt;
 - AccountEnabled &lt;System.String&gt;  
@@ -98,6 +105,11 @@ permalink: /usage
   default: [SKURule]::CreatedEarlierThanDefault()
 - LastActiveEarlierThan &lt;System.DateTime&gt;  
   default: [SKURule]::LastActiveEarlierThanDefault()
+- LastLicenseChangeEarlierThan &lt;System.DateTime&gt;  
+  default: [SKURule]::LastLicenseChangeEarlierThanDefault()
+- DeviceOwned &lt;System.String&gt;  
+  accepts: 'True', 'False', 'Skip'  
+  default: [SKURule]::DeviceOwnedDefault()
 - OneDriveGBUsedLessThan &lt;System.Decimal&gt;  
   default: [SKURule]::OneDriveGBUsedLessThanDefault()
 - MailboxGBUsedLessThan &lt;System.Decimal&gt;  
@@ -128,6 +140,10 @@ permalink: /usage
   returns: [datetime]::MaxValue
 - LastActiveEarlierThanDefault() &lt;System.DateTime&gt;  
   returns: [datetime]::MaxValue
+- LastLicenseChangeEarlierThanDefault() &lt;System.DateTime&gt;  
+  returns: [datetime]::MaxValue
+- DeviceOwnedDefault() &lt;System.String&gt;  
+  returns: 'Skip'
 - OneDriveGBUsedLessThanDefault() &lt;System.Decimal&gt;  
   returns: [UInt16]::MaxValue
 - MailboxGBUsedLessThanDefault() &lt;System.Decimal&gt;  

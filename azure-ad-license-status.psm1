@@ -14,6 +14,11 @@ class BasicUserResult {
     [guid[]]$RemovableSKUIDs
 }
 
+class HumanIdentifier {
+    [string]$AttributeName
+    [string[]]$AttributeValues
+}
+
 class SKUPrice {
     [guid]$SKUID
     [decimal]$Price
@@ -506,7 +511,7 @@ function Get-AzureADLicenseStatus {
         [ValidateNotNullOrEmpty()]
         [SKUPrice[]]$SKUPrices,
         [ValidateNotNullOrEmpty()]
-        [hashtable]$HumanUserAttributes,
+        [HumanIdentifier[]]$HumanIdentifiers,
         [ValidateSet('CSV', 'TranslatedCSV', 'JSON')]
         [string]$AttachmentFormat,
         [ValidateNotNullOrEmpty()]
@@ -911,8 +916,8 @@ function Get-AzureADLicenseStatus {
             $AADP2Users = [System.Collections.Generic.List[guid]]::new()
             $ATPUsers = [System.Collections.Generic.List[guid]]::new()
             $IntuneDevices = [System.Collections.Generic.List[guid]]::new()
-            # 'Human' users based on parameters
-            $URI = 'https://graph.microsoft.com/v1.0/users?$select=id&$filter={0}&top={1}&$count=true' -f (($humanUserAttributes.Keys | ForEach-Object{"$_ in ('$($humanUserAttributes[$_] -join ''',''')')"}) -join ' and '), $pageSize
+            # 'Human' users based on parameters, based on 'Licensed User' in https://www.microsoft.com/licensing/terms/product/Glossary/all
+            $URI = 'https://graph.microsoft.com/v1.0/users?$select=id&$filter={0}&top={1}&$count=true' -f (($HumanIdentifiers.AttributeName | ForEach-Object{"$_ in ('$(($HumanIdentifiers | Where-Object{$_.AttributeName}).AttributeValues -join ''',''')')"}) -join ' and '), $pageSize
             $humanUsers = [System.Collections.Generic.List[hashtable]]::new()
             try {
                 while ($null -ne $URI) {
@@ -943,10 +948,10 @@ function Get-AzureADLicenseStatus {
                             $AADP1Users.AddRange([guid[]]@($matchedUsers.InputObject))
                         }
                         #>
-                        $tmpUsersHashSet = [System.Collections.Generic.HashSet[guid]](Get-AADGroupMember -GroupIDs $dynamicUserGroups.id)
-                        $tmpUsersHashSet.IntersectWith($humanUsersHashSet)
-                        if ($tmpUsersHashSet.Count -gt 0) {
-                            $AADP1Users.AddRange([guid[]]@($tmpUsersHashSet))
+                        $dynamicGroupsUsersHashSet = [System.Collections.Generic.HashSet[guid]](Get-AADGroupMember -GroupIDs $dynamicUserGroups.id)
+                        $dynamicGroupsUsersHashSet.IntersectWith($humanUsersHashSet)
+                        if ($dynamicGroupsUsersHashSet.Count -gt 0) {
+                            $AADP1Users.AddRange([guid[]]@($dynamicGroupsUsersHashSet))
                         }
                     }
                 }
@@ -969,10 +974,10 @@ function Get-AzureADLicenseStatus {
                                 $AADP1Users.AddRange([guid[]]@($matchedUsers.InputObject))
                             }
                             #>
-                            $tmpUsersHashSet = [System.Collections.Generic.HashSet[guid]](Get-AADGroupMember -GroupIDs $applicationGroups.principalId)
-                            $tmpUsersHashSet.IntersectWith($humanUsersHashSet)
-                            if ($tmpUsersHashSet.Count -gt 0) {
-                                $AADP1Users.AddRange([guid[]]@($tmpUsersHashSet))
+                            $applicationUsersHashSet = [System.Collections.Generic.HashSet[guid]](Get-AADGroupMember -GroupIDs $applicationGroups.principalId)
+                            $applicationUsersHashSet.IntersectWith($humanUsersHashSet)
+                            if ($applicationUsersHashSet.Count -gt 0) {
+                                $AADP1Users.AddRange([guid[]]@($applicationUsersHashSet))
                             }
                         }
                     }
@@ -980,7 +985,7 @@ function Get-AzureADLicenseStatus {
                 Write-Message "Analyzed $applicationCount applications"
                 # Entra ID P1/P2 based on users covered by Conditional Access
                 $conditionalAccessPolicyCount = 0
-                $URI = 'https://graph.microsoft.com/v1.0/identity/conditionalAccess/policies?$select=conditions&$filter=state eq ''enabled'''
+                $URI = 'https://graph.microsoft.com/v1.0/identity/conditionalAccess/policies?$select=displayname,conditions&$filter=state eq ''enabled'''
                 while ($null -ne $URI) {
                     # Retrieve Conditional Access policies
                     $data = Invoke-MgGraphRequest -Method GET -Uri $URI
@@ -998,23 +1003,23 @@ function Get-AzureADLicenseStatus {
                                     $users.AddRange([hashtable[]]($data.value))
                                     $URI = $data['@odata.nextLink']
                                 }
-                                $includeUsers = $users.id
+                                $includeUsers = [guid[]]@($users.id)
                             }
-                            elseif ($null -eq ($includeUsers = @($conditionalAccessPolicy.conditions.users.includeUsers | Where-Object{$_ -ne 'GuestsOrExternalUsers'}))) {
-                                $includeUsers = @()
+                            else {
+                                $includeUsers = [guid[]]@($conditionalAccessPolicy.conditions.users.includeUsers | Where-Object{$_ -ne 'GuestsOrExternalUsers'})
                             }
-                            $excludeUsers = $conditionalAccessPolicy.conditions.users.excludeUsers
+                            $excludeUsers = [guid[]]@($conditionalAccessPolicy.conditions.users.excludeUsers | Where-Object{$_ -ne 'GuestsOrExternalUsers'})
                             if ($conditionalAccessPolicy.conditions.users.includeGroups.Count -gt 0) {
                                 $includeGroupUsers = Get-AADGroupMember -GroupIDs $conditionalAccessPolicy.conditions.users.includeGroups
                             }
                             else {
-                                $includeGroupUsers = @()
+                                $includeGroupUsers = [guid[]]@()
                             }
                             if ($conditionalAccessPolicy.conditions.users.excludeGroups.Count -gt 0) {
                                 $excludeGroupUsers = Get-AADGroupMember -GroupIDs $conditionalAccessPolicy.conditions.users.excludeGroups
                             }
                             else {
-                                $excludeGroupUsers = @()
+                                $excludeGroupUsers = [guid[]]@()
                             }
                             # Replace with 'ExceptWith'
                             <#
@@ -1029,8 +1034,8 @@ function Get-AzureADLicenseStatus {
                                 }
                             }
                             #>
-                            $includeUsers_Complete = [System.Collections.Generic.HashSet[guid]]([guid[]]$includeUsers + [guid[]]$includeGroupUsers)
-                            $excludeUsers_Complete = [System.Collections.Generic.HashSet[guid]]([guid[]]$excludeUsers + [guid[]]$excludeGroupUsers)
+                            $includeUsers_Complete = [System.Collections.Generic.HashSet[guid]][guid[]]@($includeUsers + $includeGroupUsers)
+                            $excludeUsers_Complete = [System.Collections.Generic.HashSet[guid]][guid[]]@($excludeUsers + $excludeGroupUsers)
                             $includeUsers_Complete.ExceptWith($excludeUsers_Complete)
                             $includeUsers_Complete.IntersectWith($humanUsersHashSet)
                             if ($conditionalAccessPolicy.conditions.userRiskLevels.Count -gt 0 -or $conditionalAccessPolicy.conditions.signInRiskLevels.Count -gt 0) {
