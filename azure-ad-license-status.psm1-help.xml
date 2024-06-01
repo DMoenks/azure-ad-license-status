@@ -486,7 +486,7 @@
                     <dev:possibleValue>
                         <dev:value>JSON</dev:value>
                         <maml:description>
-                            <maml:para>User results will be attached as a JSON file, using SKU IDs</maml:para>
+                            <maml:para>User results will be attached as JSON file, using SKU IDs</maml:para>
                         </maml:description>
                     </dev:possibleValue>
                 </dev:possibleValues>
