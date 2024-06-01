@@ -6,12 +6,12 @@
             <command:verb>Get</command:verb>
             <command:noun>AzureADLicenseStatus</command:noun>
             <maml:description>
-                <maml:para>Creates an Azure AD license report based on license assignments and consumption</maml:para>
+                <maml:para>Creates an Entra ID license report based on license assignments and consumption</maml:para>
             </maml:description>
         </command:details>
         <maml:description>
-            <maml:para>This function is meant to conquer side-effects of semi-automatic license assignments for Microsoft services in Azure AD, i.e. the combination of group-based licensing with manual group membership management, by regularly reporting both on the amount of available licenses per SKU and any conflicting license assignments per user account. This allows for somewhat easier license management without either implementing a full-fledged software asset management solution or hiring a licensing service provider.</maml:para>
-            <maml:para>SKU IDs and names are in accordance with https://learn.microsoft.com/azure/active-directory/enterprise-users/licensing-service-plan-reference</maml:para>
+            <maml:para>This function is meant to conquer side-effects of manual or semi-automatic license assignments for Microsoft services in Entra ID, e.g. the combination of group-based licensing with manual group membership management, by regularly reporting both on the amount of available licenses per SKU and any overlapping license assignments per user account. This allows for somewhat easier license management without either implementing a full-fledged software asset management solution or hiring a licensing service provider.</maml:para>
+            <maml:para>SKU IDs and names are in accordance with https://learn.microsoft.com/entra/identity/users/licensing-service-plan-reference</maml:para>
         </maml:description>
         <command:syntax>
             <command:syntaxItem>
@@ -508,8 +508,30 @@
                 <command:parameterValue required="true">System.Management.Automation.SwitchParameter</command:parameterValue>
             </command:parameter>
         </command:parameters>
-        <command:inputTypes />
-        <command:returnValues />
+        <command:inputTypes>
+            <command:inputType>
+                <dev:type>
+                    <maml:name>None</maml:name>
+                    <maml:uri />
+                    <maml:description />
+                </dev:type>
+                <maml:description>
+                    <maml:para>Get-AzureADLicenseStatus doesn't take input from the pipeline</maml:para>
+                </maml:description>
+            </command:inputType>
+        </command:inputTypes>
+        <command:returnValues>
+            <command:returnValue>
+                <dev:type>
+                    <maml:name>System.String[]</maml:name>
+                    <maml:uri>https://learn.microsoft.com/dotnet/api/system.string</maml:uri>
+                    <maml:description />
+                </dev:type>
+                <maml:description>
+                    <maml:para>Get-AzureADLicenseStatus outputs log entries to the pipeline</maml:para>
+                </maml:description>
+            </command:returnValue>
+        </command:returnValues>
         <maml:alertSet>
             <maml:alert>
                 <maml:para>----- Custom type 'SKUPrice' for parameter 'SKUPrices' -----</maml:para>
