@@ -213,11 +213,16 @@ function Get-AADGroupMember {
     # Processing
     $groupMembers = [System.Collections.Generic.List[hashtable]]::new()
     foreach ($groupID in $GroupIDs) {
-        $URI = 'https://graph.microsoft.com/v1.0/groups/{0}/transitiveMembers?$select=id&$top={1}' -f $groupID, $pageSize
-        while ($null -ne $URI) {
-            $data = Invoke-MgGraphRequest -Method GET -Uri $URI
-            $groupMembers.AddRange([hashtable[]]($data.value))
-            $URI = $data['@odata.nextLink']
+        try {
+            $URI = 'https://graph.microsoft.com/v1.0/groups/{0}/transitiveMembers?$select=id&$top={1}' -f $groupID, $pageSize
+            while ($null -ne $URI) {
+                $data = Invoke-MgGraphRequest -Method GET -Uri $URI
+                $groupMembers.AddRange([hashtable[]]($data.value))
+                $URI = $data['@odata.nextLink']
+            }
+        }
+        catch {
+            Write-Message "Error '$($_.Exception.Response.StatusCode)' for group $groupID" -Type Error -Category InvalidData
         }
     }
     if ($groupMembers.Count -gt 0) {
@@ -985,7 +990,7 @@ function Get-AzureADLicenseStatus {
                 Write-Message "Analyzed $applicationCount applications"
                 # Entra ID P1/P2 based on users covered by Conditional Access
                 $conditionalAccessPolicyCount = 0
-                $URI = 'https://graph.microsoft.com/v1.0/identity/conditionalAccess/policies?$select=displayname,conditions&$filter=state eq ''enabled'''
+                $URI = 'https://graph.microsoft.com/v1.0/identity/conditionalAccess/policies?$select=conditions&$filter=state eq ''enabled'''
                 while ($null -ne $URI) {
                     # Retrieve Conditional Access policies
                     $data = Invoke-MgGraphRequest -Method GET -Uri $URI
