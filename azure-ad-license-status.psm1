@@ -110,8 +110,7 @@ function Write-Message {
         [string]$Message,
         [ValidateSet('Error', 'Verbose')]
         [string]$Type,
-        [ValidateSet('AuthenticationError', 'InvalidArgument', 'InvalidData')]
-        [string]$Category
+        [System.Management.Automation.ErrorCategory]$Category
     )
 
     $formattedMessage = '[{0:yyyy-MM-dd HH:mm:ss}] {1}{2}' -f
@@ -223,10 +222,10 @@ function Get-AADGroupMember {
         }
         catch {
             if ($_.Exception.Response.StatusCode -eq [System.Net.HttpStatusCode]::NotFound) {
-                Write-Message "Group $groupID not found" -Type Verbose
+                Write-Message "Group $groupID not found" -Type Error -Category ObjectNotFound
             }
             else {
-                Write-Message "Group $groupID caused error '$($_.Exception.Response.StatusCode)'" -Type Error -Category InvalidData
+                Write-Message "Group $groupID caused error '$($_.Exception.Response.StatusCode)'" -Type Error -Category ProtocolError
             }
         }
     }
@@ -585,17 +584,6 @@ function Get-AzureADLicenseStatus {
             foreach ($differenceSKU in $organizationSKUs | Where-Object{$_.skuId -ne $referenceSKU.skuId}) {
                 if ($null -ne ($referenceServicePlans = $referenceSKU.servicePlans | Where-Object{$_.appliesTo -eq 'User'}) -and
                 $null -ne ($differenceServicePlans = $differenceSKU.servicePlans | Where-Object{$_.appliesTo -eq 'User'})) {
-                    # Replace with 'IsSubsetOf'
-                    <#
-                    if ($null -ne ($comparisonSKU = Compare-Object -ReferenceObject $referenceServicePlans.servicePlanId -DifferenceObject $differenceServicePlans.servicePlanId -IncludeEqual) -and
-                    $comparisonSKU.SideIndicator -contains '==' -and
-                    $comparisonSKU.SideIndicator -notcontains '=>') {
-                        if (-not $superiorSKUs_organization.ContainsKey($differenceSKU.skuId)) {
-                            $superiorSKUs_organization.Add($differenceSKU.skuId, [System.Collections.Generic.List[guid]]::new())
-                        }
-                        $superiorSKUs_organization[$differenceSKU.skuId].Add($referenceSKU.skuId)
-                    }
-                    #>
                     $referenceServicePlanIDs = [System.Collections.Generic.HashSet[guid]]$referenceServicePlans.servicePlanId
                     $differenceServicePlanIDs = [System.Collections.Generic.HashSet[guid]]$differenceServicePlans.servicePlanId
                     if ($referenceServicePlanIDs.IsSupersetOf($differenceServicePlanIDs)) {
@@ -701,7 +689,7 @@ function Get-AzureADLicenseStatus {
             }
             else {
                 $reportsRetrieved = $false
-                Write-Message -Message 'Failed to retrieve usage reports' -Type Error -Category InvalidData
+                Write-Message -Message 'Failed to retrieve usage reports' -Type Error -Category ResourceUnavailable
             }
         }
         #endregion
@@ -733,19 +721,12 @@ function Get-AzureADLicenseStatus {
                     $userSKUs_interchangeable = @()
                     if ($null -ne $userSKUs -and
                     $null -ne $InterchangeableSKUs) {
-                        # Replace with 'IntersectWith'
-                        <#
-                        if ($null -ne ($comparison_interchangeable = Compare-Object -ReferenceObject $userSKUs -DifferenceObject $InterchangeableSKUs -ExcludeDifferent -IncludeEqual)) {
-                            $userSKUs_interchangeable = @($comparison_interchangeable.InputObject)
-                        }
-                        #>
                         $userSKUs_interchangeable = [System.Collections.Generic.HashSet[guid]]$userSKUs
                         $organizationSKUs_interchangeable = [System.Collections.Generic.HashSet[guid]]$InterchangeableSKUs
                         $userSKUs_interchangeable.IntersectWith($organizationSKUs_interchangeable)
                     }
                     # Identify optimizable SKUs, based on organization-level calculations
                     if ($null -ne ($comparison_replaceableOrganization = $userSKUs | Where-Object{$_ -in $superiorSKUs_organization.Keys} | ForEach-Object{$superiorSKUs_organization[$_]})) {
-                        # Replace with 'IntersectWith'
                         $userSKUs_optimizable = Compare-Object -ReferenceObject $userSKUs -DifferenceObject $comparison_replaceableOrganization -ExcludeDifferent -IncludeEqual | ForEach-Object{$superiorSKU = $_.InputObject; $superiorSKUs_organization.Keys | Where-Object{$superiorSKUs_organization[$_] -contains $superiorSKU}} | Where-Object{$_ -in $userSKUs} | Sort-Object -Unique
                     }
                     else {
@@ -766,17 +747,6 @@ function Get-AzureADLicenseStatus {
                         foreach ($differenceSKU in $skuid_enabledPlans.Keys | Where-Object{$_ -ne $referenceSKU}) {
                             if ($null -ne ($referenceServicePlans = $skuid_enabledPlans[$referenceSKU]) -and
                             $null -ne ($differenceServicePlans = $skuid_enabledPlans[$differenceSKU])) {
-                                # Replace with 'IsSubsetOf'
-                                <#
-                                if ($null -ne ($comparisonSKU = Compare-Object -ReferenceObject $referenceServicePlans -DifferenceObject $differenceServicePlans -IncludeEqual) -and
-                                $comparisonSKU.SideIndicator -contains '==' -and
-                                $comparisonSKU.SideIndicator -notcontains '=>') {
-                                    if (-not $superiorSKUs_user.ContainsKey($differenceSKU)) {
-                                        $superiorSKUs_user.Add($differenceSKU, [System.Collections.Generic.List[guid]]::new())
-                                    }
-                                    $superiorSKUs_user[$differenceSKU].Add($referenceSKU)
-                                }
-                                #>
                                 $referenceServicePlanIDs = [System.Collections.Generic.HashSet[guid]]$referenceServicePlans
                                 $differenceServicePlanIDs = [System.Collections.Generic.HashSet[guid]]$differenceServicePlans
                                 if ($referenceServicePlanIDs.IsSupersetOf($differenceServicePlanIDs)) {
@@ -789,7 +759,6 @@ function Get-AzureADLicenseStatus {
                         }
                     }
                     if ($null -ne ($comparison_replaceableUser = $userSKUs | Where-Object{$_ -in $superiorSKUs_user.Keys} | ForEach-Object{$superiorSKUs_user[$_]})) {
-                        # Replace with 'IntersectWith'
                         $userSKUs_removable = Compare-Object -ReferenceObject $userSKUs -DifferenceObject $comparison_replaceableUser -ExcludeDifferent -IncludeEqual | ForEach-Object{$superiorSKU = $_.InputObject; $superiorSKUs_user.Keys | Where-Object{$superiorSKUs_user[$_] -contains $superiorSKU}} | Where-Object{$_ -in $userSKUs} | Sort-Object -Unique
                     }
                     else {
@@ -953,11 +922,6 @@ function Get-AzureADLicenseStatus {
                     $URI = $data['@odata.nextLink']
                     # Analyze dynamic groups
                     if ($null -ne ($dynamicUserGroups = $dynamicGroups | Where-Object{$_.membershipRule -like '*user.*'})) {
-                        <#
-                        if ($null -ne ($matchedUsers = Compare-Object $humanUsers.id (Get-AADGroupMember -GroupIDs $dynamicUserGroups.id) -ExcludeDifferent -IncludeEqual)) {
-                            $AADP1Users.AddRange([guid[]]@($matchedUsers.InputObject))
-                        }
-                        #>
                         $dynamicGroupsUsersHashSet = [System.Collections.Generic.HashSet[guid]](Get-AADGroupMember -GroupIDs $dynamicUserGroups.id)
                         $dynamicGroupsUsersHashSet.IntersectWith($humanUsersHashSet)
                         if ($dynamicGroupsUsersHashSet.Count -gt 0) {
@@ -979,11 +943,6 @@ function Get-AzureADLicenseStatus {
                     foreach ($application in $applications) {
                         $applicationData = Invoke-MgGraphRequest -Method GET -Uri ('https://graph.microsoft.com/v1.0/servicePrincipals/{0}?$expand=appRoleAssignedTo&$select=id,appRoleAssignedTo' -f $application.id)
                         if ($null -ne ($applicationGroups = $applicationData.appRoleAssignedTo | Where-Object{$_.principalType -eq 'Group'})) {
-                            <#
-                            if ($null -ne ($matchedUsers = Compare-Object $humanUsers.id (Get-AADGroupMember -GroupIDs $applicationGroups.principalId) -ExcludeDifferent -IncludeEqual)) {
-                                $AADP1Users.AddRange([guid[]]@($matchedUsers.InputObject))
-                            }
-                            #>
                             $applicationUsersHashSet = [System.Collections.Generic.HashSet[guid]](Get-AADGroupMember -GroupIDs $applicationGroups.principalId)
                             $applicationUsersHashSet.IntersectWith($humanUsersHashSet)
                             if ($applicationUsersHashSet.Count -gt 0) {
@@ -1031,19 +990,6 @@ function Get-AzureADLicenseStatus {
                             else {
                                 $excludeGroupUsers = [guid[]]@()
                             }
-                            # Replace with 'ExceptWith'
-                            <#
-                            if ($null -ne ($conditionalAccessUsers = Compare-Object -ReferenceObject ([guid[]]$includeUsers + [guid[]]$includeGroupUsers) -DifferenceObject ([guid[]]$excludeUsers + [guid[]]$excludeGroupUsers) | Where-Object{$_.SideIndicator -eq '<='})) {
-                                if ($null -ne ($matchedUsers = Compare-Object $humanUsers.id $conditionalAccessUsers.InputObject -ExcludeDifferent -IncludeEqual)) {
-                                    if ($conditionalAccessPolicy.conditions.userRiskLevels.Count -gt 0 -or $conditionalAccessPolicy.conditions.signInRiskLevels.Count -gt 0) {
-                                        $AADP2Users.AddRange([guid[]]@($matchedUsers.InputObject))
-                                    }
-                                    else {
-                                        $AADP1Users.AddRange([guid[]]@($matchedUsers.InputObject))
-                                    }
-                                }
-                            }
-                            #>
                             $includeUsers_Complete = [System.Collections.Generic.HashSet[guid]][guid[]]@($includeUsers + $includeGroupUsers)
                             $excludeUsers_Complete = [System.Collections.Generic.HashSet[guid]][guid[]]@($excludeUsers + $excludeGroupUsers)
                             $includeUsers_Complete.ExceptWith($excludeUsers_Complete)
@@ -1069,15 +1015,10 @@ function Get-AzureADLicenseStatus {
                     $URI = $data['@odata.nextLink']
                     # Analyze role assignments
                     if ($null -ne ($eligibleRoleAssignments = $roleAssignments | Where-Object{$_.scheduleInfo.startDateTime -le [datetime]::Today -and ($_.scheduleInfo.expiration.endDateTime -ge [datetime]::Today -or $_.scheduleInfo.expiration.type -eq 'noExpiration')})) {
-                        <#
-                        if ($null -ne ($matchedUsers = Compare-Object $humanUsers.id $eligibleRoleAssignments.principalId -ExcludeDifferent -IncludeEqual)) {
-                            $AADP2Users.AddRange([guid[]]@($matchedUsers.InputObject))
-                        }
-                        #>
-                        $tmpUsersHashSet = [System.Collections.Generic.HashSet[guid]]@($eligibleRoleAssignments.principalId)
-                        $tmpUsersHashSet.IntersectWith($humanUsersHashSet)
-                        if ($tmpUsersHashSet.Count -gt 0) {
-                            $AADP2Users.AddRange([guid[]]@($tmpUsersHashSet))
+                        $roleAssignmentsUsersHashSet = [System.Collections.Generic.HashSet[guid]]@($eligibleRoleAssignments.principalId)
+                        $roleAssignmentsUsersHashSet.IntersectWith($humanUsersHashSet)
+                        if ($roleAssignmentsUsersHashSet.Count -gt 0) {
+                            $AADP2Users.AddRange([guid[]]@($roleAssignmentsUsersHashSet))
                         }
                     }
                 }
@@ -1105,7 +1046,6 @@ function Get-AzureADLicenseStatus {
                 Write-Message -Message 'Failed to authenticate with Exchange Online' -Type Error -Category AuthenticationError
             }
             if ($exchangeAuthentication) {
-                # Replace with 'IntersectWith'?
                 if ($null -ne (Compare-Object -ReferenceObject $organizationSKUs.servicePlans.servicePlanId -DifferenceObject @('f20fedf3-f3c3-43c3-8267-2bfdd51c0939', '8e0c0a52-6a6c-4d40-8370-dd62790dcd70') -ExcludeDifferent -IncludeEqual)) {
                     # Protected mailboxes
                     if ($null -ne ($organizationSKUs | Where-Object{@($_.servicePlans.servicePlanId) -contains '8e0c0a52-6a6c-4d40-8370-dd62790dcd70'})) {
