@@ -222,7 +222,12 @@ function Get-AADGroupMember {
             }
         }
         catch {
-            Write-Message "Error '$($_.Exception.Response.StatusCode)' for group $groupID" -Type Error -Category InvalidData
+            if ($_.Exception.Response.StatusCode -eq [System.Net.HttpStatusCode]::NotFound) {
+                Write-Message "Group $groupID not found" -Type Verbose
+            }
+            else {
+                Write-Message "Group $groupID caused error '$($_.Exception.Response.StatusCode)'" -Type Error -Category InvalidData
+            }
         }
     }
     if ($groupMembers.Count -gt 0) {
