@@ -464,12 +464,25 @@ function Get-AzureADLicenseStatus {
     [CmdletBinding(PositionalBinding = $false)]
     [OutputType([void])]
     param (
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = $true, ParameterSetName = 'AzureCertificate')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'LocalCertificate')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'LocalCertificateThumbprint')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'Secret')]
         [ValidateNotNullOrEmpty()]
         [guid]$DirectoryID,
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = $true, ParameterSetName = 'AzureCertificate')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'LocalCertificate')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'LocalCertificateThumbprint')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'Secret')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'UserManagedIdentity')]
         [ValidateNotNullOrEmpty()]
         [guid]$ApplicationID,
+        [Parameter(Mandatory = $true, ParameterSetName = 'SystemManagedIdentity')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'UserManagedIdentity')]
+        [switch]$ManagedIdentity,
+        [Parameter(Mandatory = $true, ParameterSetName = 'Secret')]
+        [ValidateNotNullOrEmpty()]
+        [securestring]$Secret,
         [Parameter(Mandatory = $true, ParameterSetName = 'AzureCertificate')]
         [ValidateNotNullOrEmpty()]
         [guid]$SubscriptionID,
@@ -536,13 +549,23 @@ function Get-AzureADLicenseStatus {
                 $azureCertificateSecret = Get-AzKeyVaultSecret -VaultName $KeyVaultName -Name $CertificateName -AsPlainText
                 $azureCertificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new([Convert]::FromBase64String($azureCertificateSecret))
                 Disconnect-AzAccount
-                $null = Connect-MgGraph -Certificate $azureCertificate -TenantId $DirectoryID -ClientId $ApplicationID -ErrorAction Stop
+                Connect-MgGraph -TenantId $DirectoryID -ClientId $ApplicationID -Certificate $azureCertificate -NoWelcome -ErrorAction Stop
             }
             'LocalCertificate' {
-                $null = Connect-MgGraph -Certificate $Certificate -TenantId $DirectoryID -ClientId $ApplicationID -ErrorAction Stop
+                Connect-MgGraph -TenantId $DirectoryID -ClientId $ApplicationID -Certificate $Certificate -NoWelcome -ErrorAction Stop
             }
             'LocalCertificateThumbprint' {
-                $null = Connect-MgGraph -CertificateThumbprint $CertificateThumbprint -TenantId $DirectoryID -ClientId $ApplicationID -ErrorAction Stop
+                Connect-MgGraph -TenantId $DirectoryID -ClientId $ApplicationID -CertificateThumbprint $CertificateThumbprint -NoWelcome -ErrorAction Stop
+            }
+            'Secret' {
+                $credential = [pscredential]::new($ApplicationID, $Secret)
+                Connect-MgGraph -TenantId $DirectoryID -ClientSecretCredential $credential -NoWelcome -ErrorAction Stop
+            }
+            'SystemManagedIdentity' {
+                Connect-MgGraph -Identity -NoWelcome -ErrorAction Stop
+            }
+            'UserManagedIdentity' {
+                Connect-MgGraph -Identity -ClientId $ApplicationID -NoWelcome -ErrorAction Stop
             }
         }
         $graphAuthentication = $true
@@ -896,6 +919,8 @@ function Get-AzureADLicenseStatus {
             $ATPUsers = [System.Collections.Generic.List[guid]]::new()
             $IntuneDevices = [System.Collections.Generic.List[guid]]::new()
             # 'Human' users based on parameters, based on 'Licensed User' in https://www.microsoft.com/licensing/terms/product/Glossary/all
+            # Idea: Identify them by grouping users based on some attribute and counting those as a single user: [hashtable[]](Invoke-MgGraphRequest -Method GET -Uri 'v1.0/users?$select=id,employeetype,onpremisesextensionattributes').value | Group-Object {$_.onpremisesextensionattributes.extensionattribute1}
+            # Idea: Identify them by assigned managers and employee/user type
             $URI = 'https://graph.microsoft.com/v1.0/users?$select=id&$filter={0}&top={1}&$count=true' -f (($HumanIdentifiers.AttributeName | ForEach-Object{"$_ in ('$(($HumanIdentifiers | Where-Object{$_.AttributeName}).AttributeValues -join ''',''')')"}) -join ' and '), $pageSize
             $humanUsers = [System.Collections.Generic.List[hashtable]]::new()
             try {
